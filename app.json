@@ -1,30 +1,75 @@
 {
   "expo": {
-    "name": "real-estate-mobile",
+    "name": "HomeSwipe",
     "slug": "real-estate-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "scheme": "homeswipe",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0066FF"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.smartrental.homeswipe",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Chúng tôi cần vị trí để tìm nhà gần bạn",
+        "NSCameraUsageDescription": "Cho phép truy cập camera để chụp ảnh nhà",
+        "NSPhotoLibraryUsageDescription": "Cho phép truy cập thư viện để chọn ảnh nhà",
+        "NSMicrophoneUsageDescription": "Cho phép ghi âm tin nhắn thoại",
+        "NSUserNotificationsUsageDescription": "Cho phép $(PRODUCT_NAME) gửi thông báo để bạn không bỏ lỡ tin nhắn và cập nhật quan trọng."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0066FF"
       },
+      "package": "com.smartrental.homeswipe",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECORD_AUDIO",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-dev-client",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Cho phép $(PRODUCT_NAME) truy cập vị trí để tìm nhà gần bạn."
+        }
+      ],
+      "expo-video",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0066FF",
+          "defaultChannel": "default",
+          "sounds": [],
+          "enableBackgroundRemoteNotifications": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
