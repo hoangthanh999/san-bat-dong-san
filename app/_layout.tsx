@@ -116,7 +116,30 @@ export default function RootLayout() {
                     name="notifications"
                     options={{ headerShown: false, animation: 'slide_from_right' }}
                 />
+                {/* KYC screens */}
+                <Stack.Screen name="kyc/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="kyc/upload-front" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="kyc/upload-back" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="kyc/info" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="kyc/pending" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                {/* Wallet screens */}
+                <Stack.Screen name="wallet/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="wallet/deposit" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="wallet/vnpay" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="wallet/success" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="wallet/failed" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="wallet/history" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                {/* Appointment screens */}
+                <Stack.Screen name="appointments/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="appointments/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                {/* Contract screens */}
+                <Stack.Screen name="contracts/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="contracts/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                {/* Package screens */}
+                <Stack.Screen name="packages/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="packages/boost/[roomId]" options={{ headerShown: false, animation: 'slide_from_right' }} />
                 <Stack.Screen name="+not-found" />
+
                 <Stack.Screen
                     name="(auth)/onboarding"
                     options={{ headerShown: false, animation: 'fade' }}

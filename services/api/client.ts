@@ -66,7 +66,7 @@ apiClient.interceptors.response.use(
         }
 
         // Handle other errors
-        const errorMessage = error.response?.data?.message || error.message || 'Đã xảy ra lỗi';
+        const errorMessage = (error as any).response?.data?.message || (error as any).message || 'Đã xảy ra lỗi';
 
         return Promise.reject({
             ...error,

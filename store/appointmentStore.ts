@@ -11,10 +11,12 @@ interface AppointmentState {
     hasMore: boolean;
     page: number;
 
-    fetchAppointments: (reset?: boolean) => Promise<void>;
-    createAppointment: (data: { roomId: number; scheduledAt: string; note?: string }) => Promise<void>;
+    fetchAppointments: (reset?: boolean, status?: string) => Promise<void>;
+    createAppointment: (data: { roomId: number; scheduledAt: string; note?: string; message?: string }) => Promise<void>;
     cancelAppointment: (id: number) => Promise<void>;
     confirmAppointment: (id: number) => Promise<void>;
+    rescheduleAppointment: (id: number, suggestedMeetTime: string) => Promise<void>;
+    acceptReschedule: (id: number) => Promise<void>;
 }
 
 export const useAppointmentStore = create<AppointmentState>((set, get) => ({
@@ -25,12 +27,12 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     hasMore: true,
     page: 0,
 
-    fetchAppointments: async (reset = false) => {
+    fetchAppointments: async (reset = false, status?: string) => {
         if (!reset && !get().hasMore) return;
         const page = reset ? 0 : get().page;
         set({ isLoading: true });
         try {
-            const data = await appointmentService.getMyAppointments(page);
+            const data = await appointmentService.getMyAppointments(page, 10, status);
             set(state => ({
                 appointments: reset ? data.content : [...state.appointments, ...data.content],
                 hasMore: !data.last,
@@ -51,14 +53,12 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
                 isSubmitting: false,
             }));
 
-            // Schedule local notification nhắc lịch hẹn (1 giờ trước)
-            // Bỏ qua lỗi nếu không schedule được
             scheduleAppointmentReminder({
                 appointmentId: appointment.id,
                 roomId: appointment.roomId,
-                roomTitle: `Phòng #${appointment.roomId}`,
+                roomTitle: appointment.roomTitle || `Phòng #${appointment.roomId}`,
                 scheduledAt: appointment.scheduledAt,
-                landlordName: 'Chủ nhà',
+                landlordName: appointment.landlordName || 'Chủ nhà',
             }).catch(console.warn);
         } catch (error: any) {
             set({ error: error.message || 'Đặt lịch thất bại', isSubmitting: false });
@@ -81,14 +81,37 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
 
     confirmAppointment: async (id: number) => {
         try {
-            await appointmentService.updateStatus(id, 'CONFIRMED');
+            const updated = await appointmentService.confirmAppointment(id);
             set(state => ({
-                appointments: state.appointments.map(a =>
-                    a.id === id ? { ...a, status: 'CONFIRMED' as const } : a
-                ),
+                appointments: state.appointments.map(a => a.id === id ? updated : a),
             }));
         } catch (error) {
             console.error('Confirm appointment error', error);
+            throw error;
+        }
+    },
+
+    rescheduleAppointment: async (id: number, suggestedMeetTime: string) => {
+        try {
+            const updated = await appointmentService.rescheduleAppointment(id, suggestedMeetTime);
+            set(state => ({
+                appointments: state.appointments.map(a => a.id === id ? updated : a),
+            }));
+        } catch (error) {
+            console.error('Reschedule appointment error', error);
+            throw error;
+        }
+    },
+
+    acceptReschedule: async (id: number) => {
+        try {
+            const updated = await appointmentService.acceptReschedule(id);
+            set(state => ({
+                appointments: state.appointments.map(a => a.id === id ? updated : a),
+            }));
+        } catch (error) {
+            console.error('Accept reschedule error', error);
+            throw error;
         }
     },
 }));

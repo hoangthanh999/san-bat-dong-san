@@ -33,8 +33,8 @@ function MiniRoomCard({ room, onPress }: { room: Room; onPress: () => void }) {
 
 function AppointmentChip({ appt }: { appt: Appointment }) {
     const date = new Date(appt.scheduledAt);
-    const statusColor = { PENDING: '#FF9500', CONFIRMED: '#22C55E', CANCELLED: '#EF4444', COMPLETED: '#0066FF' };
-    const statusLabel = { PENDING: 'Chờ xác nhận', CONFIRMED: 'Đã xác nhận', CANCELLED: 'Đã huỷ', COMPLETED: 'Hoàn thành' };
+    const statusColor: Record<string, string> = { PENDING: '#FF9500', CONFIRMED: '#22C55E', CANCELLED: '#EF4444', COMPLETED: '#0066FF', RESCHEDULED: '#8B5CF6' };
+    const statusLabel: Record<string, string> = { PENDING: 'Chờ xác nhận', CONFIRMED: 'Đã xác nhận', CANCELLED: 'Đã huỷ', COMPLETED: 'Hoàn thành', RESCHEDULED: 'Đề xuất giờ mới' };
     return (
         <View style={styles.apptCard}>
             <View style={styles.apptDateBox}>
@@ -269,17 +269,25 @@ export default function ProfileScreen() {
                 )}
 
                 {activeTab === 'appointments' && (
-                    appointments.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <Ionicons name="calendar-outline" size={48} color="#CCC" />
-                            <Text style={styles.emptyTitle}>Chưa có lịch hẹn</Text>
-                            <Text style={styles.emptySub}>Đặt lịch xem phòng từ màn hình chi tiết bất động sản</Text>
-                        </View>
-                    ) : (
-                        <View style={{ padding: 16, gap: 10 }}>
-                            {appointments.map(appt => <AppointmentChip key={appt.id} appt={appt} />)}
-                        </View>
-                    )
+                    <View>
+                        {appointments.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <Ionicons name="calendar-outline" size={48} color="#CCC" />
+                                <Text style={styles.emptyTitle}>Chưa có lịch hẹn</Text>
+                                <Text style={styles.emptySub}>Đặt lịch xem phòng từ màn hình chi tiết bất động sản</Text>
+                            </View>
+                        ) : (
+                            <View style={{ padding: 16, gap: 10 }}>
+                                {appointments.slice(0, 3).map(appt => <AppointmentChip key={appt.id} appt={appt} />)}
+                            </View>
+                        )}
+                        <TouchableOpacity
+                            style={styles.seeAllBtn}
+                            onPress={() => router.push('/appointments' as any)}
+                        >
+                            <Text style={styles.seeAllText}>Xem tất cả lịch hẹn →</Text>
+                        </TouchableOpacity>
+                    </View>
                 )}
             </View>
 
@@ -301,11 +309,40 @@ export default function ProfileScreen() {
                     />
                 </View>
 
+                {/* Account items */}
+                <Text style={styles.settingsGroupLabel}>Tài khoản</Text>
                 {[
                     { icon: 'person-outline', label: 'Thông tin cá nhân', onPress: () => router.push('/edit-profile' as any) },
+                    { icon: 'card-outline', label: 'Xác minh danh tính (KYC)', onPress: () => router.push('/kyc' as any) },
+                    { icon: 'wallet-outline', label: 'Ví điện tử', onPress: () => router.push('/wallet' as any) },
+                ].map(({ icon, label, onPress }) => (
+                    <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
+                        <Ionicons name={icon as any} size={20} color="#555" />
+                        <Text style={styles.settingsLabel}>{label}</Text>
+                        <Ionicons name="chevron-forward" size={18} color="#CCC" />
+                    </TouchableOpacity>
+                ))}
+
+                {/* Services */}
+                <Text style={styles.settingsGroupLabel}>Dịch vụ</Text>
+                {[
+                    { icon: 'calendar-outline', label: 'Lịch hẹn xem phòng', onPress: () => router.push('/appointments' as any) },
+                    { icon: 'document-text-outline', label: 'Hợp đồng của tôi', onPress: () => router.push('/contracts' as any) },
+                    { icon: 'star-outline', label: 'Gói dịch vụ & Boost tin', onPress: () => router.push('/packages' as any) },
+                ].map(({ icon, label, onPress }) => (
+                    <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
+                        <Ionicons name={icon as any} size={20} color="#555" />
+                        <Text style={styles.settingsLabel}>{label}</Text>
+                        <Ionicons name="chevron-forward" size={18} color="#CCC" />
+                    </TouchableOpacity>
+                ))}
+
+                {/* Support */}
+                <Text style={styles.settingsGroupLabel}>Hỗ trợ</Text>
+                {[
                     { icon: 'notifications-circle-outline', label: 'Lịch sử thông báo', onPress: () => router.push('/notifications' as any) },
-                    { icon: 'shield-outline', label: 'Bảo mật & Mật khẩu', onPress: () => { } },
-                    { icon: 'help-circle-outline', label: 'Hỗ trợ', onPress: () => { } },
+                    { icon: 'shield-outline', label: 'Bảo mật & Mật khẩu', onPress: () => {} },
+                    { icon: 'help-circle-outline', label: 'Hỗ trợ', onPress: () => {} },
                 ].map(({ icon, label, onPress }) => (
                     <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
                         <Ionicons name={icon as any} size={20} color="#555" />
@@ -395,4 +432,7 @@ const styles = StyleSheet.create({
     settingsLabel: { fontSize: 15, color: '#333' },
     logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, marginTop: 4 },
     logoutText: { fontSize: 15, color: '#EF4444', fontWeight: '600' },
+    seeAllBtn: { paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' as const },
+    seeAllText: { fontSize: 14, color: '#0066FF', fontWeight: '600' as const },
+    settingsGroupLabel: { fontSize: 12, fontWeight: '700' as const, color: '#AAA', textTransform: 'uppercase' as const, letterSpacing: 0.6, paddingHorizontal: 14, paddingTop: 16, paddingBottom: 4 },
 });

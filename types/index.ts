@@ -140,6 +140,8 @@ export interface Review {
     userAvatar?: string;
     rating: number;
     comment: string;
+    reviewImages?: string[];
+    landlordReply?: string;
     reply?: string;
     createdAt: string;
 }
@@ -157,11 +159,18 @@ export interface Favorite {
 export interface Appointment {
     id: number;
     roomId: number;
+    roomTitle?: string;
+    roomImage?: string;
     tenantId: number;
+    tenantName?: string;
+    tenantAvatar?: string;
     landlordId: number;
+    landlordName?: string;
     scheduledAt: string;
+    suggestedMeetTime?: string;
     note?: string;
-    status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED';
+    message?: string;
+    status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'RESCHEDULED';
     createdAt: string;
 }
 
@@ -250,4 +259,92 @@ export interface Notification {
 export interface PushTokenRequest {
     token: string;
     platform: 'ios' | 'android';
+}
+
+// KYC Types
+export type KYCStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+
+export interface KYCSubmitData {
+    citizenId: string;
+    fullName: string;
+    dateOfBirth: string;
+    frontImageBase64: string;
+    backImageBase64: string;
+}
+
+export interface KYCStatusResponse {
+    kycStatus: KYCStatus;
+    citizenId?: string;
+    fullName?: string;
+    rejectedReason?: string;
+    updatedAt?: string;
+}
+
+// Wallet & Transaction Types
+export type TransactionType = 'DEPOSIT' | 'POST_FEE' | 'MEMBERSHIP' | 'BOOST' | 'REFUND';
+export type TransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+
+export interface Transaction {
+    id: number;
+    type: TransactionType;
+    amount: number;
+    status: TransactionStatus;
+    description?: string;
+    referenceCode?: string;
+    roomTitle?: string;
+    createdAt: string;
+}
+
+export interface WalletBalance {
+    balance: number;
+    userId: number;
+}
+
+export interface VNPayPaymentResponse {
+    paymentUrl: string;
+    orderId?: string;
+}
+
+// Contract Types
+export type ContractStatus = 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
+
+export interface Contract {
+    id: number;
+    roomId: number;
+    roomTitle?: string;
+    roomAddress?: string;
+    roomImage?: string;
+    landlordId: number;
+    landlordName?: string;
+    tenantId: number;
+    tenantName?: string;
+    startDate: string;
+    endDate: string;
+    monthlyRent: number;
+    deposit: number;
+    electricityPrice?: number;
+    waterPrice?: number;
+    garbageFee?: number;
+    wifiFee?: number;
+    status: ContractStatus;
+    createdAt: string;
+}
+
+// Service Package Types
+export type PackageType = 'MEMBERSHIP' | 'ROOM_PROMOTION';
+
+export interface ServicePackage {
+    id: number;
+    name: string;
+    type: PackageType;
+    price: number;
+    durationDays: number;
+    description?: string;
+    features?: string[];
+    isPopular?: boolean;
+}
+
+export interface BoostRoom {
+    roomId: number;
+    packageId: number;
 }

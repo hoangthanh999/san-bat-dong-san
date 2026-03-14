@@ -531,20 +531,38 @@ export default function PropertyDetailScreen() {
                     <Text style={styles.bottomPrice}>{formatPrice(room.price)}</Text>
                     <Text style={styles.bottomUnit}>/tháng</Text>
                 </View>
-                <View style={styles.bottomBtns}>
-                    <TouchableOpacity style={styles.scheduleBtn} onPress={() => {
-                        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
-                        setShowBookingModal(true);
-                    }}>
-                        <Ionicons name="calendar-outline" size={18} color="#0066FF" />
-                        <Text style={styles.scheduleBtnText}>Đặt lịch</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
-                        <Ionicons name="chatbubble-ellipses" size={18} color="white" />
-                        <Text style={styles.chatBtnText}>Chat ngay</Text>
-                    </TouchableOpacity>
-                </View>
+                {/* If user is the landlord of this room: show Boost + Edit */}
+                {user?.id === room.landlord?.id ? (
+                    <View style={styles.bottomBtns}>
+                        <TouchableOpacity
+                            style={styles.scheduleBtn}
+                            onPress={() => router.push(`/packages/boost/${roomId}` as any)}
+                        >
+                            <Ionicons name="rocket-outline" size={18} color="#0066FF" />
+                            <Text style={styles.scheduleBtnText}>Boost tin</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/edit-profile` as any)}>
+                            <Ionicons name="create-outline" size={18} color="white" />
+                            <Text style={styles.chatBtnText}>Sửa thông tin</Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View style={styles.bottomBtns}>
+                        <TouchableOpacity style={styles.scheduleBtn} onPress={() => {
+                            if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+                            setShowBookingModal(true);
+                        }}>
+                            <Ionicons name="calendar-outline" size={18} color="#0066FF" />
+                            <Text style={styles.scheduleBtnText}>Đặt lịch</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
+                            <Ionicons name="chatbubble-ellipses" size={18} color="white" />
+                            <Text style={styles.chatBtnText}>Chat ngay</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </View>
+
 
             {/* Full Map Modal */}
             <Modal visible={showFullMap} animationType="slide" onRequestClose={() => setShowFullMap(false)}>

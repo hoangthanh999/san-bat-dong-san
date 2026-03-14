@@ -105,4 +105,23 @@ export const API_ENDPOINTS = {
     NOTIFICATION_READ_ALL: '/notifications/read-all',
     NOTIFICATION_UNREAD_COUNT: '/notifications/unread-count',
     PUSH_TOKEN: '/notifications/push-token',
+
+    // KYC
+    KYC_STATUS: '/kyc/status',
+    KYC_SUBMIT: '/kyc/submit',
+
+    // Wallet
+    WALLET_BALANCE: '/wallet/balance',
+    WALLET_VNPAY_CREATE: '/wallet/vnpay/create',
+    WALLET_TRANSACTIONS: '/wallet/transactions',
+
+    // Contracts
+    CONTRACTS: '/contracts',
+    CONTRACT_BY_ID: (id: number) => `/contracts/${id}`,
+    CONTRACT_PDF: (id: number) => `/contracts/${id}/pdf`,
+
+    // Service Packages
+    PACKAGES: '/service-packages',
+    PACKAGE_PURCHASE: (id: number) => `/service-packages/${id}/purchase`,
+    PACKAGE_BOOST: '/rooms/boost',
 };
