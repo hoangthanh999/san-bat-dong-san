@@ -39,7 +39,8 @@ export const useContractStore = create<ContractState>((set, get) => ({
                 isLoading: false,
             }));
         } catch (error: any) {
-            set({ error: error.message, isLoading: false });
+            set({ error: error.message || 'Tải danh sách hợp đồng thất bại', isLoading: false });
+            throw error;
         }
     },
 
@@ -49,7 +50,8 @@ export const useContractStore = create<ContractState>((set, get) => ({
             const data = await contractService.getContractDetail(id);
             set({ selectedContract: data, isLoadingDetail: false });
         } catch (error: any) {
-            set({ error: error.message, isLoadingDetail: false });
+            set({ error: error.message || 'Tải chi tiết hợp đồng thất bại', isLoadingDetail: false });
+            throw error;
         }
     },
 

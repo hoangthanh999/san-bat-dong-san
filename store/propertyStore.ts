@@ -90,9 +90,10 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
     fetchRoomDetail: async (id: number) => {
         set({ isLoading: true, error: null, currentRoom: null });
         try {
-            const response = await roomService.getRoomDetail(id);
+            // roomService.getRoomDetail giờ trả về Room trực tiếp (đã unwrap)
+            const room = await roomService.getRoomDetail(id);
             set({
-                currentRoom: response.data,
+                currentRoom: room,
                 isLoading: false
             });
         } catch (error: any) {
@@ -134,11 +135,8 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
     toggleFavorite: async (id: number) => {
         try {
             await roomService.toggleFavorite(id);
-            // Optimistic update logic if needed
-            // Or just invalidate data
         } catch (error: any) {
             console.error('Lỗi khi thêm vào yêu thích', error);
-            // Revert change?
         }
     },
 }));

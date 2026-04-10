@@ -20,8 +20,8 @@ export default function PropertyMarker({ item, onPress, isSelected }: PropertyMa
     return (
         <Marker
             coordinate={{
-                latitude: item.location.latitude,
-                longitude: item.location.longitude,
+                latitude: item.latitude,
+                longitude: item.longitude,
             }}
             onPress={onPress}
             tracksViewChanges={false} // Optimization

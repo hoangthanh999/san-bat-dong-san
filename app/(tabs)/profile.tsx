@@ -199,8 +199,8 @@ export default function ProfileScreen() {
             {/* Role Badge */}
             <View style={styles.roleBadgeRow}>
                 <View style={styles.roleBadge}>
-                    <Ionicons name={user?.role === 'ADMIN' ? 'shield' : user?.role === 'LANDLORD' ? 'home' : 'person'} size={14} color="white" />
-                    <Text style={styles.roleText}>{user?.role === 'ADMIN' ? 'Quản trị viên' : user?.role === 'LANDLORD' ? 'Chủ nhà' : 'Người thuê'}</Text>
+                    <Ionicons name={user?.role === 'ADMIN' ? 'shield' : user?.role === 'OWNER' ? 'home' : 'person'} size={14} color="white" />
+                    <Text style={styles.roleText}>{user?.role === 'ADMIN' ? 'Quản trị viên' : user?.role === 'OWNER' ? 'Chủ nhà' : 'Người thuê'}</Text>
                 </View>
                 {(displayUser as any)?.walletBalance !== undefined && (
                     <View style={styles.walletBadge}>
@@ -341,8 +341,8 @@ export default function ProfileScreen() {
                 <Text style={styles.settingsGroupLabel}>Hỗ trợ</Text>
                 {[
                     { icon: 'notifications-circle-outline', label: 'Lịch sử thông báo', onPress: () => router.push('/notifications' as any) },
-                    { icon: 'shield-outline', label: 'Bảo mật & Mật khẩu', onPress: () => {} },
-                    { icon: 'help-circle-outline', label: 'Hỗ trợ', onPress: () => {} },
+                    { icon: 'shield-outline', label: 'Bảo mật & Mật khẩu', onPress: () => router.push('/settings/security' as any) },
+                    { icon: 'help-circle-outline', label: 'Hỗ trợ', onPress: () => { } },
                 ].map(({ icon, label, onPress }) => (
                     <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
                         <Ionicons name={icon as any} size={20} color="#555" />

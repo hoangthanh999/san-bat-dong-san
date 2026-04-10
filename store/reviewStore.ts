@@ -11,7 +11,7 @@ interface ReviewState {
     hasMore: Record<number, boolean>;
 
     fetchReviews: (roomId: number, reset?: boolean) => Promise<void>;
-    addReview: (roomId: number, rating: number, comment: string) => Promise<void>;
+    addReview: (roomId: number, rating: number, comment: string, reviewImages?: string[]) => Promise<void>;
     replyReview: (reviewId: number, roomId: number, reply: string) => Promise<void>;
     deleteReview: (reviewId: number, roomId: number) => Promise<void>;
 }
@@ -45,10 +45,10 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         }
     },
 
-    addReview: async (roomId: number, rating: number, comment: string) => {
+    addReview: async (roomId: number, rating: number, comment: string, reviewImages?: string[]) => {
         set({ isSubmitting: true, error: null });
         try {
-            const review = await reviewService.addReview(roomId, rating, comment);
+            const review = await reviewService.addReview(roomId, rating, comment, reviewImages);
             set(state => ({
                 reviewsByRoom: {
                     ...state.reviewsByRoom,
@@ -75,7 +75,8 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
                 },
             }));
         } catch (error: any) {
-            console.error('Reply review error', error);
+            set({ error: error.message || 'Phản hồi đánh giá thất bại' });
+            throw error;
         }
     },
 

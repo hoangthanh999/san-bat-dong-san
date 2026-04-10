@@ -74,12 +74,14 @@ export default function ContractsScreen() {
     const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
-        fetchContracts(true, activeTab === 'ALL' ? undefined : activeTab);
+        fetchContracts(true, activeTab === 'ALL' ? undefined : activeTab).catch(() => {});
     }, [activeTab]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchContracts(true, activeTab === 'ALL' ? undefined : activeTab);
+        try {
+            await fetchContracts(true, activeTab === 'ALL' ? undefined : activeTab);
+        } catch {}
         setRefreshing(false);
     };
 

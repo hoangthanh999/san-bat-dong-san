@@ -111,10 +111,11 @@ export default function FeedScreen() {
                         progressBackgroundColor="rgba(0,0,0,0.5)"
                     />
                 }
+                removeClippedSubviews={false}
                 windowSize={3}
                 initialNumToRender={1}
                 maxToRenderPerBatch={1}
-                removeClippedSubviews
+              
             />
         </View>
     );
@@ -189,14 +190,18 @@ const MOCK_ROOMS: Room[] = [
         price: 15000000,
         deposit: 30000000,
         area: 85,
-        address: 'Vinhomes Central Park, Bình Thạnh, TP.HCM',
+        province: 'Hồ Chí Minh',
+        district: 'Quận Bình Thạnh',
+        ward: 'Phường 22',
+        addressDetail: 'Vinhomes Central Park',
+        latitude: 10.795,
+        longitude: 106.72,
         images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop'],
         videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-living-room-with-a-fireplace-and-christmas-decorations-2780-large.mp4',
-        location: { latitude: 10.795, longitude: 106.72 },
         rentalType: 'WHOLE',
         status: 'ACTIVE',
         amenities: ['Pool', 'Gym', 'Parking', 'WiFi'],
-        landlord: {
+        landlordInfo: {
             id: 101,
             fullName: 'Nguyễn Văn A',
             avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
@@ -206,7 +211,7 @@ const MOCK_ROOMS: Room[] = [
         numBathrooms: 2,
         averageRating: 4.8,
         totalReviews: 12,
-        createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
     },
     {
         id: 2,
@@ -215,12 +220,16 @@ const MOCK_ROOMS: Room[] = [
         price: 3500000,
         deposit: 3500000,
         area: 25,
-        address: 'Lý Thường Kiệt, Quận 10, TP.HCM',
+        province: 'Hồ Chí Minh',
+        district: 'Quận 10',
+        ward: 'Phường 12',
+        addressDetail: 'Lý Thường Kiệt',
+        latitude: 10.772,
+        longitude: 106.658,
         images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&auto=format&fit=crop'],
-        location: { latitude: 10.772, longitude: 106.658 },
         rentalType: 'WHOLE',
         status: 'ACTIVE',
-        landlord: {
+        landlordInfo: {
             id: 102,
             fullName: 'Trần Thị B',
             avatarUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
@@ -230,7 +239,7 @@ const MOCK_ROOMS: Room[] = [
         numBathrooms: 1,
         averageRating: 4.2,
         totalReviews: 5,
-        createdAt: new Date().toISOString(), // Just now → "Mới đăng"
+        createdAt: new Date().toISOString(),
     },
     {
         id: 3,
@@ -239,13 +248,17 @@ const MOCK_ROOMS: Room[] = [
         price: 25000000,
         deposit: 50000000,
         area: 120,
-        address: 'Nguyễn Văn Linh, Quận 7, TP.HCM',
+        province: 'Hồ Chí Minh',
+        district: 'Quận 7',
+        ward: 'Phường Tân Phong',
+        addressDetail: 'Nguyễn Văn Linh',
+        latitude: 10.73,
+        longitude: 106.7,
         images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop'],
         videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-modern-apartment-with-a-view-of-the-city-at-night-3456-large.mp4',
-        location: { latitude: 10.73, longitude: 106.7 },
         rentalType: 'WHOLE',
         status: 'ACTIVE',
-        landlord: {
+        landlordInfo: {
             id: 103,
             fullName: 'Lê Văn C',
             avatarUrl: 'https://randomuser.me/api/portraits/men/86.jpg',
@@ -264,13 +277,17 @@ const MOCK_ROOMS: Room[] = [
         price: 8500000,
         deposit: 17000000,
         area: 35,
-        address: 'Điện Biên Phủ, Bình Thạnh, TP.HCM',
+        province: 'Hồ Chí Minh',
+        district: 'Quận Bình Thạnh',
+        ward: 'Phường 22',
+        addressDetail: 'Điện Biên Phủ',
+        latitude: 10.789,
+        longitude: 106.715,
         images: ['https://images.unsplash.com/photo-1560448205-4d9b3e6bb6db?w=800&auto=format&fit=crop'],
-        location: { latitude: 10.789, longitude: 106.715 },
         rentalType: 'WHOLE',
         status: 'ACTIVE',
         amenities: ['WiFi', 'Điều hoà', 'Bếp', 'Máy giặt'],
-        landlord: {
+        landlordInfo: {
             id: 104,
             fullName: 'Phạm Thị D',
             avatarUrl: 'https://randomuser.me/api/portraits/women/65.jpg',

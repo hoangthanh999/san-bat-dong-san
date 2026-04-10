@@ -95,7 +95,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     // 6. Lấy Expo Push Token
     try {
         const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: 'your-expo-project-id', // Thay bằng EAS project ID thật
+            projectId: '02500ffe-d6bd-4cd1-9073-75858fa35112', // Thay bằng EAS project ID thật
         });
         const token = tokenData.data;
         console.log('[PushNotif] Expo Push Token:', token);
@@ -192,25 +192,42 @@ export function handleNotificationNavigation(router: any, data: any) {
     if (!data) return;
 
     try {
-        const { type, roomId, chatPartnerId } = data;
+        const { type, roomId, chatPartnerId, appointmentId, contractId, transactionId } = data;
 
+        // Deep link by specific ID first
+        if (appointmentId) {
+            router.push(`/appointments/${appointmentId}`);
+            return;
+        }
+        if (contractId) {
+            router.push(`/contracts/${contractId}`);
+            return;
+        }
+        if (transactionId) {
+            router.push('/wallet/history');
+            return;
+        }
+        if (chatPartnerId) {
+            router.push(`/chat/${chatPartnerId}`);
+            return;
+        }
+        if (roomId) {
+            router.push(`/property/${roomId}`);
+            return;
+        }
+
+        // Fallback by type
         switch (type) {
-            case 'CHAT':
-                if (chatPartnerId) {
-                    router.push(`/chat/${chatPartnerId}`);
-                }
-                break;
-
             case 'APPOINTMENT':
             case 'APPOINTMENT_REMINDER':
-            case 'REVIEW':
-            case 'ROOM_APPROVED':
-            case 'ROOM_REJECTED':
-                if (roomId) {
-                    router.push(`/property/${roomId}`);
-                }
+                router.push('/appointments');
                 break;
-
+            case 'CONTRACT':
+                router.push('/contracts');
+                break;
+            case 'BILL':
+                router.push('/wallet');
+                break;
             case 'SYSTEM':
             default:
                 router.push('/notifications');

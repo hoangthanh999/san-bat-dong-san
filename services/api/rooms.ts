@@ -1,94 +1,86 @@
-import apiClient from './client';
+import propertyClient from './propertyClient';
 import { API_ENDPOINTS } from '../../constants';
-import { Room, RoomFilters, SearchParams, PaginatedResponse, ApiResponse } from '../../types';
+import { Room, PropertyRequestDTO, SearchParams, PaginatedResponse } from '../../types';
 
 export const roomService = {
-    // Get all rooms (paginated)
+    // Get all properties (paginated) - public
     getRooms: async (params: SearchParams): Promise<PaginatedResponse<Room>> => {
-        const response = await apiClient.get<PaginatedResponse<Room>>(API_ENDPOINTS.ROOMS, {
-            params,
+        const response = await propertyClient.get<PaginatedResponse<Room>>(API_ENDPOINTS.PROPERTIES, {
+            params: { page: params.page || 0, size: params.size || 10 },
         });
         return response.data;
     },
 
-    // Get room detail
-    getRoomDetail: async (id: number): Promise<ApiResponse<Room>> => {
-        const response = await apiClient.get<ApiResponse<Room>>(API_ENDPOINTS.ROOM_DETAIL(id));
-        return response.data;
+    // Get property detail - public
+    getRoomDetail: async (id: number): Promise<Room> => {
+        const response = await propertyClient.get<Room>(API_ENDPOINTS.PROPERTY_DETAIL(id));
+        return response.data; // đã unwrap result
     },
 
-    // Search rooms
+    // Search properties (nâng cao) - public
     searchRooms: async (params: SearchParams): Promise<PaginatedResponse<Room>> => {
-        const response = await apiClient.get<PaginatedResponse<Room>>(API_ENDPOINTS.ROOMS_SEARCH, {
+        const response = await propertyClient.get<PaginatedResponse<Room>>(API_ENDPOINTS.PROPERTIES_SEARCH, {
             params,
         });
         return response.data;
     },
 
-    // Get featured rooms (e.g. videos)
-    getFeaturedRooms: async (params: SearchParams): Promise<PaginatedResponse<Room>> => {
-        const response = await apiClient.get<PaginatedResponse<Room>>(API_ENDPOINTS.ROOMS_VIDEOS, {
-            params,
-        });
+    // Get properties by landlord - public
+    getPropertiesByLandlord: async (landlordId: number, page = 0, size = 10): Promise<PaginatedResponse<Room>> => {
+        const response = await propertyClient.get<PaginatedResponse<Room>>(
+            API_ENDPOINTS.PROPERTIES_BY_LANDLORD(landlordId),
+            { params: { page, size } }
+        );
         return response.data;
     },
 
-    // Get my rooms (for landlord)
-    getMyRooms: async (params: SearchParams): Promise<PaginatedResponse<Room>> => {
-        const response = await apiClient.get<PaginatedResponse<Room>>(API_ENDPOINTS.ROOMS_MY, {
-            params,
-        });
+    // Create property - yêu cầu JWT (OWNER)
+    createRoom: async (data: PropertyRequestDTO): Promise<Room> => {
+        // Backend nhận JSON, không phải FormData
+        const response = await propertyClient.post<Room>(API_ENDPOINTS.PROPERTIES, data);
         return response.data;
     },
 
-    // Create room
-    createRoom: async (roomData: FormData): Promise<ApiResponse<Room>> => {
-        const response = await apiClient.post<ApiResponse<Room>>(API_ENDPOINTS.ROOMS, roomData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
+    // Update property - yêu cầu JWT (OWNER)
+    updateRoom: async (id: number, data: PropertyRequestDTO): Promise<Room> => {
+        const response = await propertyClient.put<Room>(API_ENDPOINTS.PROPERTY_DETAIL(id), data);
         return response.data;
     },
 
-    // Update room
-    updateRoom: async (id: number, roomData: FormData): Promise<ApiResponse<Room>> => {
-        const response = await apiClient.put<ApiResponse<Room>>(API_ENDPOINTS.ROOM_DETAIL(id), roomData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
-        return response.data;
-    },
-
-    // Delete room
+    // Delete property - yêu cầu JWT (OWNER)
     deleteRoom: async (id: number): Promise<void> => {
-        await apiClient.delete(API_ENDPOINTS.ROOM_DETAIL(id));
+        await propertyClient.delete(API_ENDPOINTS.PROPERTY_DETAIL(id));
     },
+
+    // Update property status - yêu cầu JWT
+    // Backend dùng PATCH + query param
+    updateStatus: async (id: number, status: string): Promise<void> => {
+        await propertyClient.patch(API_ENDPOINTS.PROPERTY_STATUS(id), null, {
+            params: { status },
+        });
+    },
+
+    // Admin: Get pending properties - yêu cầu ADMIN JWT
+    getPendingProperties: async (page = 0, size = 10): Promise<PaginatedResponse<Room>> => {
+        const response = await propertyClient.get<PaginatedResponse<Room>>(
+            API_ENDPOINTS.PROPERTIES_ADMIN_PENDING,
+            { params: { page, size } }
+        );
+        return response.data;
+    },
+
+    // === Các method giữ cho tương lai (chưa có backend) ===
 
     // Toggle favorite
     toggleFavorite: async (roomId: number): Promise<void> => {
-        await apiClient.post(API_ENDPOINTS.FAVORITE_TOGGLE(roomId));
+        // TODO: Chưa có favorite API trong backend
+        console.warn('[roomService] toggleFavorite: API chưa có trong backend');
     },
 
     // Check if room is favorited
     checkFavorite: async (roomId: number): Promise<boolean> => {
-        const response = await apiClient.get<{ isFavorited: boolean }>(API_ENDPOINTS.FAVORITE_CHECK(roomId));
-        return response.data.isFavorited;
-    },
-
-    // Push room to top
-    pushRoom: async (id: number): Promise<void> => {
-        await apiClient.post(API_ENDPOINTS.ROOM_PUSH(id));
-    },
-
-    // Update room status
-    updateStatus: async (id: number, status: string): Promise<void> => {
-        await apiClient.put(API_ENDPOINTS.ROOM_STATUS(id), { status });
-    },
-
-    // Track room view
-    trackView: async (id: number): Promise<void> => {
-        await apiClient.post(API_ENDPOINTS.ROOM_VIEW(id));
+        // TODO: Chưa có favorite API trong backend
+        console.warn('[roomService] checkFavorite: API chưa có trong backend');
+        return false;
     },
 };

@@ -32,33 +32,37 @@ const FILTER_CHIPS = [
 const MOCK_MAP_ROOMS: Room[] = [
     {
         id: 1, title: 'Căn hộ cao cấp view sông', price: 15000000, area: 85, deposit: 30000000,
-        address: 'Vinhomes Central Park, Bình Thạnh', images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400'],
-        location: { latitude: 10.795, longitude: 106.72 }, rentalType: 'WHOLE', status: 'ACTIVE',
-        landlord: { id: 101, fullName: 'Nguyễn Văn A', avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg', phone: '0901234567' },
+        province: 'TP.HCM', district: 'Bình Thạnh', ward: '', addressDetail: 'Vinhomes Central Park',
+        images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400'],
+        latitude: 10.795, longitude: 106.72, rentalType: 'WHOLE', status: 'ACTIVE',
+        landlordInfo: { id: 101, fullName: 'Nguyễn Văn A', avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg', phone: '0901234567' },
         numBedrooms: 2, numBathrooms: 2, averageRating: 4.8, totalReviews: 12, createdAt: new Date().toISOString(),
         description: '', amenities: ['Pool', 'Gym'],
     },
     {
         id: 2, title: 'Phòng trọ gần ĐH Bách Khoa', price: 3500000, area: 25, deposit: 3500000,
-        address: 'Lý Thường Kiệt, Quận 10', images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400'],
-        location: { latitude: 10.772, longitude: 106.658 }, rentalType: 'WHOLE', status: 'ACTIVE',
-        landlord: { id: 102, fullName: 'Trần Thị B', phone: '0912345678' },
+        province: 'TP.HCM', district: 'Quận 10', ward: '', addressDetail: 'Lý Thường Kiệt',
+        images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400'],
+        latitude: 10.772, longitude: 106.658, rentalType: 'WHOLE', status: 'ACTIVE',
+        landlordInfo: { id: 102, fullName: 'Trần Thị B', phone: '0912345678' },
         numBedrooms: 1, numBathrooms: 1, averageRating: 4.2, totalReviews: 5, createdAt: new Date().toISOString(),
         description: '',
     },
     {
         id: 3, title: 'Nhà mặt tiền kinh doanh Q7', price: 25000000, area: 120, deposit: 50000000,
-        address: 'Nguyễn Văn Linh, Quận 7', images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400'],
-        location: { latitude: 10.73, longitude: 106.7 }, rentalType: 'WHOLE', status: 'ACTIVE',
-        landlord: { id: 103, fullName: 'Lê Văn C', phone: '0987654321' },
+        province: 'TP.HCM', district: 'Quận 7', ward: '', addressDetail: 'Nguyễn Văn Linh',
+        images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400'],
+        latitude: 10.73, longitude: 106.7, rentalType: 'WHOLE', status: 'ACTIVE',
+        landlordInfo: { id: 103, fullName: 'Lê Văn C', phone: '0987654321' },
         numBedrooms: 4, numBathrooms: 3, averageRating: 5.0, totalReviews: 2, createdAt: new Date().toISOString(),
         description: '',
     },
     {
         id: 4, title: 'Studio hiện đại gần Metro', price: 8500000, area: 35, deposit: 17000000,
-        address: 'Điện Biên Phủ, Bình Thạnh', images: ['https://images.unsplash.com/photo-1560448205-4d9b3e6bb6db?w=400'],
-        location: { latitude: 10.789, longitude: 106.715 }, rentalType: 'WHOLE', status: 'ACTIVE',
-        landlord: { id: 104, fullName: 'Phạm Thị D', phone: '0933445566' },
+        province: 'TP.HCM', district: 'Bình Thạnh', ward: '', addressDetail: 'Điện Biên Phủ',
+        images: ['https://images.unsplash.com/photo-1560448205-4d9b3e6bb6db?w=400'],
+        latitude: 10.789, longitude: 106.715, rentalType: 'WHOLE', status: 'ACTIVE',
+        landlordInfo: { id: 104, fullName: 'Phạm Thị D', phone: '0933445566' },
         numBedrooms: 0, numBathrooms: 1, averageRating: 4.5, totalReviews: 8, createdAt: new Date().toISOString(),
         description: '',
     },
@@ -126,8 +130,8 @@ export default function MapScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setSelectedRoom(room);
         mapRef.current?.animateToRegion({
-            latitude: room.location.latitude,
-            longitude: room.location.longitude,
+            latitude: room.latitude,
+            longitude: room.longitude,
             latitudeDelta: 0.015,
             longitudeDelta: 0.015,
         }, 500);
@@ -155,8 +159,8 @@ export default function MapScreen() {
                     <Marker
                         key={room.id}
                         coordinate={{
-                            latitude: room.location.latitude,
-                            longitude: room.location.longitude,
+                            latitude: room.latitude,
+                            longitude: room.longitude,
                         }}
                         onPress={() => handleMarkerPress(room)}
                         tracksViewChanges={false}
@@ -261,7 +265,7 @@ export default function MapScreen() {
                             {selectedRoom.title}
                         </Text>
                         <Text style={styles.cardAddress} numberOfLines={1}>
-                            📍 {selectedRoom.address}
+                            📍 {[selectedRoom.addressDetail, selectedRoom.district, selectedRoom.province].filter(Boolean).join(', ')}
                         </Text>
                         <View style={styles.cardMeta}>
                             {selectedRoom.numBedrooms !== undefined && (

@@ -142,7 +142,13 @@ export default function AppointmentsScreen() {
             { text: 'Không', style: 'cancel' },
             {
                 text: 'Hủy lịch', style: 'destructive',
-                onPress: () => cancelAppointment(id),
+                onPress: async () => {
+                    try {
+                        await cancelAppointment(id);
+                    } catch (e: any) {
+                        Alert.alert('Lỗi', e.message || 'Hủy lịch hẹn thất bại. Vui lòng thử lại.');
+                    }
+                },
             },
         ]);
     };

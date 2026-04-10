@@ -90,6 +90,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     fetchUnreadCount: async () => {
         try {
+            // Backend trả về Long trực tiếp (đã unwrap)
             const count = await notificationService.getUnreadCount();
             set({ unreadCount: count });
             // Đồng bộ badge với unread count

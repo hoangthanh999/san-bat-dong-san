@@ -6,7 +6,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function KYCUploadBackScreen() {
@@ -23,8 +22,8 @@ export default function KYCUploadBackScreen() {
                 return;
             }
             result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.9,
+                mediaTypes: ['images'],
+                quality: 0.8,
                 allowsEditing: true,
                 aspect: [16, 10],
             });
@@ -35,8 +34,8 @@ export default function KYCUploadBackScreen() {
                 return;
             }
             result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                quality: 0.9,
+                mediaTypes: ['images'],
+                quality: 0.8,
                 allowsEditing: true,
                 aspect: [16, 10],
             });
@@ -52,10 +51,10 @@ export default function KYCUploadBackScreen() {
             Alert.alert('Thiếu ảnh', 'Vui lòng chụp hoặc chọn ảnh mặt sau CCCD');
             return;
         }
-        const base64 = await FileSystem.readAsStringAsync(imageUri, {
-            encoding: 'base64',
-        });
-        await AsyncStorage.setItem('kyc_back_base64', base64);
+
+        // Lưu URI ảnh mặt sau
+        await AsyncStorage.setItem('kyc_back_uri', imageUri);
+
         router.push('/kyc/info' as any);
     };
 

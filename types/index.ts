@@ -1,4 +1,40 @@
-// Room/Property Types
+// ============================
+// Backend API Response Wrapper
+// ============================
+// Backend trả về: { code?: number, message?: string, result: T }
+// Client interceptor sẽ tự động unwrap result, nên service nhận T trực tiếp.
+export interface BackendApiResponse<T> {
+    code?: number;
+    message?: string;
+    result: T;
+}
+
+// Spring Boot Page response
+export interface PaginatedResponse<T> {
+    content: T[];
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;  // current page index (0-based)
+    first: boolean;
+    last: boolean;
+}
+
+// ============================
+// Property (từ property-service PropertyResponseDTO)
+// ============================
+export type RentalType = 'WHOLE' | 'SHARED';
+export type GenderConstraint = 'MALE_ONLY' | 'FEMALE_ONLY' | 'MIXED';
+export type PropertyStatus = 'PENDING' | 'ACTIVE' | 'FULL' | 'HIDDEN' | 'EXPIRED' | 'APPROVED' | 'REJECTED';
+
+export interface PropertyLandlordInfo {
+    id: number;
+    fullName: string;
+    email?: string;
+    phone?: string;
+    avatarUrl?: string;
+}
+
 export interface Room {
     id: number;
     title: string;
@@ -6,47 +42,45 @@ export interface Room {
     price: number;
     deposit: number;
     area: number;
-    address: string;
+
+    // Địa chỉ tách chi tiết
+    province: string;
+    district: string;
+    ward: string;
+    addressDetail: string;
+
+    // Tọa độ (backend tách từ PostGIS Point)
+    latitude: number;
+    longitude: number;
 
     // Media
-    images: string[];
+    images: string[];        // mảng URL Cloudinary
     videoUrl?: string;
 
-    // Location (PostGIS Point from backend)
-    location: {
-        latitude: number;
-        longitude: number;
-    };
-
-    // Details
-    rentalType: 'WHOLE' | 'SHARED';
+    // Chi tiết
     furnitureStatus?: string;
     legalStatus?: string;
     direction?: string;
     floorNumber?: number;
     numBedrooms?: number;
     numBathrooms?: number;
+
+    // Loại hình thuê
+    rentalType: RentalType;
     capacity?: number;
     currentTenants?: number;
-    genderConstraint?: 'MALE_ONLY' | 'FEMALE_ONLY' | 'MIXED';
+    genderConstraint?: GenderConstraint;
 
-    // Amenities
     amenities?: string[];
 
     // Package & Status
-    status: 'PENDING' | 'ACTIVE' | 'FULL' | 'HIDDEN' | 'EXPIRED' | 'APPROVED' | 'REJECTED';
+    status: PropertyStatus;
     packageType?: string;
     priorityLevel?: number;
-    servicePackageId?: number;
+    autoRenew?: boolean;
 
-    // User
-    landlord: {
-        id: number;
-        fullName: string;
-        avatarUrl?: string;
-        phone?: string;
-        email?: string;
-    };
+    // Thông tin chủ trọ (từ identity-service, embed trong response)
+    landlordInfo?: PropertyLandlordInfo;
 
     // Stats
     averageRating: number;
@@ -54,12 +88,29 @@ export interface Room {
 
     // Timestamps
     createdAt: string;
+    updatedAt?: string;
     expirationDate?: string;
     lastPushedAt?: string;
     approvedAt?: string;
 }
 
-// User Types
+// Backward compatibility alias
+export type Property = Room;
+
+// ============================
+// User (kết hợp identity-service + customer-service)
+// ============================
+export type UserRole = 'ADMIN' | 'USER' | 'OWNER';
+export type KYCStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+
+export interface LifestyleProfile {
+    sleepTime?: string;
+    hasPet?: boolean;
+    smoking?: boolean;
+    cleanlinessLevel?: number;
+    personality?: string;
+}
+
 export interface User {
     id: number;
     email: string;
@@ -67,17 +118,16 @@ export interface User {
     phone?: string;
     avatarUrl?: string;
     bannerUrl?: string;
-    role: 'ADMIN' | 'LANDLORD' | 'TENANT';
-    walletBalance?: number;
-    kycStatus?: string;
-    membershipLevel?: string;
-    membershipExpiresAt?: string;
-    isActive: boolean;
-    createdAt: string;
-    lastActiveAt?: string;
+    role: UserRole;
+    kycStatus?: KYCStatus;
+    isActive?: boolean;
+    createdAt?: string;
+    lifestyleProfile?: LifestyleProfile;
 }
 
-// Auth Types
+// ============================
+// Auth Types (identity-service)
+// ============================
 export interface LoginRequest {
     email: string;
     password: string;
@@ -87,15 +137,149 @@ export interface RegisterRequest {
     email: string;
     password: string;
     fullName: string;
-    phone?: string;
+    phone: string;   // backend @NotBlank — bắt buộc
 }
 
+// Backend login trả về (trước khi unwrap result)
 export interface AuthResponse {
     token: string;
-    user: User;
+    id: number;
+    email: string;
+    fullName: string;
+    role: string;
 }
 
-// Chat Types
+export interface ChangePasswordRequest {
+    oldPassword: string;
+    newPassword: string;
+}
+
+export interface ChangeEmailRequest {
+    newEmail: string;
+}
+
+export interface ForgotPasswordRequest {
+    email: string;
+}
+
+export interface ResetPasswordRequest {
+    token: string;
+    newPassword: string;
+}
+
+// ============================
+// Customer Profile (customer-service)
+// ============================
+export interface CustomerProfileDTO {
+    fullName?: string;
+    phone?: string;
+    avatarUrl?: string;
+    bannerUrl?: string;
+    lifestyleProfile?: LifestyleProfile;
+}
+
+export interface CustomerPublicResponseDTO {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+    kycStatus?: string;
+    phone?: string;
+    createdAt?: string;
+}
+
+export interface CustomerResponseDTO {
+    id: number;
+    email: string;
+    fullName: string;
+    phone?: string;
+    avatarUrl?: string;
+    bannerUrl?: string;
+    kycStatus: KYCStatus;
+    lifestyleProfile?: LifestyleProfile;
+}
+
+// ============================
+// KYC Types (customer-service)
+// ============================
+export interface KycOcrResponseDTO {
+    // Fields trả về từ FPT AI OCR scan
+    citizenId?: string;
+    fullName?: string;
+    address?: string;
+    kycToken?: string;
+    [key: string]: any;
+}
+
+export interface KYCSubmitData {
+    kycToken: string;
+    citizenId: string;
+    fullName: string;
+    address: string;
+}
+
+export interface KYCStatusResponse {
+    kycStatus: KYCStatus;
+    citizenId?: string;
+    fullName?: string;
+    rejectedReason?: string;
+    updatedAt?: string;
+}
+
+// ============================
+// Property Create/Update DTO (property-service)
+// ============================
+export interface PropertyRequestDTO {
+    title: string;
+    description?: string;
+    price: number;
+    deposit?: number;
+    area: number;
+
+    province?: string;
+    district?: string;
+    ward?: string;
+    addressDetail?: string;
+
+    latitude: number;
+    longitude: number;
+
+    furnitureStatus?: string;
+    legalStatus?: string;
+    direction?: string;
+    floorNumber?: number;
+    numBedrooms?: number;
+    numBathrooms?: number;
+
+    rentalType: RentalType;
+    capacity?: number;
+    genderConstraint?: GenderConstraint;
+
+    images: string[];
+    videoUrl?: string;
+    amenities?: string[];
+
+    servicePackageId?: number;
+}
+
+// Backward compatibility
+export type RoomCreateDTO = PropertyRequestDTO;
+
+// ============================
+// Notification (notification-service)
+// ============================
+export interface Notification {
+    id: number;
+    userId: string;     // backend dùng String
+    type: string;       // VD: "KYC_APPROVED", "ROOM_APPROVED"...
+    title: string;
+    content: string;    // backend dùng "content" không phải "message"
+    isRead: boolean;
+    createdAt: string;
+}
+
+// ============================
+// Chat Types (chưa có backend, giữ cho tương lai)
+// ============================
 export type MessageType = 'TEXT' | 'IMAGE' | 'VOICE' | 'LOCATION' | 'PROPERTY' | 'APPOINTMENT';
 
 export interface ChatMessage {
@@ -105,14 +289,10 @@ export interface ChatMessage {
     content?: string;
     type: MessageType;
     metadata?: {
-        // For LOCATION
         latitude?: number;
         longitude?: number;
-        // For PROPERTY
         roomId?: number;
-        // For VOICE
         audioUrl?: string;
-        // For APPOINTMENT
         appointmentId?: number;
         datetime?: string;
     };
@@ -131,7 +311,34 @@ export interface Conversation {
     isOnline?: boolean;
 }
 
-// Review Types
+// ============================
+// Filter / Search (khớp với PropertyController.searchProperties params)
+// ============================
+export interface RoomFilters {
+    type?: string;          // RentalType: "WHOLE" | "SHARED"
+    minPrice?: number;
+    maxPrice?: number;
+    minArea?: number;
+    maxArea?: number;
+    bedroomList?: number[];
+    bathroomList?: number[];
+    directionList?: string[];
+    furniture?: string;
+    sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'nearest';
+}
+
+export interface SearchParams extends RoomFilters {
+    keyword?: string;
+    lat?: number;
+    lng?: number;
+    radius?: number;
+    page?: number;
+    size?: number;
+}
+
+// ============================
+// Review Types (chưa có backend)
+// ============================
 export interface Review {
     id: number;
     roomId: number;
@@ -146,7 +353,9 @@ export interface Review {
     createdAt: string;
 }
 
-// Favorite Types
+// ============================
+// Favorite Types (chưa có backend)
+// ============================
 export interface Favorite {
     id: number;
     userId: number;
@@ -155,7 +364,9 @@ export interface Favorite {
     createdAt: string;
 }
 
-// Appointment Types
+// ============================
+// Appointment Types (chưa có backend)
+// ============================
 export interface Appointment {
     id: number;
     roomId: number;
@@ -174,113 +385,9 @@ export interface Appointment {
     createdAt: string;
 }
 
-// Filter Types
-export interface RoomFilters {
-    type?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    minArea?: number;
-    maxArea?: number;
-    bedroomList?: number[];
-    bathroomList?: number[];
-    directionList?: string[];
-    furniture?: string;
-    sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'nearest';
-}
-
-// Search Types
-export interface SearchParams extends RoomFilters {
-    keyword?: string;
-    address?: string;
-    lat?: number;
-    lng?: number;
-    radius?: number;
-    page?: number;
-    size?: number;
-}
-
-// API Response Types
-export interface ApiResponse<T> {
-    data: T;
-    message?: string;
-    success: boolean;
-}
-
-export interface PaginatedResponse<T> {
-    content: T[];
-    totalElements: number;
-    totalPages: number;
-    size: number;
-    number: number;
-    first: boolean;
-    last: boolean;
-}
-
-// Form Types
-export interface RoomCreateDTO {
-    title: string;
-    description?: string;
-    price: number;
-    deposit?: number;
-    area: number;
-    address: string;
-    latitude: number;
-    longitude: number;
-    rentalType: 'WHOLE' | 'SHARED';
-    furnitureStatus?: string;
-    direction?: string;
-    numBedrooms?: number;
-    numBathrooms?: number;
-    capacity?: number;
-    genderConstraint?: 'MALE_ONLY' | 'FEMALE_ONLY' | 'MIXED';
-    amenities?: string[];
-    images: string[];
-    videoUrl?: string;
-}
-
-// Notification Types
-export interface Notification {
-    id: number;
-    userId: number;
-    title: string;
-    message: string;
-    type: 'CHAT' | 'APPOINTMENT' | 'APPOINTMENT_REMINDER' | 'REVIEW' | 'ROOM_APPROVED' | 'ROOM_REJECTED' | 'SYSTEM';
-    data?: {
-        roomId?: number;
-        chatPartnerId?: number;
-        appointmentId?: number;
-        [key: string]: any;
-    };
-    isRead: boolean;
-    createdAt: string;
-}
-
-// Push Notification Types
-export interface PushTokenRequest {
-    token: string;
-    platform: 'ios' | 'android';
-}
-
-// KYC Types
-export type KYCStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
-
-export interface KYCSubmitData {
-    citizenId: string;
-    fullName: string;
-    dateOfBirth: string;
-    frontImageBase64: string;
-    backImageBase64: string;
-}
-
-export interface KYCStatusResponse {
-    kycStatus: KYCStatus;
-    citizenId?: string;
-    fullName?: string;
-    rejectedReason?: string;
-    updatedAt?: string;
-}
-
-// Wallet & Transaction Types
+// ============================
+// Wallet & Transaction Types (chưa có backend)
+// ============================
 export type TransactionType = 'DEPOSIT' | 'POST_FEE' | 'MEMBERSHIP' | 'BOOST' | 'REFUND';
 export type TransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
 
@@ -305,7 +412,9 @@ export interface VNPayPaymentResponse {
     orderId?: string;
 }
 
-// Contract Types
+// ============================
+// Contract Types (chưa có backend)
+// ============================
 export type ContractStatus = 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED';
 
 export interface Contract {
@@ -330,7 +439,9 @@ export interface Contract {
     createdAt: string;
 }
 
-// Service Package Types
+// ============================
+// Service Package Types (chưa có backend)
+// ============================
 export type PackageType = 'MEMBERSHIP' | 'ROOM_PROMOTION';
 
 export interface ServicePackage {
@@ -347,4 +458,24 @@ export interface ServicePackage {
 export interface BoostRoom {
     roomId: number;
     packageId: number;
+}
+
+// ============================
+// Notification Types (notification-service)
+// ============================
+export type NotificationType = 'APPOINTMENT' | 'REVIEW' | 'CHAT' | 'SYSTEM' | 'ROOM_APPROVED' | 'BILL' | 'CONTRACT';
+
+// ============================
+// Push Notification Types
+// ============================
+export interface PushTokenRequest {
+    token: string;
+    platform: 'ios' | 'android';
+}
+
+// Legacy API response type (cho các service chưa update)
+export interface ApiResponse<T> {
+    code?: number;
+    message?: string;
+    result: T;
 }

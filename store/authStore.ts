@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User, LoginRequest, RegisterRequest } from '../types';
+import { User, LoginRequest, RegisterRequest, AuthResponse } from '../types';
 import { authService } from '../services/api/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
@@ -31,10 +31,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-            const response = await authService.login(credentials);
+            const authData: AuthResponse = await authService.login(credentials);
+
+            // Xây dựng User object từ backend AuthResponse
+            // { token, id, email, fullName, role }
+            const user: User = {
+                id: authData.id,
+                email: authData.email,
+                fullName: authData.fullName,
+                role: authData.role as User['role'],
+            };
+
             set({
-                user: response.user,
-                token: response.token,
+                user,
+                token: authData.token,
                 isAuthenticated: true,
                 isLoading: false
             });
@@ -50,12 +60,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     register: async (data) => {
         set({ isLoading: true, error: null });
         try {
-            const user = await authService.register(data);
-            // Automatically login after successful registration? Or prompt to login?
-            // Assuming registration returns user data but token needs login or is usually provided
-            // If backend returns token on register, update accordingly.
-            // Usually backend returns user only, so user needs to login.
-
+            await authService.register(data);
+            // Backend trả về UserResponseDTO, user cần login riêng
             set({ isLoading: false });
             return;
         } catch (error: any) {
@@ -72,7 +78,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             // 1. Xóa push token khỏi server trước khi logout
             await removePushToken();
-            // 2. Logout khỏi backend
+            // 2. Xóa local storage
             await authService.logout();
             set({
                 user: null,

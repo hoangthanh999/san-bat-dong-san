@@ -103,8 +103,12 @@ export default function AppointmentDetailScreen() {
             {
                 text: 'Hủy lịch', style: 'destructive',
                 onPress: async () => {
-                    await cancelAppointment(appt.id);
-                    router.back();
+                    try {
+                        await cancelAppointment(appt.id);
+                        router.back();
+                    } catch (e: any) {
+                        Alert.alert('Lỗi', e.message || 'Hủy lịch hẹn thất bại. Vui lòng thử lại.');
+                    }
                 }
             }
         ]);

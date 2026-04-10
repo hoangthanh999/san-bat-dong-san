@@ -2,21 +2,51 @@ import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, StatusBar, Platform, Alert, ActivityIndicator,
-    Switch,
 } from 'react-native';
 import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../store/authStore';
+import { useKYCStore } from '../../store/kycStore';
 import { roomService } from '../../services/api/rooms';
+import { mediaService } from '../../services/api/media';
+import { PropertyRequestDTO } from '../../types';
 
 const STEPS = ['Cơ bản', 'Chi tiết', 'Ảnh & Video', 'Hoàn thành'];
 
 const AMENITY_OPTIONS = ['WiFi', 'Điều hoà', 'Bếp', 'Máy giặt', 'Tủ lạnh', 'Ban công', 'Chỗ để xe', 'Thang máy', 'Bảo vệ', 'Hồ bơi', 'Gym'];
 const DIRECTION_OPTIONS = ['Đông', 'Tây', 'Nam', 'Bắc', 'Đông-Nam', 'Đông-Bắc', 'Tây-Nam', 'Tây-Bắc'];
 const FURNITURE_OPTIONS = ['Không có', 'Cơ bản', 'Đầy đủ', 'Cao cấp'];
+
+// ====== DỮ LIỆU TỈNH/HUYỆN/XÃ (rút gọn, phổ biến nhất) ======
+const PROVINCES: Record<string, Record<string, string[]>> = {
+    'Hồ Chí Minh': {
+        'Quận 1': ['Phường Bến Nghé', 'Phường Bến Thành', 'Phường Cầu Kho', 'Phường Cô Giang', 'Phường Đa Kao', 'Phường Nguyễn Cư Trinh', 'Phường Nguyễn Thái Bình', 'Phường Phạm Ngũ Lão', 'Phường Tân Định'],
+        'Quận 2 (TP Thủ Đức)': ['Phường An Khánh', 'Phường An Lợi Đông', 'Phường An Phú', 'Phường Bình An', 'Phường Bình Khánh', 'Phường Bình Trưng Đông', 'Phường Bình Trưng Tây', 'Phường Cát Lái', 'Phường Thạnh Mỹ Lợi', 'Phường Thảo Điền', 'Phường Thủ Thiêm'],
+        'Quận 3': ['Phường 1', 'Phường 2', 'Phường 3', 'Phường 4', 'Phường 5', 'Phường 9', 'Phường 12', 'Phường 13', 'Phường 14', 'Phường Võ Thị Sáu'],
+        'Quận 7': ['Phường Bình Thuận', 'Phường Phú Mỹ', 'Phường Phú Thuận', 'Phường Tân Hưng', 'Phường Tân Kiểng', 'Phường Tân Phong', 'Phường Tân Phú', 'Phường Tân Quy'],
+        'Quận Bình Thạnh': ['Phường 1', 'Phường 2', 'Phường 3', 'Phường 5', 'Phường 6', 'Phường 7', 'Phường 11', 'Phường 12', 'Phường 13', 'Phường 14', 'Phường 15', 'Phường 17', 'Phường 19', 'Phường 21', 'Phường 22', 'Phường 24', 'Phường 25', 'Phường 27', 'Phường 28'],
+        'Quận Gò Vấp': ['Phường 1', 'Phường 3', 'Phường 4', 'Phường 5', 'Phường 6', 'Phường 7', 'Phường 9', 'Phường 10', 'Phường 11', 'Phường 12', 'Phường 13', 'Phường 14', 'Phường 15', 'Phường 16', 'Phường 17'],
+        'Quận Tân Bình': ['Phường 1', 'Phường 2', 'Phường 3', 'Phường 4', 'Phường 5', 'Phường 6', 'Phường 7', 'Phường 8', 'Phường 9', 'Phường 10', 'Phường 11', 'Phường 12', 'Phường 13', 'Phường 14', 'Phường 15'],
+        'Quận Tân Phú': ['Phường Hiệp Tân', 'Phường Hòa Thạnh', 'Phường Phú Thạnh', 'Phường Phú Thọ Hòa', 'Phường Phú Trung', 'Phường Sơn Kỳ', 'Phường Tân Quý', 'Phường Tân Sơn Nhì', 'Phường Tân Thành', 'Phường Tân Thới Hòa', 'Phường Tây Thạnh'],
+        'Quận Phú Nhuận': ['Phường 1', 'Phường 2', 'Phường 3', 'Phường 4', 'Phường 5', 'Phường 7', 'Phường 8', 'Phường 9', 'Phường 10', 'Phường 11', 'Phường 13', 'Phường 15', 'Phường 17'],
+    },
+    'Hà Nội': {
+        'Quận Ba Đình': ['Phường Cống Vị', 'Phường Điện Biên', 'Phường Đội Cấn', 'Phường Giảng Võ', 'Phường Kim Mã', 'Phường Liễu Giai', 'Phường Ngọc Hà', 'Phường Ngọc Khánh', 'Phường Nguyễn Trung Trực', 'Phường Phúc Xá', 'Phường Quán Thánh', 'Phường Thành Công', 'Phường Trúc Bạch', 'Phường Vĩnh Phúc'],
+        'Quận Hoàn Kiếm': ['Phường Chương Dương', 'Phường Cửa Đông', 'Phường Cửa Nam', 'Phường Đồng Xuân', 'Phường Hàng Bạc', 'Phường Hàng Bài', 'Phường Hàng Bồ', 'Phường Hàng Buồm', 'Phường Hàng Đào', 'Phường Hàng Gai', 'Phường Hàng Mã', 'Phường Hàng Trống', 'Phường Lý Thái Tổ', 'Phường Phan Chu Trinh', 'Phường Phúc Tân', 'Phường Tràng Tiền', 'Phường Trần Hưng Đạo'],
+        'Quận Đống Đa': ['Phường Cát Linh', 'Phường Hàng Bột', 'Phường Khâm Thiên', 'Phường Khương Thượng', 'Phường Kim Liên', 'Phường Láng Hạ', 'Phường Láng Thượng', 'Phường Nam Đồng', 'Phường Ngã Tư Sở', 'Phường Ô Chợ Dừa', 'Phường Phương Liên', 'Phường Phương Mai', 'Phường Quang Trung', 'Phường Quốc Tử Giám', 'Phường Thổ Quan', 'Phường Thịnh Quang', 'Phường Trung Liệt', 'Phường Trung Phụng', 'Phường Trung Tự', 'Phường Văn Chương', 'Phường Văn Miếu'],
+        'Quận Cầu Giấy': ['Phường Dịch Vọng', 'Phường Dịch Vọng Hậu', 'Phường Mai Dịch', 'Phường Nghĩa Đô', 'Phường Nghĩa Tân', 'Phường Quan Hoa', 'Phường Trung Hòa', 'Phường Yên Hòa'],
+        'Quận Thanh Xuân': ['Phường Hạ Đình', 'Phường Khương Đình', 'Phường Khương Mai', 'Phường Khương Trung', 'Phường Kim Giang', 'Phường Nhân Chính', 'Phường Phương Liệt', 'Phường Thanh Xuân Bắc', 'Phường Thanh Xuân Nam', 'Phường Thanh Xuân Trung', 'Phường Thượng Đình'],
+    },
+    'Đà Nẵng': {
+        'Quận Hải Châu': ['Phường Bình Hiên', 'Phường Bình Thuận', 'Phường Hải Châu I', 'Phường Hải Châu II', 'Phường Hòa Cường Bắc', 'Phường Hòa Cường Nam', 'Phường Hòa Thuận Đông', 'Phường Hòa Thuận Tây', 'Phường Nam Dương', 'Phường Phước Ninh', 'Phường Thạch Thang', 'Phường Thanh Bình', 'Phường Thuận Phước'],
+        'Quận Thanh Khê': ['Phường An Khê', 'Phường Chính Gián', 'Phường Hòa Khê', 'Phường Tam Thuận', 'Phường Tân Chính', 'Phường Thạc Gián', 'Phường Thanh Khê Đông', 'Phường Thanh Khê Tây', 'Phường Vĩnh Trung', 'Phường Xuân Hà'],
+        'Quận Sơn Trà': ['Phường An Hải Bắc', 'Phường An Hải Đông', 'Phường An Hải Tây', 'Phường Mân Thái', 'Phường Nại Hiên Đông', 'Phường Phước Mỹ', 'Phường Thọ Quang'],
+    },
+};
 
 function StepIndicator({ currentStep }: { currentStep: number }) {
     return (
@@ -63,12 +93,21 @@ function VideoPreviewPlayer({ uri, onRemove }: { uri: string; onRemove: () => vo
         p.loop = false;
         p.muted = true;
     });
+
+    // ✅ Cleanup player khi unmount
+    useEffect(() => {
+        return () => {
+            try {
+                player.release();
+            } catch (_) { }
+        };
+    }, []);
+
     return (
         <View style={styles.videoPreviewContainer}>
             <VideoView
                 style={styles.videoPreview}
                 player={player}
-                allowsFullscreen
                 allowsPictureInPicture={false}
                 contentFit="cover"
             />
@@ -83,19 +122,63 @@ function VideoPreviewPlayer({ uri, onRemove }: { uri: string; onRemove: () => vo
     );
 }
 
+// ========== DROPDOWN SELECTOR ==========
+function DropdownPicker({ label, options, value, onChange, placeholder }: {
+    label: string; options: string[]; value: string; onChange: (v: string) => void; placeholder: string;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <View style={styles.formField}>
+            <Text style={styles.fieldLabel}>{label}</Text>
+            <TouchableOpacity style={styles.dropdownBtn} onPress={() => setIsOpen(!isOpen)}>
+                <Text style={value ? styles.dropdownValue : styles.dropdownPlaceholder}>
+                    {value || placeholder}
+                </Text>
+                <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#999" />
+            </TouchableOpacity>
+            {isOpen && (
+                <ScrollView
+                    style={styles.dropdownList}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                >
+                    {options.map(opt => (
+                        <TouchableOpacity
+                            key={opt}
+                            style={[styles.dropdownItem, opt === value && styles.dropdownItemSelected]}
+                            onPress={() => { onChange(opt); setIsOpen(false); }}
+                        >
+                            <Text style={[styles.dropdownItemText, opt === value && styles.dropdownItemTextSelected]}>{opt}</Text>
+                            {opt === value && <Ionicons name="checkmark" size={16} color="#0066FF" />}
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            )}
+        </View>
+    );
+}
+
 export default function PostScreen() {
     const router = useRouter();
     const { isAuthenticated } = useAuthStore();
+    const { kycStatus, fetchKYCStatus } = useKYCStore();
     const [step, setStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState('');
     const [images, setImages] = useState<string[]>([]);
     const [videoUri, setVideoUri] = useState<string | null>(null);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
-    // Form data
+    React.useEffect(() => {
+        if (isAuthenticated) fetchKYCStatus();
+    }, [isAuthenticated]);
+
     const [form, setForm] = useState({
         title: '',
-        address: '',
+        province: '',
+        district: '',
+        ward: '',
+        addressDetail: '',
         price: '',
         deposit: '',
         area: '',
@@ -118,12 +201,14 @@ export default function PostScreen() {
         updateForm('amenities', form.amenities.includes(val) ? form.amenities.filter(a => a !== val) : [...form.amenities, val]);
     };
 
+    // Derived dropdown options
+    const districtOptions = form.province ? Object.keys(PROVINCES[form.province] || {}) : [];
+    const wardOptions = form.province && form.district ? (PROVINCES[form.province]?.[form.district] || []) : [];
+
     const pickImages = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsMultipleSelection: true,
-            quality: 0.8,
-            selectionLimit: 10,
+            allowsMultipleSelection: true, quality: 0.8, selectionLimit: 10,
         });
         if (!result.canceled) {
             setImages(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 10));
@@ -132,36 +217,31 @@ export default function PostScreen() {
 
     const pickVideo = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-            quality: 0.8,
-            videoMaxDuration: 120,
+            mediaTypes: ImagePicker.MediaTypeOptions.Videos, quality: 0.8, videoMaxDuration: 120,
         });
-        if (!result.canceled && result.assets[0]) {
-            setVideoUri(result.assets[0].uri);
-        }
+        if (!result.canceled && result.assets[0]) setVideoUri(result.assets[0].uri);
     };
 
     const generateAIDescription = async () => {
-        if (!form.title && !form.address) {
-            Alert.alert('Gợi ý', 'Vui lòng nhập tiêu đề và địa chỉ trước để AI có thể tạo mô tả phù hợp.');
+        if (!form.title && !form.province) {
+            Alert.alert('Gợi ý', 'Vui lòng nhập tiêu đề và địa chỉ trước.');
             return;
         }
         setIsGeneratingAI(true);
-        // Simulate AI generation
         await new Promise(r => setTimeout(r, 1800));
-        const aiText = `Căn phòng ${form.rentalType === 'WHOLE' ? 'nguyên căn' : 'chia sẻ'} tại ${form.address}, diện tích ${form.area || '...'}m², giá thuê chỉ ${form.price ? Number(form.price).toLocaleString('vi-VN') : '...'}đ/tháng.\n\nNội thất ${form.furnitureStatus || 'cơ bản'}, phù hợp cho ${form.genderConstraint === 'MALE_ONLY' ? 'nam giới' : form.genderConstraint === 'FEMALE_ONLY' ? 'nữ giới' : 'mọi đối tượng'}.${form.amenities.length > 0 ? '\n\nTiện ích: ' + form.amenities.join(', ') + '.' : ''}\n\nGiao thông thuận tiện, gần các tiện ích thiết yếu. Liên hệ ngay để được tư vấn!`;
+        const addr = [form.addressDetail, form.ward, form.district, form.province].filter(Boolean).join(', ');
+        const aiText = `Căn phòng ${form.rentalType === 'WHOLE' ? 'nguyên căn' : 'chia sẻ'} tại ${addr}, diện tích ${form.area || '...'}m², giá thuê chỉ ${form.price ? Number(form.price).toLocaleString('vi-VN') : '...'}đ/tháng.\n\nNội thất ${form.furnitureStatus || 'cơ bản'}, phù hợp cho ${form.genderConstraint === 'MALE_ONLY' ? 'nam giới' : form.genderConstraint === 'FEMALE_ONLY' ? 'nữ giới' : 'mọi đối tượng'}.${form.amenities.length > 0 ? '\n\nTiện ích: ' + form.amenities.join(', ') + '.' : ''}\n\nGiao thông thuận tiện, gần các tiện ích thiết yếu. Liên hệ ngay để được tư vấn!`;
         updateForm('description', aiText);
         setIsGeneratingAI(false);
     };
 
-    const removeImage = (index: number) => {
-        setImages(prev => prev.filter((_, i) => i !== index));
-    };
+    const removeImage = (index: number) => setImages(prev => prev.filter((_, i) => i !== index));
 
     const validateStep = () => {
         if (step === 0) {
             if (!form.title.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề'); return false; }
-            if (!form.address.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ'); return false; }
+            if (!form.province) { Alert.alert('Lỗi', 'Vui lòng chọn tỉnh/thành phố'); return false; }
+            if (!form.district) { Alert.alert('Lỗi', 'Vui lòng chọn quận/huyện'); return false; }
             if (!form.price || isNaN(Number(form.price))) { Alert.alert('Lỗi', 'Vui lòng nhập giá hợp lệ'); return false; }
             if (!form.area || isNaN(Number(form.area))) { Alert.alert('Lỗi', 'Vui lòng nhập diện tích hợp lệ'); return false; }
         }
@@ -179,38 +259,78 @@ export default function PostScreen() {
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
-            const formData = new FormData();
-            formData.append('title', form.title);
-            formData.append('address', form.address);
-            formData.append('price', form.price);
-            formData.append('deposit', form.deposit || '0');
-            formData.append('area', form.area);
-            formData.append('rentalType', form.rentalType);
-            formData.append('description', form.description);
-            formData.append('numBedrooms', form.numBedrooms);
-            formData.append('numBathrooms', form.numBathrooms);
-            formData.append('furnitureStatus', form.furnitureStatus);
-            formData.append('direction', form.direction);
-            formData.append('genderConstraint', form.genderConstraint);
-            formData.append('latitude', form.latitude);
-            formData.append('longitude', form.longitude);
-            form.amenities.forEach(a => formData.append('amenities', a));
+            // 1. Upload images qua media-service
+            setUploadProgress('Đang tải ảnh lên...');
+            const imageFiles = images.map((uri, i) => ({
+                uri, name: `property_${Date.now()}_${i}.jpg`, type: 'image/jpeg',
+            }));
+            let imageUrls: string[] = [];
+            try {
+                imageUrls = await mediaService.uploadMultiple(imageFiles, 'properties');
+            } catch (uploadErr) {
+                // Fallback: gửi URI trực tiếp nếu media-service không hoạt động
+                console.warn('[Post] Media upload failed, using local URIs:', uploadErr);
+                imageUrls = images;
+            }
 
-            images.forEach((uri, index) => {
-                formData.append('images', {
-                    uri,
-                    name: `image_${index}.jpg`,
-                    type: 'image/jpeg',
-                } as any);
-            });
+            // 2. Upload video nếu có
+            let videoUrl: string | undefined;
+            if (videoUri) {
+                setUploadProgress('Đang tải video...');
+                try {
+                    videoUrl = await mediaService.uploadFile(videoUri, `video_${Date.now()}.mp4`, 'video/mp4', 'properties');
+                } catch {
+                    console.warn('[Post] Video upload failed');
+                }
+            }
 
-            await roomService.createRoom(formData);
-            setStep(3); // Success step
+            // 3. Build JSON body đúng PropertyRequestDTO
+            setUploadProgress('Đang đăng tin...');
+            const body: PropertyRequestDTO = {
+                title: form.title,
+                description: form.description,
+                price: Number(form.price),
+                deposit: Number(form.deposit) || 0,
+                area: Number(form.area),
+                province: form.province,
+                district: form.district,
+                ward: form.ward,
+                addressDetail: form.addressDetail,
+                latitude: Number(form.latitude),
+                longitude: Number(form.longitude),
+                furnitureStatus: form.furnitureStatus,
+                direction: form.direction || undefined,
+                numBedrooms: Number(form.numBedrooms),
+                numBathrooms: Number(form.numBathrooms),
+                rentalType: form.rentalType,
+                capacity: form.capacity ? Number(form.capacity) : undefined,
+                genderConstraint: form.genderConstraint,
+                images: imageUrls,
+                videoUrl,
+                amenities: form.amenities,
+            };
+
+            await roomService.createRoom(body);
+            setStep(3); // Success
         } catch (error: any) {
             Alert.alert('Lỗi', error.message || 'Đăng bài thất bại. Vui lòng thử lại.');
         } finally {
             setIsSubmitting(false);
+            setUploadProgress('');
         }
+    };
+
+    const resetForm = () => {
+        setStep(0);
+        setImages([]);
+        setVideoUri(null);
+        setForm({
+            title: '', province: '', district: '', ward: '', addressDetail: '',
+            price: '', deposit: '', area: '', rentalType: 'WHOLE', description: '',
+            numBedrooms: '1', numBathrooms: '1', capacity: '', furnitureStatus: 'Cơ bản',
+            direction: '', genderConstraint: 'MIXED', amenities: [],
+            latitude: '10.762622', longitude: '106.660172',
+        });
     };
 
     if (!isAuthenticated) {
@@ -226,6 +346,28 @@ export default function PostScreen() {
         );
     }
 
+    if (kycStatus !== 'VERIFIED') {
+        return (
+            <View style={styles.authRequired}>
+                <StatusBar barStyle="dark-content" />
+                <Ionicons name="shield-checkmark-outline" size={72} color="#0066FF" />
+                <Text style={styles.authTitle}>
+                    {kycStatus === 'PENDING' ? 'Đang chờ xác minh' : 'Xác minh danh tính'}
+                </Text>
+                <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginTop: 4, paddingHorizontal: 20, lineHeight: 20 }}>
+                    {kycStatus === 'PENDING'
+                        ? 'Hồ sơ KYC của bạn đang được xét duyệt. Vui lòng đợi kết quả!'
+                        : 'Bạn cần xác minh danh tính (KYC) trước khi đăng tin bất động sản.'}
+                </Text>
+                {kycStatus !== 'PENDING' && (
+                    <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/kyc' as any)}>
+                        <Text style={styles.loginBtnText}>Xác minh ngay</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+        );
+    }
+
     // Success Screen
     if (step === 3) {
         return (
@@ -235,7 +377,7 @@ export default function PostScreen() {
                 </View>
                 <Text style={styles.successTitle}>Đăng tin thành công!</Text>
                 <Text style={styles.successSub}>Tin đăng của bạn đang chờ được duyệt. Chúng tôi sẽ thông báo khi tin được phê duyệt.</Text>
-                <TouchableOpacity style={styles.homeBtn} onPress={() => { setStep(0); setImages([]); setForm({ title: '', address: '', price: '', deposit: '', area: '', rentalType: 'WHOLE', description: '', numBedrooms: '1', numBathrooms: '1', capacity: '', furnitureStatus: 'Cơ bản', direction: '', genderConstraint: 'MIXED', amenities: [], latitude: '10.762622', longitude: '106.660172' }); }}>
+                <TouchableOpacity style={styles.homeBtn} onPress={resetForm}>
                     <Text style={styles.homeBtnText}>Đăng tin mới</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.viewBtn} onPress={() => router.push('/(tabs)/profile')}>
@@ -248,8 +390,6 @@ export default function PostScreen() {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" />
-
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => step === 0 ? router.back() : setStep(s => s - 1)}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
@@ -260,7 +400,7 @@ export default function PostScreen() {
 
             <StepIndicator currentStep={step} />
 
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                 <View style={styles.formContent}>
                     {/* Step 0: Basic Info */}
                     {step === 0 && (
@@ -269,8 +409,33 @@ export default function PostScreen() {
                                 <TextInput style={styles.input} placeholder="VD: Căn hộ 2PN view đẹp, full nội thất..." value={form.title} onChangeText={v => updateForm('title', v)} />
                             </FormField>
 
-                            <FormField label="Địa chỉ *" required>
-                                <TextInput style={styles.input} placeholder="Số nhà, đường, quận, thành phố..." value={form.address} onChangeText={v => updateForm('address', v)} />
+                            {/* ====== DROPDOWN TỈNH/HUYỆN/XÃ ====== */}
+                            <DropdownPicker
+                                label="Tỉnh/Thành phố *"
+                                options={Object.keys(PROVINCES)}
+                                value={form.province}
+                                onChange={v => { updateForm('province', v); updateForm('district', ''); updateForm('ward', ''); }}
+                                placeholder="Chọn tỉnh/thành phố"
+                            />
+
+                            <DropdownPicker
+                                label="Quận/Huyện *"
+                                options={districtOptions}
+                                value={form.district}
+                                onChange={v => { updateForm('district', v); updateForm('ward', ''); }}
+                                placeholder={form.province ? 'Chọn quận/huyện' : 'Chọn tỉnh trước'}
+                            />
+
+                            <DropdownPicker
+                                label="Phường/Xã"
+                                options={wardOptions}
+                                value={form.ward}
+                                onChange={v => updateForm('ward', v)}
+                                placeholder={form.district ? 'Chọn phường/xã' : 'Chọn quận trước'}
+                            />
+
+                            <FormField label="Địa chỉ chi tiết">
+                                <TextInput style={styles.input} placeholder="Số nhà, tên đường..." value={form.addressDetail} onChangeText={v => updateForm('addressDetail', v)} />
                             </FormField>
 
                             <FormField label="Giá thuê (đồng/tháng) *">
@@ -305,19 +470,10 @@ export default function PostScreen() {
                             </FormField>
 
                             <FormField label="Mô tả">
-                                <TextInput style={[styles.input, styles.textarea]} placeholder="Mô tả chi tiết về phòng trọ, tiện ích xung quanh..." value={form.description} onChangeText={v => updateForm('description', v)} multiline numberOfLines={4} />
-                                <TouchableOpacity
-                                    style={styles.aiBtn}
-                                    onPress={generateAIDescription}
-                                    disabled={isGeneratingAI}
-                                >
-                                    {isGeneratingAI
-                                        ? <ActivityIndicator size="small" color="#8B5CF6" />
-                                        : <Text style={styles.aiBtnIcon}>✨</Text>
-                                    }
-                                    <Text style={styles.aiBtnText}>
-                                        {isGeneratingAI ? 'AI đang viết...' : 'AI viết mô tả'}
-                                    </Text>
+                                <TextInput style={[styles.input, styles.textarea]} placeholder="Mô tả chi tiết về phòng trọ..." value={form.description} onChangeText={v => updateForm('description', v)} multiline numberOfLines={4} />
+                                <TouchableOpacity style={styles.aiBtn} onPress={generateAIDescription} disabled={isGeneratingAI}>
+                                    {isGeneratingAI ? <ActivityIndicator size="small" color="#8B5CF6" /> : <Text style={styles.aiBtnIcon}>✨</Text>}
+                                    <Text style={styles.aiBtnText}>{isGeneratingAI ? 'AI đang viết...' : 'AI viết mô tả'}</Text>
                                 </TouchableOpacity>
                             </FormField>
                         </>
@@ -338,6 +494,12 @@ export default function PostScreen() {
                                     </FormField>
                                 </View>
                             </View>
+
+                            {form.rentalType === 'SHARED' && (
+                                <FormField label="Sức chứa (người)">
+                                    <TextInput style={styles.input} placeholder="VD: 4" value={form.capacity} onChangeText={v => updateForm('capacity', v)} keyboardType="numeric" />
+                                </FormField>
+                            )}
 
                             <FormField label="Nội thất">
                                 <ChipSelector options={FURNITURE_OPTIONS} selected={[form.furnitureStatus]} onToggle={v => updateForm('furnitureStatus', v)} />
@@ -384,9 +546,8 @@ export default function PostScreen() {
                                 </View>
                             </View>
 
-                            {/* Video Preview */}
                             {videoUri && (
-                                <VideoPreviewPlayer uri={videoUri} onRemove={() => setVideoUri(null)} />
+                                <VideoPreviewPlayer key={videoUri} uri={videoUri} onRemove={() => setVideoUri(null)} />
                             )}
 
                             {images.length === 0 ? (
@@ -420,7 +581,6 @@ export default function PostScreen() {
                         </>
                     )}
                 </View>
-
                 <View style={{ height: 30 }} />
             </ScrollView>
 
@@ -443,7 +603,10 @@ export default function PostScreen() {
                         disabled={isSubmitting}
                     >
                         {isSubmitting ? (
-                            <ActivityIndicator color="white" />
+                            <View style={{ alignItems: 'center' }}>
+                                <ActivityIndicator color="white" />
+                                {!!uploadProgress && <Text style={styles.uploadProgressText}>{uploadProgress}</Text>}
+                            </View>
                         ) : (
                             <>
                                 <Ionicons name="cloud-upload-outline" size={18} color="white" />
@@ -518,6 +681,16 @@ const styles = StyleSheet.create({
     stepper: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: 'white', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12 },
     stepperBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
     stepperValue: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', minWidth: 30, textAlign: 'center' },
+    // Dropdown
+    dropdownBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13 },
+    dropdownValue: { fontSize: 15, color: '#1A1A1A' },
+    dropdownPlaceholder: { fontSize: 15, color: '#BBB' },
+    dropdownList: { maxHeight: 200, backgroundColor: 'white', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, marginTop: 4 },
+    dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0' },
+    dropdownItemSelected: { backgroundColor: '#E8F0FF' },
+    dropdownItemText: { fontSize: 14, color: '#333' },
+    dropdownItemTextSelected: { color: '#0066FF', fontWeight: '600' },
+    // Images
     imagePickerSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
     imageCount: { fontSize: 15, fontWeight: '600', color: '#333' },
     addImageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -548,6 +721,7 @@ const styles = StyleSheet.create({
     nextBtn: { flex: 2, backgroundColor: '#0066FF', borderRadius: 12, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },
     nextBtnDisabled: { backgroundColor: '#AAC8FF' },
     nextBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
+    uploadProgressText: { color: 'white', fontSize: 11, marginTop: 4 },
     successScreen: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16, paddingHorizontal: 40, backgroundColor: 'white' },
     successIcon: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#F0FDF4', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
     successTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A1A' },

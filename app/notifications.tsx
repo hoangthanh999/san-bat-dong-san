@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
-    View, Text, StyleSheet, FlatList, TouchableOpacity,
+    View, Text, StyleSheet, SectionList, TouchableOpacity,
     StatusBar, Platform, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,8 @@ function NotificationItem({ item, onPress }: { item: Notification; onPress: () =
         CHAT: { name: 'chatbubble', bg: '#F0FDF4', color: '#22C55E' },
         SYSTEM: { name: 'megaphone', bg: '#FFF0F0', color: '#EF4444' },
         ROOM_APPROVED: { name: 'checkmark-circle', bg: '#F0FDF4', color: '#22C55E' },
+        BILL: { name: 'wallet-outline', bg: '#FFF8E1', color: '#F59E0B' },
+        CONTRACT: { name: 'document-text', bg: '#F3E8FF', color: '#8B5CF6' },
     };
     const iconConfig = icons[item.type] || icons['SYSTEM'];
 
@@ -22,10 +24,9 @@ function NotificationItem({ item, onPress }: { item: Notification; onPress: () =
         const d = new Date(dateStr);
         const diffMs = Date.now() - d.getTime();
         const diffHrs = diffMs / 3600000;
-        if (diffHrs < 1) return `${Math.floor(diffMs / 60000)} phút trước`;
+        if (diffHrs < 1) return `${Math.max(1, Math.floor(diffMs / 60000))} phút trước`;
         if (diffHrs < 24) return `${Math.floor(diffHrs)} giờ trước`;
-        if (diffHrs < 48) return 'Hôm qua';
-        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     };
 
     return (
@@ -41,12 +42,24 @@ function NotificationItem({ item, onPress }: { item: Notification; onPress: () =
                 <Text style={[styles.notifTitle, !item.isRead && styles.notifTitleUnread]} numberOfLines={1}>
                     {item.title}
                 </Text>
-                <Text style={styles.notifMsg} numberOfLines={2}>{item.message}</Text>
+                <Text style={styles.notifMsg} numberOfLines={2}>{item.content}</Text>
                 <Text style={styles.notifTime}>{formatTime(item.createdAt)}</Text>
             </View>
             {!item.isRead && <View style={styles.unreadDot} />}
         </TouchableOpacity>
     );
+}
+
+function getSectionTitle(dateStr: string): string {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 86400000);
+    const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    if (itemDate.getTime() === today.getTime()) return 'Hôm nay';
+    if (itemDate.getTime() === yesterday.getTime()) return 'Hôm qua';
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export default function NotificationsScreen() {
@@ -57,11 +70,39 @@ export default function NotificationsScreen() {
         fetchNotifications(true);
     }, []);
 
+    const sections = useMemo(() => {
+        const groups: Record<string, Notification[]> = {};
+        for (const notif of notifications) {
+            const title = getSectionTitle(notif.createdAt);
+            if (!groups[title]) groups[title] = [];
+            groups[title].push(notif);
+        }
+        return Object.entries(groups).map(([title, data]) => ({ title, data }));
+    }, [notifications]);
+
     const handleNotifPress = (notif: Notification) => {
         markAsRead(notif.id);
-        // Navigate based on type
-        if (notif.data?.roomId) router.push(`/property/${notif.data.roomId}` as any);
-        else if (notif.data?.chatPartnerId) router.push(`/chat/${notif.data.chatPartnerId}` as any);
+        // Navigate based on notification type (backend chỉ có type, không có data field)
+        switch (notif.type) {
+            case 'APPOINTMENT':
+                router.push('/appointments' as any);
+                break;
+            case 'CONTRACT':
+                router.push('/contracts' as any);
+                break;
+            case 'BILL':
+                router.push('/wallet' as any);
+                break;
+            case 'ROOM_APPROVED':
+                // Quay về danh sách BĐS của tôi
+                router.push('/(tabs)/profile' as any);
+                break;
+            case 'CHAT':
+                router.push('/(tabs)/chat' as any);
+                break;
+            default:
+                break;
+        }
     };
 
     return (
@@ -92,15 +133,21 @@ export default function NotificationsScreen() {
                     <Text style={styles.emptySub}>Các thông báo từ hệ thống sẽ xuất hiện ở đây</Text>
                 </View>
             ) : (
-                <FlatList
-                    data={notifications}
+                <SectionList
+                    sections={sections}
                     keyExtractor={item => item.id.toString()}
                     renderItem={({ item }) => (
                         <NotificationItem item={item} onPress={() => handleNotifPress(item)} />
                     )}
+                    renderSectionHeader={({ section: { title } }) => (
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionHeaderText}>{title}</Text>
+                        </View>
+                    )}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
                     onEndReached={() => fetchNotifications()}
                     onEndReachedThreshold={0.3}
+                    stickySectionHeadersEnabled={false}
                 />
             )}
         </View>
@@ -112,6 +159,8 @@ const styles = StyleSheet.create({
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
     headerTitle: { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
     markAllBtn: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
+    sectionHeader: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#F8F9FA' },
+    sectionHeaderText: { fontSize: 14, fontWeight: '700', color: '#888' },
     notifItem: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, backgroundColor: 'white', gap: 12 },
     notifItemUnread: { backgroundColor: '#F0F5FF' },
     iconWrapper: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },

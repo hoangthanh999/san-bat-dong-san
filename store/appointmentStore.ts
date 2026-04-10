@@ -74,8 +74,9 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
                     a.id === id ? { ...a, status: 'CANCELLED' as const } : a
                 ),
             }));
-        } catch (error) {
-            console.error('Cancel appointment error', error);
+        } catch (error: any) {
+            set({ error: error.message || 'Hủy lịch hẹn thất bại' });
+            throw error;
         }
     },
 

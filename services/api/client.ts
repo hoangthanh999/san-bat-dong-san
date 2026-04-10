@@ -2,26 +2,36 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, STORAGE_KEYS } from '../../constants';
 
-// Create Axios instance
+// Create Axios instance cho gateway (identity, customer, media, notification)
+// KHÔNG set default Content-Type ở đây — interceptor sẽ xử lý
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout: 30000,
-    headers: {
-        'Content-Type': 'application/json',
-    },
 });
 
-// Request Interceptor - Attach JWT token
+// Request Interceptor - Attach JWT token + tự động set Content-Type
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         try {
             const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
 
-            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
+            // Tự động set Content-Type dựa trên loại data
+            if (config.data instanceof FormData) {
+                // FormData → KHÔNG set Content-Type
+                // React Native sẽ tự thêm 'multipart/form-data; boundary=...'
+                // Nếu axios đã set default, xóa nó đi
+                if (config.headers['Content-Type']) {
+                    delete (config.headers as any)['Content-Type'];
+                }
+            } else if (config.data && !config.headers['Content-Type']) {
+                // JSON data mà chưa có Content-Type → set application/json
+                config.headers['Content-Type'] = 'application/json';
+            }
+
+            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
 
             return config;
         } catch (error) {
@@ -34,23 +44,28 @@ apiClient.interceptors.request.use(
     }
 );
 
-// Response Interceptor - Handle errors
+// Response Interceptor - Auto-unwrap backend ApiResponse { code, message, result }
 apiClient.interceptors.response.use(
     (response) => {
         console.log(`[API Response] ${response.config.url} - Status: ${response.status}`);
+
+        // Backend luôn trả về { code?, message?, result: T }
+        // Tự động unwrap result để service layer nhận data trực tiếp
+        if (response.data && response.data.result !== undefined) {
+            response.data = response.data.result;
+        }
+
         return response;
     },
     async (error: AxiosError) => {
-        console.error('[API Error]', error.response?.status, error.message);
+        const status = error.response?.status;
+        console.error('[API Error]', status, error.message);
 
         // Handle 401 Unauthorized - Token expired
-        if (error.response?.status === 401) {
-            // Clear token and redirect to login
+        if (status === 401) {
             await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
             await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
 
-            // You can emit an event or use navigation here to redirect to login
-            // For now, just reject with custom error
             return Promise.reject({
                 ...error,
                 message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
@@ -65,8 +80,9 @@ apiClient.interceptors.response.use(
             });
         }
 
-        // Handle other errors
-        const errorMessage = (error as any).response?.data?.message || (error as any).message || 'Đã xảy ra lỗi';
+        // Handle backend error response
+        const backendMessage = (error.response?.data as any)?.message;
+        const errorMessage = backendMessage || error.message || 'Đã xảy ra lỗi';
 
         return Promise.reject({
             ...error,

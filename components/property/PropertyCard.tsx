@@ -50,7 +50,8 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
     const { toggleFavorite } = usePropertyStore();
     const { isAuthenticated } = useAuthStore();
 
-    const player = useVideoPlayer(item.videoUrl ?? null, (p: VideoPlayer) => {
+    // Chỉ tạo player khi có videoUrl thực sự
+    const player = useVideoPlayer(item.videoUrl || null, (p: VideoPlayer) => {
         p.loop = true;
         p.muted = isMuted;
     });
@@ -59,17 +60,27 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
     const likeOpacity = useSharedValue(0);
 
     useEffect(() => {
-        if (!item.videoUrl) return;
-        if (isActive) {
-            player.play();
-        } else {
-            player.pause();
-            player.currentTime = 0;
+        if (!item.videoUrl || !player) return;
+        try {
+            if (isActive) {
+                player.play();
+            } else {
+                player.pause();
+                player.currentTime = 0;
+            }
+        } catch (e) {
+            // Player có thể đã bị release khi component unmount/remount
+            console.warn('[PropertyCard] Video player error:', e);
         }
     }, [isActive]);
 
     useEffect(() => {
-        player.muted = isMuted;
+        if (!player) return;
+        try {
+            player.muted = isMuted;
+        } catch (e) {
+            // Bỏ qua nếu player đã release
+        }
     }, [isMuted]);
 
     const handleLike = async () => {
@@ -94,19 +105,23 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
             router.push('/(auth)/login');
             return;
         }
-        if (item.landlord?.phone) {
+        if (item.landlordInfo?.phone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Linking.openURL(`tel:${item.landlord.phone}`);
+            Linking.openURL(`tel:${item.landlordInfo.phone}`);
         } else {
             Alert.alert('Thông báo', 'Số điện thoại chưa được cập nhật.');
         }
+    };
+
+    const getFullAddress = (r: Room) => {
+        return [r.addressDetail, r.ward, r.district, r.province].filter(Boolean).join(', ');
     };
 
     const handleShare = async () => {
         try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await Share.share({
-                message: `🏠 ${item.title}\n📍 ${item.address}\n💰 ${formatPrice(item.price)}/tháng\n\nXem thêm trên HomeSwipe`,
+                message: `🏠 ${item.title}\n📍 ${getFullAddress(item)}\n💰 ${formatPrice(item.price)}/tháng\n\nXem thêm trên HomeSwipe`,
                 title: item.title,
             });
         } catch (e) { }
@@ -115,7 +130,7 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
     const handleChat = () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push(`/chat/${item.landlord.id}`);
+        router.push(`/chat/${item.landlordInfo?.id}`);
     };
 
     const handlePressDetails = () => {
@@ -147,11 +162,10 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
                 onLongPress={handleLike}
                 style={styles.mediaContainer}
             >
-                {item.videoUrl ? (
+                {item.videoUrl && player ? (
                     <VideoView
                         style={styles.video}
                         player={player}
-                        allowsFullscreen={false}
                         allowsPictureInPicture={false}
                         contentFit="cover"
                         nativeControls={false}
@@ -210,7 +224,7 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
 
                 <View style={styles.row}>
                     <Feather name="map-pin" size={13} color="#ddd" />
-                    <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
+                    <Text style={styles.addressText} numberOfLines={1}>{getFullAddress(item)}</Text>
                 </View>
 
                 <View style={styles.featuresRow}>
@@ -239,8 +253,8 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
                 <TouchableOpacity onPress={handleChat} style={styles.landlordContainer}>
                     <Image
                         source={{
-                            uri: item.landlord.avatarUrl ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(item.landlord.fullName)}&background=0066FF&color=fff&size=100`,
+                            uri: item.landlordInfo?.avatarUrl ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(item.landlordInfo?.fullName || 'User')}&background=0066FF&color=fff&size=100`,
                         }}
                         style={styles.avatar}
                     />

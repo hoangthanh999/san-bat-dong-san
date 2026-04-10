@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "638030193171",
+    "project_id": "homeswipe-8446e",
+    "storage_bucket": "homeswipe-8446e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:638030193171:android:6fc2df449d89491d6555e6",
+        "android_client_info": {
+          "package_name": "com.smartrental.homeswipe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALGxUajQE6migtVK-n3D1Scfxa1ADOEx8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

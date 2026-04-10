@@ -14,7 +14,9 @@ export default function ContractDetailScreen() {
     const { selectedContract, isLoadingDetail, fetchContractDetail } = useContractStore();
 
     useEffect(() => {
-        fetchContractDetail(parseInt(id!, 10));
+        fetchContractDetail(parseInt(id!, 10)).catch((e: any) => {
+            Alert.alert('Lỗi', e.message || 'Không thể tải chi tiết hợp đồng.');
+        });
     }, [id]);
 
     const handleDownloadPDF = async () => {

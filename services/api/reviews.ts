@@ -11,11 +11,12 @@ export const reviewService = {
         return response.data;
     },
 
-    addReview: async (roomId: number, rating: number, comment: string): Promise<Review> => {
+    addReview: async (roomId: number, rating: number, comment: string, reviewImages?: string[]): Promise<Review> => {
         const response = await apiClient.post<Review>(API_ENDPOINTS.REVIEWS, {
             roomId,
             rating,
             comment,
+            reviewImages,
         });
         return response.data;
     },

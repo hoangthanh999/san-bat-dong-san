@@ -5,27 +5,36 @@ import {
     StyleSheet,
     TouchableOpacity,
     TextInput,
-    Alert,
+    ScrollView,
+    Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Review } from '../../types';
-import { useAuthStore } from '../../store/authStore';
 
 interface ReviewCardProps {
     review: Review;
     isMyReview?: boolean;
-    onReply?: (reviewId: number) => void;
+    onReply?: (reviewId: number, replyText: string) => void;
     onDelete?: (reviewId: number) => void;
 }
 
 export function ReviewCard({ review, isMyReview, onReply, onDelete }: ReviewCardProps) {
     const [showReplyInput, setShowReplyInput] = useState(false);
     const [replyText, setReplyText] = useState('');
+    const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
     const formatDate = (dateStr: string) => {
         const d = new Date(dateStr);
         return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    const handleSendReply = () => {
+        if (replyText.trim()) {
+            onReply?.(review.id, replyText.trim());
+            setShowReplyInput(false);
+            setReplyText('');
+        }
     };
 
     return (
@@ -60,19 +69,30 @@ export function ReviewCard({ review, isMyReview, onReply, onDelete }: ReviewCard
 
             <Text style={styles.comment}>{review.comment}</Text>
 
+            {/* Review Images */}
+            {review.reviewImages && review.reviewImages.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
+                    {review.reviewImages.map((img, index) => (
+                        <TouchableOpacity key={index} onPress={() => setFullScreenImage(img)} activeOpacity={0.8}>
+                            <Image source={{ uri: img }} style={styles.reviewImage} contentFit="cover" />
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            )}
+
             {/* Reply from landlord */}
-            {review.reply && (
+            {(review.reply || review.landlordReply) && (
                 <View style={styles.replyBox}>
                     <View style={styles.replyHeader}>
                         <Ionicons name="arrow-redo" size={14} color="#0066FF" />
                         <Text style={styles.replyLabel}>Phản hồi từ chủ nhà</Text>
                     </View>
-                    <Text style={styles.replyText}>{review.reply}</Text>
+                    <Text style={styles.replyText}>{review.reply || review.landlordReply}</Text>
                 </View>
             )}
 
             {/* Reply button for landlord */}
-            {onReply && !review.reply && (
+            {onReply && !review.reply && !review.landlordReply && (
                 <TouchableOpacity
                     style={styles.replyButton}
                     onPress={() => setShowReplyInput(!showReplyInput)}
@@ -91,20 +111,23 @@ export function ReviewCard({ review, isMyReview, onReply, onDelete }: ReviewCard
                         onChangeText={setReplyText}
                         multiline
                     />
-                    <TouchableOpacity
-                        style={styles.sendReplyBtn}
-                        onPress={() => {
-                            if (replyText.trim()) {
-                                onReply?.(review.id);
-                                setShowReplyInput(false);
-                                setReplyText('');
-                            }
-                        }}
-                    >
+                    <TouchableOpacity style={styles.sendReplyBtn} onPress={handleSendReply}>
                         <Text style={styles.sendReplyText}>Gửi</Text>
                     </TouchableOpacity>
                 </View>
             )}
+
+            {/* Full screen image modal */}
+            <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={() => setFullScreenImage(null)}>
+                <View style={styles.fullScreenOverlay}>
+                    <TouchableOpacity style={styles.fullScreenClose} onPress={() => setFullScreenImage(null)}>
+                        <Ionicons name="close" size={28} color="white" />
+                    </TouchableOpacity>
+                    {fullScreenImage && (
+                        <Image source={{ uri: fullScreenImage }} style={styles.fullScreenImage} contentFit="contain" />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -158,6 +181,16 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#444',
         lineHeight: 20,
+    },
+    imageScroll: {
+        marginTop: 10,
+    },
+    reviewImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 8,
+        marginRight: 8,
+        backgroundColor: '#F0F0F0',
     },
     replyBox: {
         backgroundColor: '#F0F5FF',
@@ -217,5 +250,22 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: '600',
         fontSize: 13,
+    },
+    fullScreenOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fullScreenClose: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        zIndex: 10,
+        padding: 8,
+    },
+    fullScreenImage: {
+        width: '100%',
+        height: '80%',
     },
 });

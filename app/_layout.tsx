@@ -138,12 +138,11 @@ export default function RootLayout() {
                 {/* Package screens */}
                 <Stack.Screen name="packages/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
                 <Stack.Screen name="packages/boost/[roomId]" options={{ headerShown: false, animation: 'slide_from_right' }} />
-                <Stack.Screen name="+not-found" />
-
-                <Stack.Screen
-                    name="(auth)/onboarding"
-                    options={{ headerShown: false, animation: 'fade' }}
-                />
+                {/* Settings screens */}
+                <Stack.Screen name="settings/security" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                {/* Landlord profile */}
+                <Stack.Screen name="landlord-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                <Stack.Screen name="+not-found" options={{ headerShown: false }} />
             </Stack>
             <AuthGuard />
         </GestureHandlerRootView>

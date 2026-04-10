@@ -21,11 +21,13 @@ import MapView, { Marker, PROVIDER_GOOGLE, Circle } from 'react-native-maps';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 
 import { usePropertyStore } from '../../store/propertyStore';
 import { useAuthStore } from '../../store/authStore';
 import { useReviewStore } from '../../store/reviewStore';
 import { useAppointmentStore } from '../../store/appointmentStore';
+import { roomService } from '../../services/api/rooms';
 import { ImageGallery } from '../../components/property/ImageGallery';
 import { ReviewCard } from '../../components/property/ReviewCard';
 import { Room } from '../../types';
@@ -61,10 +63,13 @@ export default function PropertyDetailScreen() {
     const [showFullMap, setShowFullMap] = useState(false);
     const [reviewRating, setReviewRating] = useState(5);
     const [reviewComment, setReviewComment] = useState('');
+    const [reviewImages, setReviewImages] = useState<string[]>([]);
     const [bookingDate, setBookingDate] = useState('');
     const [bookingNote, setBookingNote] = useState('');
     const [userDistance, setUserDistance] = useState<string | null>(null);
     const [descExpanded, setDescExpanded] = useState(false);
+    const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const roomId = Number(id);
     const room = currentRoom?.id === roomId ? currentRoom : null;
@@ -78,15 +83,20 @@ export default function PropertyDetailScreen() {
         }
     }, [roomId]);
 
+    // Helper: ghép địa chỉ từ các trường tách riêng của backend
+    const getFullAddress = (r: Room) => {
+        return [r.addressDetail, r.ward, r.district, r.province].filter(Boolean).join(', ');
+    };
+
     const fetchDistanceFromUser = async () => {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') return;
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-            if (room?.location) {
+            if (room?.latitude && room?.longitude) {
                 const dist = calculateDistance(
                     loc.coords.latitude, loc.coords.longitude,
-                    room.location.latitude, room.location.longitude
+                    room.latitude, room.longitude
                 );
                 setUserDistance(dist < 1 ? `${Math.round(dist * 1000)}m` : `${dist.toFixed(1)}km`);
             }
@@ -112,7 +122,7 @@ export default function PropertyDetailScreen() {
     const handleShare = async () => {
         try {
             await Share.share({
-                message: `${room?.title}\n${room?.address}\nGiá: ${formatPrice(room?.price || 0)}/tháng\n\nXem thêm trên HomeSwipe`,
+                message: `${room?.title}\n${room ? getFullAddress(room) : ''}\nGiá: ${formatPrice(room?.price || 0)}/tháng\n\nXem thêm trên HomeSwipe`,
                 title: room?.title,
             });
         } catch (e) { }
@@ -120,9 +130,9 @@ export default function PropertyDetailScreen() {
 
     const handleCall = () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
-        if (room?.landlord?.phone) {
+        if (room?.landlordInfo?.phone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Linking.openURL(`tel:${room.landlord.phone}`);
+            Linking.openURL(`tel:${room.landlordInfo.phone}`);
         } else {
             Alert.alert('Thông báo', 'Số điện thoại chủ nhà chưa được cập nhật.');
         }
@@ -130,16 +140,16 @@ export default function PropertyDetailScreen() {
 
     const handleChat = () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
-        router.push(`/chat/${room?.landlord?.id}`);
+        router.push(`/chat/${room?.landlordInfo?.id}`);
     };
 
     const handleNavigate = () => {
-        if (!room?.location) return;
-        const { latitude, longitude } = room.location;
+        if (!room?.latitude || !room?.longitude) return;
+        const { latitude, longitude } = room;
 
         Alert.alert(
             'Chỉ đường đến đây',
-            room.address,
+            getFullAddress(room),
             [
                 { text: 'Bản đồ trong app', onPress: () => setShowFullMap(true) },
                 { text: 'Google Maps', onPress: () => openGoogleMaps(latitude, longitude) },
@@ -168,19 +178,32 @@ export default function PropertyDetailScreen() {
 
     const copyAddress = () => {
         // Clipboard not installed, just show alert
-        Alert.alert('Đã sao chép', room?.address || '');
+        Alert.alert('Đã sao chép', room ? getFullAddress(room) : '');
     };
 
     const handleSubmitReview = async () => {
         if (!reviewComment.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập nội dung đánh giá'); return; }
         try {
-            await addReview(roomId, reviewRating, reviewComment);
+            await addReview(roomId, reviewRating, reviewComment, reviewImages.length > 0 ? reviewImages : undefined);
             setShowReviewModal(false);
             setReviewComment('');
             setReviewRating(5);
+            setReviewImages([]);
             Alert.alert('Thành công', 'Cảm ơn bạn đã đánh giá!');
         } catch (e: any) {
             Alert.alert('Lỗi', e.message || 'Gửi đánh giá thất bại');
+        }
+    };
+
+    const pickReviewImages = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsMultipleSelection: true,
+            quality: 0.8,
+            selectionLimit: 5 - reviewImages.length,
+        });
+        if (!result.canceled) {
+            setReviewImages(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));
         }
     };
 
@@ -201,6 +224,65 @@ export default function PropertyDetailScreen() {
     const formatPrice = (price: number) => {
         if (price >= 1000000000) return `${(price / 1000000000).toFixed(1)} tỷ`;
         return `${(price / 1000000).toFixed(0)} triệu`;
+    };
+
+    // Check if current user is the owner
+    const isOwner = user && room && room.landlordInfo && user.id === room.landlordInfo.id;
+
+    const handleToggleStatus = async () => {
+        if (!room) return;
+        const newStatus = room.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+        const label = newStatus === 'ACTIVE' ? 'hiện' : 'ẩn';
+        Alert.alert(
+            `${newStatus === 'ACTIVE' ? 'Hiện' : 'Ẩn'} tin đăng`,
+            `Bạn có chắc muốn ${label} tin "${room.title}"?`,
+            [
+                { text: 'Huỷ', style: 'cancel' },
+                {
+                    text: `${newStatus === 'ACTIVE' ? 'Hiện' : 'Ẩn'} tin`,
+                    onPress: async () => {
+                        setIsTogglingStatus(true);
+                        try {
+                            await roomService.updateStatus(room.id, newStatus);
+                            fetchRoomDetail(room.id); // refresh
+                            Alert.alert('Thành công', `Tin đã được ${label}`);
+                        } catch (e: any) {
+                            Alert.alert('Lỗi', e.message || `Không thể ${label} tin`);
+                        } finally {
+                            setIsTogglingStatus(false);
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
+    const handleDeleteProperty = () => {
+        if (!room) return;
+        Alert.alert(
+            'Xoá tin đăng',
+            `Bạn có chắc muốn xoá vĩnh viễn tin "${room.title}"? Hành động này không thể hoàn tác.`,
+            [
+                { text: 'Huỷ', style: 'cancel' },
+                {
+                    text: 'Xoá vĩnh viễn',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsDeleting(true);
+                        try {
+                            await roomService.deleteRoom(room.id);
+                            Alert.alert('Thành công', 'Tin đăng đã được xoá', [
+                                { text: 'OK', onPress: () => router.back() },
+                            ]);
+                        } catch (e: any) {
+                            Alert.alert('Lỗi', e.message || 'Không thể xoá tin');
+                        } finally {
+                            setIsDeleting(false);
+                        }
+                    },
+                },
+            ],
+        );
     };
 
     if (isLoading || !room) {
@@ -267,7 +349,7 @@ export default function PropertyDetailScreen() {
                     {/* Address row with navigate */}
                     <TouchableOpacity style={styles.addressRow} onPress={handleNavigate} activeOpacity={0.7}>
                         <Ionicons name="location" size={16} color="#0066FF" />
-                        <Text style={styles.addressText} numberOfLines={2}>{room.address}</Text>
+                        <Text style={styles.addressText} numberOfLines={2}>{getFullAddress(room)}</Text>
                         <View style={styles.directionChip}>
                             <Ionicons name="navigate-outline" size={12} color="#0066FF" />
                             <Text style={styles.directionText}>Chỉ đường</Text>
@@ -400,7 +482,7 @@ export default function PropertyDetailScreen() {
                             )}
 
                             {/* Map Section */}
-                            {room.location && (
+                            {room.latitude && room.longitude && (
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>📍 Vị trí</Text>
 
@@ -414,8 +496,8 @@ export default function PropertyDetailScreen() {
                                             style={styles.map}
                                             provider={PROVIDER_GOOGLE}
                                             initialRegion={{
-                                                latitude: room.location.latitude,
-                                                longitude: room.location.longitude,
+                                                latitude: room.latitude,
+                                                longitude: room.longitude,
                                                 latitudeDelta: 0.005,
                                                 longitudeDelta: 0.005,
                                             }}
@@ -425,8 +507,8 @@ export default function PropertyDetailScreen() {
                                             rotateEnabled={false}
                                         >
                                             <Marker coordinate={{
-                                                latitude: room.location.latitude,
-                                                longitude: room.location.longitude,
+                                                latitude: room.latitude,
+                                                longitude: room.longitude,
                                             }} />
                                         </MapView>
                                         <View style={styles.mapExpandBtn}>
@@ -438,7 +520,7 @@ export default function PropertyDetailScreen() {
                                     {/* Address row */}
                                     <TouchableOpacity style={styles.addressNavRow} onPress={handleNavigate}>
                                         <Ionicons name="location" size={16} color="#0066FF" />
-                                        <Text style={styles.fullAddress} numberOfLines={2}>{room.address}</Text>
+                                        <Text style={styles.fullAddress} numberOfLines={2}>{getFullAddress(room)}</Text>
                                         <View style={styles.directionBtn}>
                                             <Ionicons name="navigate" size={14} color="white" />
                                             <Text style={styles.directionBtnText}>Chỉ đường</Text>
@@ -460,19 +542,25 @@ export default function PropertyDetailScreen() {
                             )}
 
                             {/* Landlord Card */}
+                            {room.landlordInfo && (
                             <View style={styles.section}>
                                 <Text style={styles.sectionTitle}>👤 Thông tin chủ nhà</Text>
-                                <View style={styles.landlordCard}>
+                                <TouchableOpacity
+                                    style={styles.landlordCard}
+                                    onPress={() => router.push(`/landlord-profile?slug=${(room.landlordInfo as any)?.slug || ''}&landlordId=${room.landlordInfo?.id}` as any)}
+                                    activeOpacity={0.7}
+                                >
                                     <Image
-                                        source={{ uri: room.landlord.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(room.landlord.fullName)}&background=0066FF&color=fff` }}
+                                        source={{ uri: room.landlordInfo.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(room.landlordInfo.fullName || 'User')}&background=0066FF&color=fff` }}
                                         style={styles.landlordAvatar}
                                     />
                                     <View style={styles.landlordInfo}>
-                                        <Text style={styles.landlordName}>{room.landlord.fullName}</Text>
+                                        <Text style={styles.landlordName}>{room.landlordInfo.fullName}</Text>
                                         <View style={styles.verifiedBadge}>
                                             <Ionicons name="checkmark-circle" size={14} color="#0066FF" />
                                             <Text style={styles.verifiedText}>Đã xác minh</Text>
                                         </View>
+                                        <Text style={{ fontSize: 12, color: '#0066FF', marginTop: 2 }}>Xem hồ sơ →</Text>
                                     </View>
                                     <View style={styles.landlordBtns}>
                                         <TouchableOpacity style={styles.landlordCallBtn} onPress={handleCall}>
@@ -482,8 +570,56 @@ export default function PropertyDetailScreen() {
                                             <Ionicons name="chatbubble-ellipses" size={18} color="#0066FF" />
                                         </TouchableOpacity>
                                     </View>
-                                </View>
+                                </TouchableOpacity>
                             </View>
+                            )}
+
+                            {/* Owner Management Section */}
+                            {isOwner && (
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>⚙️ Quản lý tin đăng</Text>
+                                    <View style={{ gap: 10 }}>
+                                        <TouchableOpacity
+                                            style={[styles.ownerActionBtn, { backgroundColor: room.status === 'ACTIVE' ? '#FFF3E0' : '#E8F5E9' }]}
+                                            onPress={handleToggleStatus}
+                                            disabled={isTogglingStatus}
+                                        >
+                                            {isTogglingStatus ? (
+                                                <ActivityIndicator size="small" color="#999" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons
+                                                        name={room.status === 'ACTIVE' ? 'eye-off-outline' : 'eye-outline'}
+                                                        size={20}
+                                                        color={room.status === 'ACTIVE' ? '#E65100' : '#2E7D32'}
+                                                    />
+                                                    <Text style={[
+                                                        styles.ownerActionText,
+                                                        { color: room.status === 'ACTIVE' ? '#E65100' : '#2E7D32' },
+                                                    ]}>
+                                                        {room.status === 'ACTIVE' ? 'Ẩn tin đăng' : 'Hiện tin đăng'}
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={[styles.ownerActionBtn, { backgroundColor: '#FFEBEE' }]}
+                                            onPress={handleDeleteProperty}
+                                            disabled={isDeleting}
+                                        >
+                                            {isDeleting ? (
+                                                <ActivityIndicator size="small" color="#EF4444" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                                                    <Text style={[styles.ownerActionText, { color: '#EF4444' }]}>Xoá tin đăng</Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
                         </>
                     )}
 
@@ -532,7 +668,7 @@ export default function PropertyDetailScreen() {
                     <Text style={styles.bottomUnit}>/tháng</Text>
                 </View>
                 {/* If user is the landlord of this room: show Boost + Edit */}
-                {user?.id === room.landlord?.id ? (
+                {user?.id === room.landlordInfo?.id ? (
                     <View style={styles.bottomBtns}>
                         <TouchableOpacity
                             style={styles.scheduleBtn}
@@ -579,23 +715,23 @@ export default function PropertyDetailScreen() {
                         style={{ flex: 1 }}
                         provider={PROVIDER_GOOGLE}
                         initialRegion={{
-                            latitude: room.location?.latitude || 10.762622,
-                            longitude: room.location?.longitude || 106.660172,
+                            latitude: room.latitude || 10.762622,
+                            longitude: room.longitude || 106.660172,
                             latitudeDelta: 0.01,
                             longitudeDelta: 0.01,
                         }}
                         showsUserLocation
                         showsMyLocationButton
                     >
-                        {room.location && (
+                        {room.latitude && room.longitude && (
                             <>
                                 <Marker
-                                    coordinate={{ latitude: room.location.latitude, longitude: room.location.longitude }}
+                                    coordinate={{ latitude: room.latitude, longitude: room.longitude }}
                                     title={room.title}
                                     description={formatPrice(room.price) + '/tháng'}
                                 />
                                 <Circle
-                                    center={{ latitude: room.location.latitude, longitude: room.location.longitude }}
+                                    center={{ latitude: room.latitude, longitude: room.longitude }}
                                     radius={500}
                                     fillColor="rgba(0, 102, 255, 0.08)"
                                     strokeColor="rgba(0, 102, 255, 0.3)"
@@ -643,6 +779,28 @@ export default function PropertyDetailScreen() {
                             value={reviewComment}
                             onChangeText={setReviewComment}
                         />
+                        <Text style={styles.modalLabel}>Thêm ảnh thực tế (tối đa 5)</Text>
+                        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                            {reviewImages.map((uri, i) => (
+                                <View key={i} style={{ position: 'relative' }}>
+                                    <Image source={{ uri }} style={{ width: 64, height: 64, borderRadius: 8 }} />
+                                    <TouchableOpacity
+                                        style={{ position: 'absolute', top: -6, right: -6, backgroundColor: '#EF4444', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}
+                                        onPress={() => setReviewImages(prev => prev.filter((_, idx) => idx !== i))}
+                                    >
+                                        <Ionicons name="close" size={12} color="white" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                            {reviewImages.length < 5 && (
+                                <TouchableOpacity
+                                    style={{ width: 64, height: 64, borderRadius: 8, borderWidth: 2, borderColor: '#E0E0E0', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' }}
+                                    onPress={pickReviewImages}
+                                >
+                                    <Ionicons name="camera-outline" size={24} color="#0066FF" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
                         <TouchableOpacity
                             style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
                             onPress={handleSubmitReview}
@@ -905,4 +1063,9 @@ const styles = StyleSheet.create({
     submitBtn: { backgroundColor: '#0066FF', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
     submitBtnDisabled: { backgroundColor: '#AAC8FF' },
     submitBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
+    ownerActionBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12,
+    },
+    ownerActionText: { fontSize: 15, fontWeight: '600' },
 });

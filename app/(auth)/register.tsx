@@ -20,6 +20,7 @@ export default function RegisterScreen() {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [phone, setPhone] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
 
@@ -27,6 +28,7 @@ export default function RegisterScreen() {
         let errors: { [key: string]: string } = {};
         if (!fullName) errors.fullName = 'Vui lòng nhập họ tên';
         if (!email) errors.email = 'Vui lòng nhập email';
+        if (!phone) errors.phone = 'Vui lòng nhập số điện thoại';
         if (!password) errors.password = 'Vui lòng nhập mật khẩu';
         if (password.length < 6) errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
         if (password !== confirmPassword) errors.confirmPassword = 'Mật khẩu không khớp';
@@ -38,7 +40,7 @@ export default function RegisterScreen() {
         if (!validate()) return;
 
         try {
-            await register({ email, password, fullName });
+            await register({ email, password, fullName, phone });
             // Suggest routing to login or auto-login
             router.replace('/(auth)/login');
         } catch (err) {
@@ -75,7 +77,13 @@ export default function RegisterScreen() {
                         autoCapitalize="none"
                         error={fieldErrors.email}
                     />
-
+                    <Input
+                        label="Số điện thoại"
+                        placeholder="0123456789"
+                        value={phone}
+                        onChangeText={setPhone}
+                        error={fieldErrors.phone}
+                    />
                     <Input
                         label="Mật khẩu"
                         placeholder="••••••••"
