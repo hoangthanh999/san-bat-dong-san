@@ -1,29 +1,37 @@
-import apiClient from './client';
+import paymentClient from './paymentClient';
+import { API_ENDPOINTS } from '../../constants';
 import { ServicePackage, PackageType } from '../../types';
 
 export const packageService = {
     /**
      * Lấy danh sách gói dịch vụ
-     * type: MEMBERSHIP | ROOM_PROMOTION
+     * ⚠️ Backend chưa có API list packages — đang phát triển
      */
     getServicePackages: async (type?: PackageType): Promise<ServicePackage[]> => {
-        const response = await apiClient.get<ServicePackage[]>('/packages', {
-            params: type ? { type } : undefined,
-        });
-        return response.data;
+        // TODO: Backend chưa có endpoint GET /api/packages
+        console.warn('[packageService] getServicePackages: API chưa có trong backend - đang phát triển');
+        return [];
     },
 
     /**
-     * Mua gói hội viên — trừ tiền từ ví
+     * Mua gói hội viên
+     * POST /api/packages/buy-membership?userId=X&packageId=Y
+     * Gọi trực tiếp payment-service:8087 (không qua nginx)
+     *
+     * Backend: ServicePackageController.buyMembership(@RequestParam userId, @RequestParam packageId)
      */
-    purchaseMembership: async (packageId: number): Promise<void> => {
-        await apiClient.post('/packages/purchase/membership', { packageId });
+    purchaseMembership: async (userId: number, packageId: number): Promise<void> => {
+        await paymentClient.post(API_ENDPOINTS.PACKAGE_BUY_MEMBERSHIP, null, {
+            params: { userId, packageId },
+        });
     },
 
     /**
-     * Boost tin đăng — trừ tiền từ ví
+     * Boost tin đăng
+     * ⚠️ Backend chưa có API boost — đang phát triển
      */
     boostRoom: async (data: { roomId: number; packageId: number }): Promise<void> => {
-        await apiClient.post('/packages/purchase/boost', data);
+        // TODO: Backend chưa có endpoint POST /api/packages/boost
+        console.warn('[packageService] boostRoom: API chưa có trong backend - đang phát triển');
     },
 };

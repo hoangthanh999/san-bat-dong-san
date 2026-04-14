@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Platform, Alert, ActivityIndicator, StatusBar,
@@ -7,9 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { authService } from '../../services/api/auth';
 import { useAuthStore } from '../../store/authStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SecuritySettingsScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { logout } = useAuthStore();
 
     // ========== Change Password ==========
@@ -77,7 +79,7 @@ export default function SecuritySettingsScreen() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -214,7 +216,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
         paddingBottom: 12, backgroundColor: 'white',
         borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },

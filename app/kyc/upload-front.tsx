@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     StatusBar, Platform, Alert, Image, ActivityIndicator,
@@ -8,9 +8,11 @@ import { useRouter, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKYCStore } from '../../store/kycStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function KYCUploadFrontScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [imageUri, setImageUri] = useState<string | null>(null);
     const { scanCitizenId, isScanning } = useKYCStore();
 
@@ -95,7 +97,7 @@ export default function KYCUploadFrontScreen() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -203,7 +205,7 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
         paddingBottom: 12,
         backgroundColor: 'white',
     },

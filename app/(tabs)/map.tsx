@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+﻿import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     View, StyleSheet, FlatList, Dimensions, StatusBar,
     TouchableOpacity, Text, ScrollView, Animated, Platform, Alert,
@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { usePropertyStore } from '../../store/propertyStore';
 import { Room } from '../../types';
 import { DEFAULT_MAP_REGION } from '../../constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.82;
@@ -31,45 +32,43 @@ const FILTER_CHIPS = [
 
 const MOCK_MAP_ROOMS: Room[] = [
     {
-        id: 1, title: 'Căn hộ cao cấp view sông', price: 15000000, area: 85, deposit: 30000000,
-        province: 'TP.HCM', district: 'Bình Thạnh', ward: '', addressDetail: 'Vinhomes Central Park',
+        id: 1, title: 'Căn hộ cao cấp view sông', price: 15000000, area: 85,
+        address: 'Vinhomes Central Park, Bình Thạnh, TP.HCM',
         images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400'],
-        latitude: 10.795, longitude: 106.72, rentalType: 'WHOLE', status: 'ACTIVE',
-        landlordInfo: { id: 101, fullName: 'Nguyễn Văn A', avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg', phone: '0901234567' },
-        numBedrooms: 2, numBathrooms: 2, averageRating: 4.8, totalReviews: 12, createdAt: new Date().toISOString(),
-        description: '', amenities: ['Pool', 'Gym'],
+        latitude: 10.795, longitude: 106.72, transactionType: 'RENT', propertyType: 'APARTMENT', status: 'ACTIVE',
+        ownerId: 101,
+        bedrooms: 2, bathrooms: 2, createdAt: new Date().toISOString(),
+        amenities: ['Pool', 'Gym'],
     },
     {
-        id: 2, title: 'Phòng trọ gần ĐH Bách Khoa', price: 3500000, area: 25, deposit: 3500000,
-        province: 'TP.HCM', district: 'Quận 10', ward: '', addressDetail: 'Lý Thường Kiệt',
+        id: 2, title: 'Phòng trọ gần ĐH Bách Khoa', price: 3500000, area: 25,
+        address: 'Lý Thường Kiệt, Quận 10, TP.HCM',
         images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400'],
-        latitude: 10.772, longitude: 106.658, rentalType: 'WHOLE', status: 'ACTIVE',
-        landlordInfo: { id: 102, fullName: 'Trần Thị B', phone: '0912345678' },
-        numBedrooms: 1, numBathrooms: 1, averageRating: 4.2, totalReviews: 5, createdAt: new Date().toISOString(),
-        description: '',
+        latitude: 10.772, longitude: 106.658, transactionType: 'RENT', propertyType: 'ROOM', status: 'ACTIVE',
+        ownerId: 102,
+        bedrooms: 1, bathrooms: 1, createdAt: new Date().toISOString(),
     },
     {
-        id: 3, title: 'Nhà mặt tiền kinh doanh Q7', price: 25000000, area: 120, deposit: 50000000,
-        province: 'TP.HCM', district: 'Quận 7', ward: '', addressDetail: 'Nguyễn Văn Linh',
+        id: 3, title: 'Nhà mặt tiền kinh doanh Q7', price: 25000000, area: 120,
+        address: 'Nguyễn Văn Linh, Quận 7, TP.HCM',
         images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400'],
-        latitude: 10.73, longitude: 106.7, rentalType: 'WHOLE', status: 'ACTIVE',
-        landlordInfo: { id: 103, fullName: 'Lê Văn C', phone: '0987654321' },
-        numBedrooms: 4, numBathrooms: 3, averageRating: 5.0, totalReviews: 2, createdAt: new Date().toISOString(),
-        description: '',
+        latitude: 10.73, longitude: 106.7, transactionType: 'RENT', propertyType: 'HOUSE', status: 'ACTIVE',
+        ownerId: 103,
+        bedrooms: 4, bathrooms: 3, createdAt: new Date().toISOString(),
     },
     {
-        id: 4, title: 'Studio hiện đại gần Metro', price: 8500000, area: 35, deposit: 17000000,
-        province: 'TP.HCM', district: 'Bình Thạnh', ward: '', addressDetail: 'Điện Biên Phủ',
+        id: 4, title: 'Studio hiện đại gần Metro', price: 8500000, area: 35,
+        address: 'Điện Biên Phủ, Bình Thạnh, TP.HCM',
         images: ['https://images.unsplash.com/photo-1560448205-4d9b3e6bb6db?w=400'],
-        latitude: 10.789, longitude: 106.715, rentalType: 'WHOLE', status: 'ACTIVE',
-        landlordInfo: { id: 104, fullName: 'Phạm Thị D', phone: '0933445566' },
-        numBedrooms: 0, numBathrooms: 1, averageRating: 4.5, totalReviews: 8, createdAt: new Date().toISOString(),
-        description: '',
+        latitude: 10.789, longitude: 106.715, transactionType: 'RENT', propertyType: 'APARTMENT', status: 'ACTIVE',
+        ownerId: 104,
+        bedrooms: 0, bathrooms: 1, createdAt: new Date().toISOString(),
     },
 ];
 
 export default function MapScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { rooms, fetchRooms, isLoading } = usePropertyStore();
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
     const [activeFilter, setActiveFilter] = useState('all');
@@ -85,10 +84,10 @@ export default function MapScreen() {
             case 'cheap': return room.price < 5000000;
             case 'mid': return room.price >= 5000000 && room.price <= 15000000;
             case 'high': return room.price > 15000000;
-            case '1pn': return room.numBedrooms === 1;
-            case '2pn': return room.numBedrooms === 2;
-            case '3pn': return (room.numBedrooms || 0) >= 3;
-            case 'whole': return room.rentalType === 'WHOLE';
+            case '1pn': return room.bedrooms === 1;
+            case '2pn': return room.bedrooms === 2;
+            case '3pn': return (room.bedrooms || 0) >= 3;
+            case 'whole': return room.propertyType === 'HOUSE';
             default: return true;
         }
     });
@@ -191,7 +190,7 @@ export default function MapScreen() {
             </MapView>
 
             {/* Search Bar */}
-            <View style={styles.searchContainer}>
+            <View style={[styles.searchContainer, { top: insets.top + 8 }]}>
                 <TouchableOpacity
                     style={styles.searchBar}
                     onPress={() => router.push('/filter' as any)}
@@ -209,7 +208,7 @@ export default function MapScreen() {
             </View>
 
             {/* Filter Chips */}
-            <View style={styles.chipsContainer}>
+            <View style={[styles.chipsContainer, { top: insets.top + 64 }]}>
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -265,13 +264,13 @@ export default function MapScreen() {
                             {selectedRoom.title}
                         </Text>
                         <Text style={styles.cardAddress} numberOfLines={1}>
-                            📍 {[selectedRoom.addressDetail, selectedRoom.district, selectedRoom.province].filter(Boolean).join(', ')}
+                            📍 {selectedRoom.address}
                         </Text>
                         <View style={styles.cardMeta}>
-                            {selectedRoom.numBedrooms !== undefined && (
+                            {selectedRoom.bedrooms !== undefined && (
                                 <View style={styles.metaItem}>
                                     <Ionicons name="bed-outline" size={12} color="#666" />
-                                    <Text style={styles.metaText}>{selectedRoom.numBedrooms} PN</Text>
+                                    <Text style={styles.metaText}>{selectedRoom.bedrooms} PN</Text>
                                 </View>
                             )}
                             <View style={styles.metaItem}>
@@ -301,7 +300,7 @@ const styles = StyleSheet.create({
     map: { width: '100%', height: '100%' },
     searchContainer: {
         position: 'absolute',
-        top: Platform.OS === 'ios' ? 54 : 16,
+        top: 0, // overridden by inline style,
         left: 16,
         right: 16,
     },
@@ -330,7 +329,7 @@ const styles = StyleSheet.create({
     },
     chipsContainer: {
         position: 'absolute',
-        top: Platform.OS === 'ios' ? 112 : 74,
+        top: 0, // overridden by inline style,
         left: 0,
         right: 0,
     },

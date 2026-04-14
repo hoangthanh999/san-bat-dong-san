@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar,
     Platform, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useContractStore } from '../../store/contractStore';
 import { Contract, ContractStatus } from '../../types';
 
@@ -69,19 +70,20 @@ function ContractCard({ contract, onPress }: { contract: Contract; onPress: () =
 
 export default function ContractsScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { contracts, isLoading, fetchContracts } = useContractStore();
     const [activeTab, setActiveTab] = useState<ContractStatus | 'ALL'>('ACTIVE');
     const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
-        fetchContracts(true, activeTab === 'ALL' ? undefined : activeTab).catch(() => {});
+        fetchContracts(true, activeTab === 'ALL' ? undefined : activeTab).catch(() => { });
     }, [activeTab]);
 
     const onRefresh = async () => {
         setRefreshing(true);
         try {
             await fetchContracts(true, activeTab === 'ALL' ? undefined : activeTab);
-        } catch {}
+        } catch { }
         setRefreshing(false);
     };
 
@@ -90,7 +92,7 @@ export default function ContractsScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -144,7 +146,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12,
+        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },

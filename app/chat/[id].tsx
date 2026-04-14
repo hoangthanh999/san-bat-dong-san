@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import {
     View, Text, FlatList, TouchableOpacity, StyleSheet,
     TextInput, KeyboardAvoidingView, Platform, StatusBar,
@@ -11,7 +11,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { ChatMessage } from '../../types';
@@ -34,6 +34,7 @@ export default function ChatDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const partnerId = Number(id);
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { user } = useAuthStore();
     const { messages, conversations, fetchHistory, sendMessage, markAsRead, isLoading, connectWebSocket } = useChatStore();
 
@@ -256,7 +257,7 @@ export default function ChatDetailScreen() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -417,7 +418,7 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 12,
-        paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
         paddingBottom: 12,
         backgroundColor: 'white',
         borderBottomWidth: 1, borderBottomColor: '#F0F0F0',

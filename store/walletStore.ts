@@ -1,67 +1,70 @@
 import { create } from 'zustand';
-import { Transaction, WalletBalance } from '../types';
+import { Transaction } from '../types';
 import { walletService } from '../services/api/wallet';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../constants';
 
 interface WalletState {
-    balance: number;
     transactions: Transaction[];
     paymentUrl: string | null;
     isLoading: boolean;
     isCreatingPayment: boolean;
-    hasMore: boolean;
-    page: number;
     error: string | null;
 
-    fetchBalance: () => Promise<void>;
     createPayment: (amount: number) => Promise<string>;
-    fetchTransactions: (reset?: boolean, type?: string) => Promise<void>;
+    fetchTransactions: () => Promise<void>;
     clearPaymentUrl: () => void;
 }
 
+/**
+ * Helper: Lấy userId đã lưu khi login từ AsyncStorage
+ */
+async function getUserId(): Promise<number> {
+    const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+    if (!userData) throw new Error('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+    const user = JSON.parse(userData);
+    return user.id;
+}
+
 export const useWalletStore = create<WalletState>((set, get) => ({
-    balance: 0,
     transactions: [],
     paymentUrl: null,
     isLoading: false,
     isCreatingPayment: false,
-    hasMore: true,
-    page: 0,
     error: null,
 
-    fetchBalance: async () => {
-        try {
-            const data = await walletService.getWalletBalance();
-            set({ balance: data.balance });
-        } catch (error: any) {
-            console.error('Fetch wallet balance error:', error);
-        }
-    },
-
+    /**
+     * Tạo URL thanh toán VNPay
+     * Backend: POST /api/payment/create-payment?amount=X&userId=Y
+     * Trả về: { url: "https://sandbox.vnpay..." }
+     */
     createPayment: async (amount: number): Promise<string> => {
         set({ isCreatingPayment: true, error: null });
         try {
-            const data = await walletService.createVNPayPayment(amount);
-            set({ paymentUrl: data.paymentUrl, isCreatingPayment: false });
-            return data.paymentUrl;
+            const userId = await getUserId();
+            const data = await walletService.createVNPayPayment(amount, userId);
+            set({ paymentUrl: data.url, isCreatingPayment: false });
+            return data.url;
         } catch (error: any) {
             set({ error: error.message || 'Tạo thanh toán thất bại', isCreatingPayment: false });
             throw error;
         }
     },
 
-    fetchTransactions: async (reset = false, type?: string) => {
-        const { page, hasMore } = get();
-        if (!reset && !hasMore) return;
-        const currentPage = reset ? 0 : page;
-        set({ isLoading: true });
+    /**
+     * Lấy lịch sử giao dịch
+     * Backend: GET /api/transactions/my-history/{userId}
+     * Trả về: List<Transaction> (không phân trang)
+     */
+    fetchTransactions: async () => {
+        set({ isLoading: true, error: null });
         try {
-            const data = await walletService.getTransactionHistory({ page: currentPage, type });
-            set((state) => ({
-                transactions: reset ? data.content : [...state.transactions, ...data.content],
-                hasMore: !data.last,
-                page: data.number + 1,
+            const userId = await getUserId();
+            const data = await walletService.getTransactionHistory(userId);
+            set({
+                transactions: data,
                 isLoading: false,
-            }));
+            });
         } catch (error: any) {
             set({ error: error.message, isLoading: false });
         }

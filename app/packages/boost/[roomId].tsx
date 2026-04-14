@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
     Platform, Modal, Alert, ActivityIndicator,
@@ -8,19 +8,29 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { usePackageStore } from '../../../store/packageStore';
 import { useWalletStore } from '../../../store/walletStore';
 import { ServicePackage } from '../../../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function BoostRoomScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { roomId } = useLocalSearchParams<{ roomId: string }>();
     const { boostPackages, isLoading, isPurchasing, fetchPackages, boostRoom } = usePackageStore();
-    const { balance, fetchBalance } = useWalletStore();
+    const { transactions, fetchTransactions } = useWalletStore();
     const [selectedPkg, setSelectedPkg] = useState<ServicePackage | null>(null);
     const [showConfirm, setShowConfirm] = useState(false);
 
+    // Tính balance từ transaction history (backend chưa có wallet balance API)
+    const balance = transactions.reduce((sum, tx) => {
+        if (tx.status !== 'SUCCESS') return sum;
+        const amount = Number(tx.amount) || 0;
+        if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amount;
+        return sum - amount;
+    }, 0);
+
     useEffect(() => {
         fetchPackages('ROOM_PROMOTION');
-        fetchBalance();
-    }, []);
+        fetchTransactions();
+    }, []);;
 
     const handleBoost = () => {
         if (!selectedPkg) {
@@ -47,7 +57,7 @@ export default function BoostRoomScreen() {
         try {
             await boostRoom(parseInt(roomId!, 10), selectedPkg.id);
             setShowConfirm(false);
-            await fetchBalance();
+            await fetchTransactions();
             Alert.alert('Thành công! 🚀', `Tin đăng đã được đẩy lên top trong ${selectedPkg.durationDays} ngày!`, [
                 { text: 'OK', onPress: () => router.back() },
             ]);
@@ -64,7 +74,7 @@ export default function BoostRoomScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -194,7 +204,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12,
+        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },

@@ -10,6 +10,7 @@ import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation } from '../../types';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { useHeaderHeight } from '../../hooks/useResponsive';
 
 function formatTime(dateStr?: string) {
     if (!dateStr) return '';
@@ -60,6 +61,7 @@ export default function ChatListScreen() {
     const { conversations, fetchConversations, isLoading, deleteConversation } = useChatStore();
     const { isAuthenticated } = useAuthStore();
     const [refreshing, setRefreshing] = useState(false);
+    const { headerPaddingTop } = useHeaderHeight();
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -92,7 +94,7 @@ export default function ChatListScreen() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
                 <Text style={styles.headerTitle}>Tin nhắn</Text>
                 <TouchableOpacity>
                     <Ionicons name="create-outline" size={24} color="#0066FF" />
@@ -137,7 +139,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 56 : 16, paddingBottom: 12,
+        paddingHorizontal: 16, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     headerTitle: { fontSize: 22, fontWeight: '700', color: '#1A1A1A' },

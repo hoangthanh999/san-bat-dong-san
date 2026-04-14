@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { ServicePackage, PackageType } from '../types';
 import { packageService } from '../services/api/packages';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../constants';
 
 interface PackageState {
     membershipPackages: ServicePackage[];
@@ -13,6 +15,16 @@ interface PackageState {
     purchaseMembership: (packageId: number) => Promise<void>;
     boostRoom: (roomId: number, packageId: number) => Promise<void>;
     clearError: () => void;
+}
+
+/**
+ * Helper: Lấy userId đã lưu khi login từ AsyncStorage
+ */
+async function getUserId(): Promise<number> {
+    const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+    if (!userData) throw new Error('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+    const user = JSON.parse(userData);
+    return user.id;
 }
 
 export const usePackageStore = create<PackageState>((set) => ({
@@ -44,10 +56,15 @@ export const usePackageStore = create<PackageState>((set) => ({
         }
     },
 
+    /**
+     * Mua gói hội viên
+     * Backend: POST /api/packages/buy-membership?userId=X&packageId=Y
+     */
     purchaseMembership: async (packageId: number) => {
         set({ isPurchasing: true, error: null });
         try {
-            await packageService.purchaseMembership(packageId);
+            const userId = await getUserId();
+            await packageService.purchaseMembership(userId, packageId);
             set({ isPurchasing: false });
         } catch (error: any) {
             set({ error: error.message || 'Mua gói thất bại', isPurchasing: false });
@@ -55,6 +72,10 @@ export const usePackageStore = create<PackageState>((set) => ({
         }
     },
 
+    /**
+     * Boost tin đăng
+     * ⚠️ Backend chưa có API — đang phát triển
+     */
     boostRoom: async (roomId: number, packageId: number) => {
         set({ isPurchasing: true, error: null });
         try {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, Dimensions, Pressable,
+    View, Text, StyleSheet, Pressable,
     TouchableOpacity, Linking, Share, Alert,
+    useWindowDimensions,
 } from 'react-native';
 import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
@@ -16,17 +17,16 @@ import Animated, {
     withSequence,
     withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Room } from '../../types';
 import { usePropertyStore } from '../../store/propertyStore';
 import { useAuthStore } from '../../store/authStore';
 
-const { width, height } = Dimensions.get('window');
-const BOTTOM_TAB_HEIGHT = 80;
-
 interface PropertyCardProps {
     item: Room;
     isActive: boolean;
+    cardHeight: number; // chiều cao do parent truyền vào (đã tính chính xác)
 }
 
 function getSmartTags(item: Room): { label: string; color: string; bg: string }[] {
@@ -43,12 +43,14 @@ function getSmartTags(item: Room): { label: string; color: string; bg: string }[
     return tags.slice(0, 3);
 }
 
-export default function PropertyCard({ item, isActive }: PropertyCardProps) {
+export default function PropertyCard({ item, isActive, cardHeight }: PropertyCardProps) {
     const router = useRouter();
     const [isMuted, setIsMuted] = useState(true);
     const [isLiked, setIsLiked] = useState(false);
     const { toggleFavorite } = usePropertyStore();
     const { isAuthenticated } = useAuthStore();
+    const insets = useSafeAreaInsets();
+    const { width } = useWindowDimensions();
 
     // Chỉ tạo player khi có videoUrl thực sự
     const player = useVideoPlayer(item.videoUrl || null, (p: VideoPlayer) => {
@@ -105,16 +107,16 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
             router.push('/(auth)/login');
             return;
         }
-        if (item.landlordInfo?.phone) {
+        if (item.ownerPhone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Linking.openURL(`tel:${item.landlordInfo.phone}`);
+            Linking.openURL(`tel:${item.ownerPhone}`);
         } else {
             Alert.alert('Thông báo', 'Số điện thoại chưa được cập nhật.');
         }
     };
 
     const getFullAddress = (r: Room) => {
-        return [r.addressDetail, r.ward, r.district, r.province].filter(Boolean).join(', ');
+        return r.address || '';
     };
 
     const handleShare = async () => {
@@ -130,7 +132,7 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
     const handleChat = () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push(`/chat/${item.landlordInfo?.id}`);
+        router.push(`/chat/${item.ownerId}`);
     };
 
     const handlePressDetails = () => {
@@ -154,8 +156,18 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
 
     const tags = getSmartTags(item);
 
+    // ---------- Responsive layout calculations ----------
+    // Smart Tags: đặt dưới header floating (~insets.top + 56px header content)
+    const tagsTop = insets.top + 64;
+    // Mute indicator: dưới status bar 1 chút
+    const muteTop = insets.top + 12;
+    // Info overlay & right actions: cách bottom 16px
+    // KHÔNG cần insets.bottom vì FlatList container đã kết thúc đúng tại đỉnh tab bar
+    const infoBottom = 16;
+    const actionsBottom = infoBottom + 108;
+
     return (
-        <View style={[styles.container, { height: height - BOTTOM_TAB_HEIGHT }]}>
+        <View style={[styles.container, { height: cardHeight, width }]}>
             {/* Media Layer */}
             <Pressable
                 onPress={() => setIsMuted(!isMuted)}
@@ -185,7 +197,7 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
 
                 {/* Mute indicator */}
                 {item.videoUrl && (
-                    <View style={styles.muteIndicator}>
+                    <View style={[styles.muteIndicator, { top: muteTop }]}>
                         <Ionicons
                             name={isMuted ? 'volume-mute' : 'volume-high'}
                             size={14}
@@ -204,7 +216,7 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
 
             {/* Smart Tags */}
             {tags.length > 0 && (
-                <View style={styles.tagsRow} pointerEvents="none">
+                <View style={[styles.tagsRow, { top: tagsTop }]} pointerEvents="none">
                     {tags.map((tag, i) => (
                         <View key={i} style={[styles.tag, { backgroundColor: tag.bg }]}>
                             <Text style={[styles.tagText, { color: tag.color }]}>{tag.label}</Text>
@@ -214,7 +226,7 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
             )}
 
             {/* Info Overlay */}
-            <Pressable style={styles.infoOverlay} onPress={handlePressDetails}>
+            <Pressable style={[styles.infoOverlay, { bottom: infoBottom }]} onPress={handlePressDetails}>
                 <View style={styles.priceTag}>
                     <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
                     <Text style={styles.unitText}>/ tháng</Text>
@@ -228,16 +240,16 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
                 </View>
 
                 <View style={styles.featuresRow}>
-                    {item.numBedrooms !== undefined && (
+                    {item.bedrooms !== undefined && (
                         <View style={styles.featureBadge}>
                             <Ionicons name="bed-outline" size={11} color="white" />
-                            <Text style={styles.featureText}>{item.numBedrooms} PN</Text>
+                            <Text style={styles.featureText}>{item.bedrooms} PN</Text>
                         </View>
                     )}
-                    {item.numBathrooms !== undefined && (
+                    {item.bathrooms !== undefined && (
                         <View style={styles.featureBadge}>
                             <Ionicons name="water-outline" size={11} color="white" />
-                            <Text style={styles.featureText}>{item.numBathrooms} PT</Text>
+                            <Text style={styles.featureText}>{item.bathrooms} PT</Text>
                         </View>
                     )}
                     <View style={styles.featureBadge}>
@@ -248,13 +260,13 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
             </Pressable>
 
             {/* Right Action Buttons */}
-            <View style={styles.rightActions}>
+            <View style={[styles.rightActions, { bottom: actionsBottom }]}>
                 {/* Avatar */}
                 <TouchableOpacity onPress={handleChat} style={styles.landlordContainer}>
                     <Image
                         source={{
-                            uri: item.landlordInfo?.avatarUrl ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(item.landlordInfo?.fullName || 'User')}&background=0066FF&color=fff&size=100`,
+                            uri: item.ownerAvatarUrl ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(item.ownerFullName || 'User')}&background=0066FF&color=fff&size=100`,
                         }}
                         style={styles.avatar}
                     />
@@ -299,7 +311,6 @@ export default function PropertyCard({ item, isActive }: PropertyCardProps) {
 
 const styles = StyleSheet.create({
     container: {
-        width,
         backgroundColor: 'black',
         position: 'relative',
     },
@@ -317,7 +328,6 @@ const styles = StyleSheet.create({
     },
     muteIndicator: {
         position: 'absolute',
-        top: 60,
         right: 12,
         backgroundColor: 'rgba(0,0,0,0.45)',
         borderRadius: 12,
@@ -335,7 +345,6 @@ const styles = StyleSheet.create({
     },
     tagsRow: {
         position: 'absolute',
-        top: 110,
         left: 16,
         flexDirection: 'row',
         gap: 6,
@@ -353,7 +362,6 @@ const styles = StyleSheet.create({
     },
     infoOverlay: {
         position: 'absolute',
-        bottom: 28,
         left: 16,
         right: 90,
     },
@@ -418,7 +426,6 @@ const styles = StyleSheet.create({
     rightActions: {
         position: 'absolute',
         right: 10,
-        bottom: 120,
         alignItems: 'center',
         gap: 18,
     },

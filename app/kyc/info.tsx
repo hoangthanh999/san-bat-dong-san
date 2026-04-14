@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     StatusBar, Platform, Alert, TextInput, ScrollView, ActivityIndicator,
@@ -7,9 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKYCStore } from '../../store/kycStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function KYCInfoScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { submitKYC, isSubmitting, scanResult } = useKYCStore();
     const [citizenId, setCitizenId] = useState(scanResult?.citizenId || '');
     const [fullName, setFullName] = useState(scanResult?.fullName || '');
@@ -123,7 +125,7 @@ export default function KYCInfoScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -249,7 +251,7 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
         paddingBottom: 12,
         backgroundColor: 'white',
     },

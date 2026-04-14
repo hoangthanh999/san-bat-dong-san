@@ -1,7 +1,8 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
-    View, FlatList, Dimensions, StatusBar, ViewToken,
-    TouchableOpacity, Text, StyleSheet, Platform, RefreshControl,
+    View, FlatList, StatusBar, ViewToken,
+    TouchableOpacity, Text, StyleSheet, RefreshControl,
+    useWindowDimensions, LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,9 +11,7 @@ import { useNotificationStore } from '../../store/notificationStore';
 import PropertyCard from '../../components/property/PropertyCard';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Room } from '../../types';
-
-const { height } = Dimensions.get('window');
-const BOTTOM_TAB_HEIGHT = Platform.OS === 'ios' ? 88 : 64;
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FeedScreen() {
     const router = useRouter();
@@ -21,6 +20,18 @@ export default function FeedScreen() {
     const [activeId, setActiveId] = useState<number | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const flatListRef = useRef<FlatList>(null);
+    const insets = useSafeAreaInsets();
+    const { height, width } = useWindowDimensions();
+
+    // Dùng onLayout để đo chiều cao THỰC TẾ của container FlatList
+    // Cách này chính xác 100% trên mọi thiết bị (notch, punch-hole, home indicator...)
+    // Không cần tính thủ công tab bar / insets
+    const [feedHeight, setFeedHeight] = useState(0);
+    const onFeedLayout = useCallback((e: LayoutChangeEvent) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 0) setFeedHeight(h);
+    }, []);
+    const CARD_HEIGHT = feedHeight > 0 ? feedHeight : height;
 
     const viewabilityConfig = useRef({
         itemVisiblePercentThreshold: 50,
@@ -58,8 +69,8 @@ export default function FeedScreen() {
         <View style={{ flex: 1, backgroundColor: 'black' }}>
             <StatusBar barStyle="light-content" translucent />
 
-            {/* Floating Header */}
-            <View style={styles.header} pointerEvents="box-none">
+            {/* Floating Header — vị trí dựa trên insets.top */}
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
                 <View style={styles.logoContainer}>
                     <Text style={styles.logoText}>🏠</Text>
                     <Text style={styles.logoName}>HomeSwipe</Text>
@@ -87,36 +98,40 @@ export default function FeedScreen() {
                 </View>
             </View>
 
-            <FlatList
-                ref={flatListRef}
-                data={displayRooms}
-                keyExtractor={(item) => item.id.toString()}
-                renderItem={({ item }) => (
-                    <PropertyCard item={item} isActive={item.id === activeId} />
-                )}
-                pagingEnabled
-                snapToInterval={height - BOTTOM_TAB_HEIGHT}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                showsVerticalScrollIndicator={false}
-                onViewableItemsChanged={onViewableItemsChanged}
-                viewabilityConfig={viewabilityConfig}
-                onEndReached={() => loadMoreRooms()}
-                onEndReachedThreshold={0.5}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor="white"
-                        progressBackgroundColor="rgba(0,0,0,0.5)"
+            <View style={{ flex: 1 }} onLayout={onFeedLayout}>
+                {/* Chỉ render FlatList khi đã đo được chiều cao thực tế */}
+                {CARD_HEIGHT > 0 && (
+                    <FlatList
+                        ref={flatListRef}
+                        data={displayRooms}
+                        keyExtractor={(item) => item.id.toString()}
+                        renderItem={({ item }) => (
+                            <PropertyCard item={item} isActive={item.id === activeId} cardHeight={CARD_HEIGHT} />
+                        )}
+                        pagingEnabled
+                        snapToInterval={CARD_HEIGHT}
+                        snapToAlignment="start"
+                        decelerationRate="fast"
+                        showsVerticalScrollIndicator={false}
+                        onViewableItemsChanged={onViewableItemsChanged}
+                        viewabilityConfig={viewabilityConfig}
+                        onEndReached={() => loadMoreRooms()}
+                        onEndReachedThreshold={0.5}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                tintColor="white"
+                                progressBackgroundColor="rgba(0,0,0,0.5)"
+                            />
+                        }
+                        removeClippedSubviews={false}
+                        windowSize={3}
+                        initialNumToRender={1}
+                        maxToRenderPerBatch={1}
                     />
-                }
-                removeClippedSubviews={false}
-                windowSize={3}
-                initialNumToRender={1}
-                maxToRenderPerBatch={1}
-              
-            />
+                )}
+            </View>
         </View>
     );
 }
@@ -132,7 +147,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 54 : 16,
         paddingBottom: 12,
     },
     logoContainer: {
@@ -188,29 +202,22 @@ const MOCK_ROOMS: Room[] = [
         title: 'Căn hộ cao cấp view sông Sài Gòn, nội thất sang trọng',
         description: 'Căn hộ 2PN, 2WC, full nội thất, view trực diện sông.',
         price: 15000000,
-        deposit: 30000000,
         area: 85,
-        province: 'Hồ Chí Minh',
-        district: 'Quận Bình Thạnh',
-        ward: 'Phường 22',
-        addressDetail: 'Vinhomes Central Park',
+        address: 'Vinhomes Central Park, Phường 22, Quận Bình Thạnh, Hồ Chí Minh',
         latitude: 10.795,
         longitude: 106.72,
         images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop'],
         videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-living-room-with-a-fireplace-and-christmas-decorations-2780-large.mp4',
-        rentalType: 'WHOLE',
+        transactionType: 'RENT',
+        propertyType: 'APARTMENT',
         status: 'ACTIVE',
         amenities: ['Pool', 'Gym', 'Parking', 'WiFi'],
-        landlordInfo: {
-            id: 101,
-            fullName: 'Nguyễn Văn A',
-            avatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
-            phone: '0901234567',
-        },
-        numBedrooms: 2,
-        numBathrooms: 2,
-        averageRating: 4.8,
-        totalReviews: 12,
+        ownerId: 101,
+        ownerFullName: 'Nguyễn Văn A',
+        ownerAvatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
+        ownerPhone: '0901234567',
+        bedrooms: 2,
+        bathrooms: 2,
         createdAt: new Date(Date.now() - 86400000).toISOString(),
     },
     {
@@ -218,27 +225,20 @@ const MOCK_ROOMS: Room[] = [
         title: 'Phòng trọ giá rẻ gần đại học Bách Khoa, giờ giấc tự do',
         description: 'Phòng mới xây, giờ giấc tự do, có gác lửng.',
         price: 3500000,
-        deposit: 3500000,
         area: 25,
-        province: 'Hồ Chí Minh',
-        district: 'Quận 10',
-        ward: 'Phường 12',
-        addressDetail: 'Lý Thường Kiệt',
+        address: 'Lý Thường Kiệt, Phường 12, Quận 10, Hồ Chí Minh',
         latitude: 10.772,
         longitude: 106.658,
         images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&auto=format&fit=crop'],
-        rentalType: 'WHOLE',
+        transactionType: 'RENT',
+        propertyType: 'ROOM',
         status: 'ACTIVE',
-        landlordInfo: {
-            id: 102,
-            fullName: 'Trần Thị B',
-            avatarUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
-            phone: '0912345678',
-        },
-        numBedrooms: 1,
-        numBathrooms: 1,
-        averageRating: 4.2,
-        totalReviews: 5,
+        ownerId: 102,
+        ownerFullName: 'Trần Thị B',
+        ownerAvatarUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
+        ownerPhone: '0912345678',
+        bedrooms: 1,
+        bathrooms: 1,
         createdAt: new Date().toISOString(),
     },
     {
@@ -246,28 +246,21 @@ const MOCK_ROOMS: Room[] = [
         title: 'Nhà nguyên căn mặt tiền kinh doanh, 1 trệt 2 lầu đẹp',
         description: 'Nhà 1 trệt 2 lầu, thích hợp mở văn phòng hoặc kinh doanh.',
         price: 25000000,
-        deposit: 50000000,
         area: 120,
-        province: 'Hồ Chí Minh',
-        district: 'Quận 7',
-        ward: 'Phường Tân Phong',
-        addressDetail: 'Nguyễn Văn Linh',
+        address: 'Nguyễn Văn Linh, Phường Tân Phong, Quận 7, Hồ Chí Minh',
         latitude: 10.73,
         longitude: 106.7,
         images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop'],
         videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-modern-apartment-with-a-view-of-the-city-at-night-3456-large.mp4',
-        rentalType: 'WHOLE',
+        transactionType: 'RENT',
+        propertyType: 'HOUSE',
         status: 'ACTIVE',
-        landlordInfo: {
-            id: 103,
-            fullName: 'Lê Văn C',
-            avatarUrl: 'https://randomuser.me/api/portraits/men/86.jpg',
-            phone: '0987654321',
-        },
-        numBedrooms: 4,
-        numBathrooms: 3,
-        averageRating: 5.0,
-        totalReviews: 2,
+        ownerId: 103,
+        ownerFullName: 'Lê Văn C',
+        ownerAvatarUrl: 'https://randomuser.me/api/portraits/men/86.jpg',
+        ownerPhone: '0987654321',
+        bedrooms: 4,
+        bathrooms: 3,
         createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
     },
     {
@@ -275,28 +268,21 @@ const MOCK_ROOMS: Room[] = [
         title: 'Studio hiện đại, full nội thất cao cấp, gần Metro Tân Cảng',
         description: 'Studio sang trọng với đầy đủ tiện nghi.',
         price: 8500000,
-        deposit: 17000000,
         area: 35,
-        province: 'Hồ Chí Minh',
-        district: 'Quận Bình Thạnh',
-        ward: 'Phường 22',
-        addressDetail: 'Điện Biên Phủ',
+        address: 'Điện Biên Phủ, Phường 22, Quận Bình Thạnh, Hồ Chí Minh',
         latitude: 10.789,
         longitude: 106.715,
         images: ['https://images.unsplash.com/photo-1560448205-4d9b3e6bb6db?w=800&auto=format&fit=crop'],
-        rentalType: 'WHOLE',
+        transactionType: 'RENT',
+        propertyType: 'APARTMENT',
         status: 'ACTIVE',
         amenities: ['WiFi', 'Điều hoà', 'Bếp', 'Máy giặt'],
-        landlordInfo: {
-            id: 104,
-            fullName: 'Phạm Thị D',
-            avatarUrl: 'https://randomuser.me/api/portraits/women/65.jpg',
-            phone: '0933445566',
-        },
-        numBedrooms: 0,
-        numBathrooms: 1,
-        averageRating: 4.5,
-        totalReviews: 8,
+        ownerId: 104,
+        ownerFullName: 'Phạm Thị D',
+        ownerAvatarUrl: 'https://randomuser.me/api/portraits/women/65.jpg',
+        ownerPhone: '0933445566',
+        bedrooms: 0,
+        bathrooms: 1,
         createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
     },
 ];

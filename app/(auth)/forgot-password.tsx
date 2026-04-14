@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, TextInput,
     KeyboardAvoidingView, Platform, StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService } from '../../services/api/auth';
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSent, setIsSent] = useState(false);
@@ -72,7 +74,7 @@ export default function ForgotPasswordScreen() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -126,7 +128,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'white' },
     header: {
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
         paddingBottom: 8,
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },

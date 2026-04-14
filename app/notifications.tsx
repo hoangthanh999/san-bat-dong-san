@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { useNotificationStore } from '../store/notificationStore';
 import { Notification } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function NotificationItem({ item, onPress }: { item: Notification; onPress: () => void }) {
     const icons: Record<string, { name: string; bg: string; color: string }> = {
@@ -64,6 +65,7 @@ function getSectionTitle(dateStr: string): string {
 
 export default function NotificationsScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { notifications, fetchNotifications, markAsRead, markAllAsRead, isLoading, unreadCount } = useNotificationStore();
 
     useEffect(() => {
@@ -110,7 +112,7 @@ export default function NotificationsScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -156,7 +158,7 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
     headerTitle: { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
     markAllBtn: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
     sectionHeader: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#F8F9FA' },

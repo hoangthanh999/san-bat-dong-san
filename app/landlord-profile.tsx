@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     StatusBar, Platform, ActivityIndicator,
@@ -9,9 +9,11 @@ import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { userService } from '../services/api/user';
 import { roomService } from '../services/api/rooms';
 import { CustomerPublicResponseDTO, Room } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function LandlordProfileScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { slug, landlordId } = useLocalSearchParams<{ slug?: string; landlordId?: string }>();
     const [profile, setProfile] = useState<CustomerPublicResponseDTO | null>(null);
     const [rooms, setRooms] = useState<Room[]>([]);
@@ -45,7 +47,7 @@ export default function LandlordProfileScreen() {
     };
 
     const getFullAddress = (r: Room) => {
-        return [r.addressDetail, r.ward, r.district, r.province].filter(Boolean).join(', ');
+        return r.address || '';
     };
 
     const formatPrice = (p: number) => {
@@ -81,7 +83,7 @@ export default function LandlordProfileScreen() {
             <StatusBar barStyle="light-content" />
 
             {/* Header Banner */}
-            <View style={styles.banner}>
+            <View style={[styles.banner, { paddingTop: insets.top + 8 }]}>
                 <View style={styles.bannerGradient} />
                 <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color="white" />
@@ -174,9 +176,9 @@ export default function LandlordProfileScreen() {
                                         <Text style={styles.roomMetaItem}>
                                             <Ionicons name="resize-outline" size={12} color="#999" /> {room.area}m²
                                         </Text>
-                                        {room.numBedrooms != null && (
+                                        {room.bedrooms != null && (
                                             <Text style={styles.roomMetaItem}>
-                                                <Ionicons name="bed-outline" size={12} color="#999" /> {room.numBedrooms} PN
+                                                <Ionicons name="bed-outline" size={12} color="#999" /> {room.bedrooms} PN
                                             </Text>
                                         )}
                                     </View>
@@ -201,14 +203,14 @@ const styles = StyleSheet.create({
     banner: {
         height: 120, backgroundColor: '#0066FF',
         justifyContent: 'flex-end', padding: 16,
-        paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
     },
     bannerGradient: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: '#0052CC',
     },
     backBtn: {
-        position: 'absolute', top: Platform.OS === 'ios' ? 54 : 16, left: 16,
+        position: 'absolute', top: 0 /* paddingTop set via inline style using useSafeAreaInsets */, left: 16,
         width: 40, height: 40, justifyContent: 'center',
     },
     bannerTitle: { fontSize: 20, fontWeight: '700', color: 'white', marginTop: 20 },

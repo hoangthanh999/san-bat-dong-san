@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, StatusBar,
     Platform, ScrollView, RefreshControl, ActivityIndicator,
@@ -37,11 +37,8 @@ function TransactionItem({ item }: { item: Transaction }) {
             </View>
             <View style={styles.txInfo}>
                 <Text style={styles.txLabel}>{item.description || typeLabel[item.type] || item.type}</Text>
-                {item.roomTitle && (
-                    <Text style={styles.txSub} numberOfLines={1}>{item.roomTitle}</Text>
-                )}
-                {item.referenceCode && (
-                    <Text style={styles.txRef}>Mã GD: {item.referenceCode}</Text>
+                {item.vnpayCode && (
+                    <Text style={styles.txRef}>Mã GD: {item.vnpayCode}</Text>
                 )}
                 <Text style={styles.txDate}>{formatDate(item.createdAt)}</Text>
             </View>
@@ -58,19 +55,27 @@ function TransactionItem({ item }: { item: Transaction }) {
 
 export default function WalletScreen() {
     const router = useRouter();
-    const { balance, transactions, isLoading, fetchBalance, fetchTransactions } = useWalletStore();
+    const insets = useSafeAreaInsets();
+    const { transactions, isLoading, fetchTransactions } = useWalletStore();
     const [refreshing, setRefreshing] = React.useState(false);
 
     useEffect(() => {
-        fetchBalance();
-        fetchTransactions(true);
+        fetchTransactions();
     }, []);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([fetchBalance(), fetchTransactions(true)]);
+        await fetchTransactions();
         setRefreshing(false);
     };
+
+    // Tính tổng nạp - chi từ lịch sử giao dịch (backend chưa có wallet balance API)
+    const balance = transactions.reduce((sum, tx) => {
+        if (tx.status !== 'SUCCESS') return sum;
+        const amount = Number(tx.amount) || 0;
+        if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amount;
+        return sum - amount;
+    }, 0);
 
     const recentTx = transactions.slice(0, 5);
 
@@ -80,7 +85,7 @@ export default function WalletScreen() {
             <StatusBar barStyle="light-content" />
 
             {/* Header gradient */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="white" />
                 </TouchableOpacity>
@@ -162,7 +167,7 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 54 : 20,
+        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
         paddingBottom: 16,
         backgroundColor: '#0066FF',
     },

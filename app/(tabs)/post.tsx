@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, StatusBar, Platform, Alert, ActivityIndicator,
@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
 import { useKYCStore } from '../../store/kycStore';
 import { roomService } from '../../services/api/rooms';
@@ -20,6 +21,21 @@ const STEPS = ['Cơ bản', 'Chi tiết', 'Ảnh & Video', 'Hoàn thành'];
 const AMENITY_OPTIONS = ['WiFi', 'Điều hoà', 'Bếp', 'Máy giặt', 'Tủ lạnh', 'Ban công', 'Chỗ để xe', 'Thang máy', 'Bảo vệ', 'Hồ bơi', 'Gym'];
 const DIRECTION_OPTIONS = ['Đông', 'Tây', 'Nam', 'Bắc', 'Đông-Nam', 'Đông-Bắc', 'Tây-Nam', 'Tây-Bắc'];
 const FURNITURE_OPTIONS = ['Không có', 'Cơ bản', 'Đầy đủ', 'Cao cấp'];
+
+
+const FURNITURE_MAP: Record<string, string> = {
+    'Không có': 'UNFURNISHED',
+    'Cơ bản': 'PARTIALLY_FURNISHED',
+    'Đầy đủ': 'FULLY_FURNISHED',
+    'Cao cấp': 'FULLY_FURNISHED',
+};
+
+// Label hiển thị ngược lại (để ChipSelector show đúng)
+const FURNITURE_REVERSE_MAP: Record<string, string> = {
+    'UNFURNISHED': 'Không có',
+    'PARTIALLY_FURNISHED': 'Cơ bản',
+    'FULLY_FURNISHED': 'Đầy đủ',
+};
 
 // ====== DỮ LIỆU TỈNH/HUYỆN/XÃ (rút gọn, phổ biến nhất) ======
 const PROVINCES: Record<string, Record<string, string[]>> = {
@@ -160,6 +176,7 @@ function DropdownPicker({ label, options, value, onChange, placeholder }: {
 
 export default function PostScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { isAuthenticated } = useAuthStore();
     const { kycStatus, fetchKYCStatus } = useKYCStore();
     const [step, setStep] = useState(0);
@@ -180,16 +197,19 @@ export default function PostScreen() {
         ward: '',
         addressDetail: '',
         price: '',
-        deposit: '',
         area: '',
-        rentalType: 'WHOLE' as 'WHOLE' | 'SHARED',
+        transactionType: 'FOR_RENT' as 'FOR_RENT' | 'FOR_SALE',
+        propertyType: 'ROOM' as string,
         description: '',
-        numBedrooms: '1',
-        numBathrooms: '1',
+        bedrooms: '1',
+        bathrooms: '1',
         capacity: '',
-        furnitureStatus: 'Cơ bản',
-        direction: '',
-        genderConstraint: 'MIXED' as 'MALE_ONLY' | 'FEMALE_ONLY' | 'MIXED',
+        furnishingStatus: 'PARTIALLY_FURNISHED',
+        hasBalcony: false,
+        availabilityStatus: 'IMMEDIATELY',
+        electricityPrice: 'STATE_PRICE',
+        waterPrice: 'STATE_PRICE',
+        internetPrice: 'FREE',
         amenities: [] as string[],
         latitude: '10.762622',
         longitude: '106.660172',
@@ -230,7 +250,7 @@ export default function PostScreen() {
         setIsGeneratingAI(true);
         await new Promise(r => setTimeout(r, 1800));
         const addr = [form.addressDetail, form.ward, form.district, form.province].filter(Boolean).join(', ');
-        const aiText = `Căn phòng ${form.rentalType === 'WHOLE' ? 'nguyên căn' : 'chia sẻ'} tại ${addr}, diện tích ${form.area || '...'}m², giá thuê chỉ ${form.price ? Number(form.price).toLocaleString('vi-VN') : '...'}đ/tháng.\n\nNội thất ${form.furnitureStatus || 'cơ bản'}, phù hợp cho ${form.genderConstraint === 'MALE_ONLY' ? 'nam giới' : form.genderConstraint === 'FEMALE_ONLY' ? 'nữ giới' : 'mọi đối tượng'}.${form.amenities.length > 0 ? '\n\nTiện ích: ' + form.amenities.join(', ') + '.' : ''}\n\nGiao thông thuận tiện, gần các tiện ích thiết yếu. Liên hệ ngay để được tư vấn!`;
+        const aiText = `Phòng ${form.propertyType === 'ROOM' ? 'trọ' : 'căn hộ'} tại ${addr}, diện tích ${form.area || '...'}m², giá ${form.transactionType === 'FOR_RENT' ? 'thuê' : 'bán'} chỉ ${form.price ? Number(form.price).toLocaleString('vi-VN') : '...'}đ/tháng.\n\nNội thất ${form.furnishingStatus || 'cơ bản'}.${form.amenities.length > 0 ? '\n\nTiện ích: ' + form.amenities.join(', ') + '.' : ''}\n\nGiao thông thuận tiện, gần các tiện ích thiết yếu. Liên hệ ngay để được tư vấn!`;
         updateForm('description', aiText);
         setIsGeneratingAI(false);
     };
@@ -284,30 +304,31 @@ export default function PostScreen() {
                 }
             }
 
-            // 3. Build JSON body đúng PropertyRequestDTO
+            // 3. Build JSON body đúng PropertyCreateDTO (khớp backend)
             setUploadProgress('Đang đăng tin...');
+            const address = [form.addressDetail, form.ward, form.district, form.province].filter(Boolean).join(', ');
             const body: PropertyRequestDTO = {
+                transactionType: form.transactionType,
                 title: form.title,
                 description: form.description,
                 price: Number(form.price),
-                deposit: Number(form.deposit) || 0,
                 area: Number(form.area),
-                province: form.province,
-                district: form.district,
-                ward: form.ward,
-                addressDetail: form.addressDetail,
+                address,
                 latitude: Number(form.latitude),
                 longitude: Number(form.longitude),
-                furnitureStatus: form.furnitureStatus,
-                direction: form.direction || undefined,
-                numBedrooms: Number(form.numBedrooms),
-                numBathrooms: Number(form.numBathrooms),
-                rentalType: form.rentalType,
+                propertyType: form.propertyType,
                 capacity: form.capacity ? Number(form.capacity) : undefined,
-                genderConstraint: form.genderConstraint,
                 images: imageUrls,
                 videoUrl,
                 amenities: form.amenities,
+                bedrooms: Number(form.bedrooms),
+                bathrooms: Number(form.bathrooms),
+                hasBalcony: form.hasBalcony,
+                furnishingStatus: form.furnishingStatus,
+                availabilityStatus: form.availabilityStatus,
+                electricityPrice: form.electricityPrice,
+                waterPrice: form.waterPrice,
+                internetPrice: form.internetPrice,
             };
 
             await roomService.createRoom(body);
@@ -326,10 +347,11 @@ export default function PostScreen() {
         setVideoUri(null);
         setForm({
             title: '', province: '', district: '', ward: '', addressDetail: '',
-            price: '', deposit: '', area: '', rentalType: 'WHOLE', description: '',
-            numBedrooms: '1', numBathrooms: '1', capacity: '', furnitureStatus: 'Cơ bản',
-            direction: '', genderConstraint: 'MIXED', amenities: [],
-            latitude: '10.762622', longitude: '106.660172',
+            price: '', area: '', transactionType: 'FOR_RENT' as 'FOR_RENT' | 'FOR_SALE', propertyType: 'ROOM', description: '',
+            bedrooms: '1', bathrooms: '1', capacity: '', furnishingStatus: 'PARTIALLY_FURNISHED',
+            hasBalcony: false, availabilityStatus: 'IMMEDIATELY',
+            electricityPrice: 'STATE_PRICE', waterPrice: 'STATE_PRICE', internetPrice: 'FREE',
+            amenities: [], latitude: '10.762622', longitude: '106.660172',
         });
     };
 
@@ -390,7 +412,7 @@ export default function PostScreen() {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" />
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => step === 0 ? router.back() : setStep(s => s - 1)}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -442,28 +464,20 @@ export default function PostScreen() {
                                 <TextInput style={styles.input} placeholder="VD: 5000000" value={form.price} onChangeText={v => updateForm('price', v)} keyboardType="numeric" />
                             </FormField>
 
-                            <View style={styles.row2}>
-                                <View style={{ flex: 1 }}>
-                                    <FormField label="Tiền cọc (đồng)">
-                                        <TextInput style={styles.input} placeholder="0" value={form.deposit} onChangeText={v => updateForm('deposit', v)} keyboardType="numeric" />
-                                    </FormField>
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <FormField label="Diện tích (m²) *">
-                                        <TextInput style={styles.input} placeholder="VD: 30" value={form.area} onChangeText={v => updateForm('area', v)} keyboardType="numeric" />
-                                    </FormField>
-                                </View>
-                            </View>
 
-                            <FormField label="Loại phòng">
+                            <FormField label="Diện tích (m²) *">
+                                <TextInput style={styles.input} placeholder="VD: 30" value={form.area} onChangeText={v => updateForm('area', v)} keyboardType="numeric" />
+                            </FormField>
+
+                            <FormField label="Loại BĐS">
                                 <View style={styles.toggleRow}>
-                                    {[{ val: 'WHOLE', label: 'Nguyên căn' }, { val: 'SHARED', label: 'Phòng chia sẻ' }].map(opt => (
+                                    {[{ val: 'ROOM', label: 'Phòng trọ' }, { val: 'APARTMENT', label: 'Căn hộ' }, { val: 'HOUSE', label: 'Nhà' }].map(opt => (
                                         <TouchableOpacity
                                             key={opt.val}
-                                            style={[styles.toggleBtn, form.rentalType === opt.val && styles.toggleBtnActive]}
-                                            onPress={() => updateForm('rentalType', opt.val)}
+                                            style={[styles.toggleBtn, form.propertyType === opt.val && styles.toggleBtnActive]}
+                                            onPress={() => updateForm('propertyType', opt.val)}
                                         >
-                                            <Text style={[styles.toggleText, form.rentalType === opt.val && styles.toggleTextActive]}>{opt.label}</Text>
+                                            <Text style={[styles.toggleText, form.propertyType === opt.val && styles.toggleTextActive]}>{opt.label}</Text>
                                         </TouchableOpacity>
                                     ))}
                                 </View>
@@ -485,42 +499,28 @@ export default function PostScreen() {
                             <View style={styles.row2}>
                                 <View style={{ flex: 1 }}>
                                     <FormField label="Phòng ngủ">
-                                        <NumberStepper value={Number(form.numBedrooms)} onChange={v => updateForm('numBedrooms', v.toString())} min={0} max={10} />
+                                        <NumberStepper value={Number(form.bedrooms)} onChange={v => updateForm('bedrooms', v.toString())} min={0} max={10} />
                                     </FormField>
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <FormField label="Phòng tắm">
-                                        <NumberStepper value={Number(form.numBathrooms)} onChange={v => updateForm('numBathrooms', v.toString())} min={1} max={10} />
+                                        <NumberStepper value={Number(form.bathrooms)} onChange={v => updateForm('bathrooms', v.toString())} min={1} max={10} />
                                     </FormField>
                                 </View>
                             </View>
 
-                            {form.rentalType === 'SHARED' && (
+                            {form.propertyType === 'ROOM' && (
                                 <FormField label="Sức chứa (người)">
                                     <TextInput style={styles.input} placeholder="VD: 4" value={form.capacity} onChangeText={v => updateForm('capacity', v)} keyboardType="numeric" />
                                 </FormField>
                             )}
 
                             <FormField label="Nội thất">
-                                <ChipSelector options={FURNITURE_OPTIONS} selected={[form.furnitureStatus]} onToggle={v => updateForm('furnitureStatus', v)} />
-                            </FormField>
-
-                            <FormField label="Hướng nhà">
-                                <ChipSelector options={DIRECTION_OPTIONS} selected={form.direction ? [form.direction] : []} onToggle={v => updateForm('direction', v)} />
-                            </FormField>
-
-                            <FormField label="Đối tượng cho thuê">
-                                <View style={styles.toggleRow}>
-                                    {[{ val: 'MIXED', label: 'Tất cả' }, { val: 'MALE_ONLY', label: 'Chỉ nam' }, { val: 'FEMALE_ONLY', label: 'Chỉ nữ' }].map(opt => (
-                                        <TouchableOpacity
-                                            key={opt.val}
-                                            style={[styles.toggleBtn, form.genderConstraint === opt.val && styles.toggleBtnActive]}
-                                            onPress={() => updateForm('genderConstraint', opt.val)}
-                                        >
-                                            <Text style={[styles.toggleText, form.genderConstraint === opt.val && styles.toggleTextActive]}>{opt.label}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                <ChipSelector
+                                    options={FURNITURE_OPTIONS}
+                                    selected={[FURNITURE_REVERSE_MAP[form.furnishingStatus] || form.furnishingStatus]}
+                                    onToggle={v => updateForm('furnishingStatus', FURNITURE_MAP[v] || v)}
+                                />
                             </FormField>
 
                             <FormField label="Tiện ích">
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     authTitle: { fontSize: 20, fontWeight: '700', color: '#1A1A1A', textAlign: 'center' },
     loginBtn: { backgroundColor: '#0066FF', borderRadius: 12, paddingHorizontal: 36, paddingVertical: 14 },
     loginBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
     headerTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },
     stepIndicator: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
     stepItem: { alignItems: 'center', gap: 4 },

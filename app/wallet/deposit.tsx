@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, StatusBar,
     Platform, ScrollView, TextInput, Alert, ActivityIndicator,
@@ -11,7 +11,16 @@ const QUICK_AMOUNTS = [100000, 200000, 500000, 1000000, 2000000, 5000000];
 
 export default function DepositScreen() {
     const router = useRouter();
-    const { balance, createPayment, isCreatingPayment } = useWalletStore();
+    const insets = useSafeAreaInsets();
+    const { transactions, createPayment, isCreatingPayment } = useWalletStore();
+
+    // Tính balance từ transaction history (backend chưa có wallet balance API)
+    const balance = transactions.reduce((sum, tx) => {
+        if (tx.status !== 'SUCCESS') return sum;
+        const amt = Number(tx.amount) || 0;
+        if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amt;
+        return sum - amt;
+    }, 0);
     const [selectedAmount, setSelectedAmount] = useState<number>(500000);
     const [customAmount, setCustomAmount] = useState('');
 
@@ -56,7 +65,7 @@ export default function DepositScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -161,7 +170,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12,
+        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },

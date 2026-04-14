@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Platform, Modal,
+    Platform, Modal, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePropertyStore } from '../store/propertyStore';
@@ -111,14 +111,15 @@ export default function FilterScreen({ visible, onClose }: FilterSheetProps) {
                         <View style={styles.chipRow}>
                             {[
                                 { val: undefined, label: 'Tất cả' },
-                                { val: 'WHOLE', label: 'Nguyên căn' },
-                                { val: 'SHARED', label: 'Phòng chia sẻ' },
+                                { val: 'ROOM', label: 'Phòng trọ' },
+                                { val: 'APARTMENT', label: 'Căn hộ' },
+                                { val: 'HOUSE', label: 'Nhà' },
                             ].map(opt => (
                                 <Chip
                                     key={opt.label}
                                     label={opt.label}
-                                    selected={local.type === opt.val}
-                                    onPress={() => updateLocal('type', opt.val)}
+                                    selected={local.propertyType === opt.val}
+                                    onPress={() => updateLocal('propertyType', opt.val)}
                                 />
                             ))}
                         </View>
@@ -204,7 +205,7 @@ export default function FilterScreen({ visible, onClose }: FilterSheetProps) {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'white' },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 20 : 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
     headerTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
     resetBtn: { color: '#888', fontSize: 15, fontWeight: '600' },
     scrollView: { flex: 1 },

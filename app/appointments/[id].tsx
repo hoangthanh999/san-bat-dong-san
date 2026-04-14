@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     StatusBar, Platform, Alert, TextInput, Modal, ActivityIndicator,
@@ -6,6 +6,7 @@ import {
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { useAuthStore } from '../../store/authStore';
 import { appointmentService } from '../../services/api/appointments';
@@ -13,6 +14,7 @@ import { Appointment } from '../../types';
 
 export default function AppointmentDetailScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const { user } = useAuthStore();
     const { appointments, confirmAppointment, cancelAppointment } = useAppointmentStore();
@@ -146,7 +148,7 @@ export default function AppointmentDetailScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -307,7 +309,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12,
+        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },

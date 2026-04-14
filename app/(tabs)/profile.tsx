@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     FlatList, RefreshControl, StatusBar, Platform, Alert, Switch,
@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useUserStore } from '../../store/userStore';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { useNotificationStore } from '../../store/notificationStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Room, Appointment } from '../../types';
 
@@ -54,6 +55,7 @@ function AppointmentChip({ appt }: { appt: Appointment }) {
 
 export default function ProfileScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { user, isAuthenticated, logout } = useAuthStore();
     const { profile, myRooms, favorites, fetchProfile, fetchMyRooms, fetchFavorites, isLoading } = useUserStore();
     const { appointments, fetchAppointments } = useAppointmentStore();
@@ -140,7 +142,7 @@ export default function ProfileScreen() {
             <StatusBar barStyle="light-content" />
 
             {/* Banner + Avatar */}
-            <View style={styles.banner}>
+            <View style={[styles.banner, { paddingTop: insets.top + 8 }]}>
                 <Image
                     source={{ uri: (displayUser as any)?.bannerUrl || 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800' }}
                     style={styles.bannerImg}
@@ -148,7 +150,7 @@ export default function ProfileScreen() {
                 />
                 <View style={styles.bannerOverlay} />
 
-                <View style={styles.topBar}>
+                <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
                     <Text style={styles.screenTitle}>Hồ sơ</Text>
                     <TouchableOpacity onPress={() => router.push('/notifications' as any)}>
                         <Ionicons name="notifications-outline" size={24} color="white" />
@@ -372,7 +374,7 @@ const styles = StyleSheet.create({
     banner: { height: 140, position: 'relative' },
     bannerImg: { ...StyleSheet.absoluteFillObject },
     bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
-    topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16 },
+    topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */ },
     screenTitle: { fontSize: 20, fontWeight: '700', color: 'white' },
     profileSection: { backgroundColor: 'white', paddingBottom: 20, paddingHorizontal: 16 },
     avatarRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -40 },

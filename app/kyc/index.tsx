@@ -1,9 +1,10 @@
-import React from 'react';
+﻿import React from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     StatusBar, Platform, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 
 const BENEFITS = [
@@ -15,6 +16,7 @@ const BENEFITS = [
 
 export default function KYCIntroScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     return (
         <View style={styles.container}>
@@ -22,7 +24,7 @@ export default function KYCIntroScreen() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -98,7 +100,7 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
         paddingBottom: 12,
         backgroundColor: 'white',
         borderBottomWidth: 1, borderBottomColor: '#F0F0F0',

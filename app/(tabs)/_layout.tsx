@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, View, Text, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatStore } from '../../store/chatStore';
 import { useNotificationStore } from '../../store/notificationStore';
 
@@ -19,11 +20,16 @@ export default function TabLayout() {
     const isDark = colorScheme === 'dark';
     const { totalUnread } = useChatStore();
     const { unreadCount: notifUnread } = useNotificationStore();
+    const insets = useSafeAreaInsets();
 
     const tabBg = isDark ? '#1A1A1A' : '#FFFFFF';
     const tabBorder = isDark ? '#333' : '#E0E0E0';
     const activeColor = '#0066FF';
     const inactiveColor = isDark ? '#888' : '#999';
+
+    // Tab bar height tự động: content 48 + paddingTop 8 + paddingBottom dựa trên safe area
+    const tabBarPaddingBottom = Math.max(insets.bottom, 12);
+    const TAB_BAR_HEIGHT = 48 + 8 + tabBarPaddingBottom;
 
     return (
         <Tabs
@@ -32,8 +38,8 @@ export default function TabLayout() {
                 tabBarStyle: {
                     backgroundColor: tabBg,
                     borderTopColor: tabBorder,
-                    height: Platform.OS === 'ios' ? 88 : 64,
-                    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+                    height: TAB_BAR_HEIGHT,
+                    paddingBottom: tabBarPaddingBottom,
                     paddingTop: 8,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: -2 },

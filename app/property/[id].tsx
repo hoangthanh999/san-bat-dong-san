@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+﻿import React, { useEffect, useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -22,6 +22,7 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePropertyStore } from '../../store/propertyStore';
 import { useAuthStore } from '../../store/authStore';
@@ -51,9 +52,10 @@ const NEARBY_POIS = [
 export default function PropertyDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { currentRoom, fetchRoomDetail, isLoading, toggleFavorite } = usePropertyStore();
     const { user, isAuthenticated } = useAuthStore();
-    const { reviewsByRoom, fetchReviews, addReview, isSubmitting } = useReviewStore();
+    const { reviewsByRoom, totalReviews: totalReviewsMap, fetchReviews, addReview, isSubmitting } = useReviewStore();
     const { createAppointment, isSubmitting: bookingSubmitting } = useAppointmentStore();
 
     const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
@@ -74,6 +76,10 @@ export default function PropertyDetailScreen() {
     const roomId = Number(id);
     const room = currentRoom?.id === roomId ? currentRoom : null;
     const reviews = reviewsByRoom[roomId] || [];
+    const reviewTotal = totalReviewsMap[roomId] || 0;
+    const reviewAvg = reviews.length > 0
+        ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+        : 0;
 
     useEffect(() => {
         if (roomId) {
@@ -85,7 +91,7 @@ export default function PropertyDetailScreen() {
 
     // Helper: ghép địa chỉ từ các trường tách riêng của backend
     const getFullAddress = (r: Room) => {
-        return [r.addressDetail, r.ward, r.district, r.province].filter(Boolean).join(', ');
+        return r.address || '';
     };
 
     const fetchDistanceFromUser = async () => {
@@ -130,9 +136,9 @@ export default function PropertyDetailScreen() {
 
     const handleCall = () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
-        if (room?.landlordInfo?.phone) {
+        if (room?.ownerPhone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Linking.openURL(`tel:${room.landlordInfo.phone}`);
+            Linking.openURL(`tel:${room.ownerPhone}`);
         } else {
             Alert.alert('Thông báo', 'Số điện thoại chủ nhà chưa được cập nhật.');
         }
@@ -140,7 +146,7 @@ export default function PropertyDetailScreen() {
 
     const handleChat = () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
-        router.push(`/chat/${room?.landlordInfo?.id}`);
+        router.push(`/chat/${room?.ownerId}`);
     };
 
     const handleNavigate = () => {
@@ -227,11 +233,11 @@ export default function PropertyDetailScreen() {
     };
 
     // Check if current user is the owner
-    const isOwner = user && room && room.landlordInfo && user.id === room.landlordInfo.id;
+    const isOwner = user && room && user.id === room.ownerId;
 
     const handleToggleStatus = async () => {
         if (!room) return;
-        const newStatus = room.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+        const newStatus = room.status === 'ACTIVE' ? 'HIDDEN' : 'ACTIVE';
         const label = newStatus === 'ACTIVE' ? 'hiện' : 'ẩn';
         Alert.alert(
             `${newStatus === 'ACTIVE' ? 'Hiện' : 'Ẩn'} tin đăng`,
@@ -243,7 +249,7 @@ export default function PropertyDetailScreen() {
                     onPress: async () => {
                         setIsTogglingStatus(true);
                         try {
-                            await roomService.updateStatus(room.id, newStatus);
+                            await roomService.updatePropertyStatus(room.id, newStatus);
                             fetchRoomDetail(room.id); // refresh
                             Alert.alert('Thành công', `Tin đã được ${label}`);
                         } catch (e: any) {
@@ -295,7 +301,6 @@ export default function PropertyDetailScreen() {
         );
     }
 
-    const averageRating = room.averageRating || 0;
     const shortDesc = room.description?.slice(0, 150);
     const isLongDesc = (room.description?.length || 0) > 150;
 
@@ -311,7 +316,7 @@ export default function PropertyDetailScreen() {
                         images={room.images.length > 0 ? room.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800']}
                         compact
                     />
-                    <View style={styles.galleryOverlayTop}>
+                    <View style={[styles.galleryOverlayTop, { top: insets.top + 8 }]}>
                         <TouchableOpacity style={styles.overlayBtn} onPress={() => router.back()}>
                             <Ionicons name="arrow-back" size={22} color="white" />
                         </TouchableOpacity>
@@ -339,7 +344,7 @@ export default function PropertyDetailScreen() {
                         </View>
                         <View style={[styles.statusBadge, room.status === 'ACTIVE' ? styles.statusActive : styles.statusOther]}>
                             <Text style={styles.statusText}>
-                                {room.status === 'ACTIVE' ? '✅ Còn phòng' : room.status === 'FULL' ? '❌ Hết phòng' : room.status}
+                                {room.status === 'ACTIVE' ? '✅ Đang hiển thị' : room.status === 'FULL' ? '❌ Hết phòng' : room.status === 'PENDING' ? '⏳ Chờ duyệt' : room.status === 'HIDDEN' ? '🔒 Đã ẩn' : room.status}
                             </Text>
                         </View>
                     </View>
@@ -368,10 +373,10 @@ export default function PropertyDetailScreen() {
                     <View style={styles.ratingRow}>
                         <View style={styles.stars}>
                             {[1, 2, 3, 4, 5].map(s => (
-                                <Ionicons key={s} name={s <= Math.round(averageRating) ? 'star' : 'star-outline'} size={14} color="#FFB800" />
+                                <Ionicons key={s} name={s <= Math.round(reviewAvg) ? 'star' : 'star-outline'} size={14} color="#FFB800" />
                             ))}
                         </View>
-                        <Text style={styles.ratingText}>{averageRating.toFixed(1)} ({room.totalReviews} đánh giá)</Text>
+                        <Text style={styles.ratingText}>{reviewAvg.toFixed(1)} ({reviewTotal} đánh giá)</Text>
                     </View>
 
                     {/* Quick Stats */}
@@ -383,25 +388,18 @@ export default function PropertyDetailScreen() {
                                 <Text style={styles.statLabel}>Diện tích</Text>
                             </View>
                         )}
-                        {room.numBedrooms !== undefined && (
+                        {room.bedrooms !== undefined && (
                             <View style={styles.statItem}>
                                 <Ionicons name="bed-outline" size={22} color="#0066FF" />
-                                <Text style={styles.statValue}>{room.numBedrooms}</Text>
+                                <Text style={styles.statValue}>{room.bedrooms}</Text>
                                 <Text style={styles.statLabel}>Phòng ngủ</Text>
                             </View>
                         )}
-                        {room.numBathrooms !== undefined && (
+                        {room.bathrooms !== undefined && (
                             <View style={styles.statItem}>
                                 <Ionicons name="water-outline" size={22} color="#0066FF" />
-                                <Text style={styles.statValue}>{room.numBathrooms}</Text>
+                                <Text style={styles.statValue}>{room.bathrooms}</Text>
                                 <Text style={styles.statLabel}>Phòng tắm</Text>
-                            </View>
-                        )}
-                        {room.deposit > 0 && (
-                            <View style={styles.statItem}>
-                                <Ionicons name="cash-outline" size={22} color="#0066FF" />
-                                <Text style={styles.statValue}>{formatPrice(room.deposit)}</Text>
-                                <Text style={styles.statLabel}>Đặt cọc</Text>
                             </View>
                         )}
                     </View>
@@ -419,7 +417,7 @@ export default function PropertyDetailScreen() {
                             onPress={() => setActiveTab('reviews')}
                         >
                             <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>
-                                Đánh giá ({room.totalReviews})
+                                Đánh giá ({reviewTotal})
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -448,16 +446,9 @@ export default function PropertyDetailScreen() {
                             <View style={styles.section}>
                                 <Text style={styles.sectionTitle}>🏷️ Chi tiết</Text>
                                 <View style={styles.detailsGrid}>
-                                    <DetailRow label="Loại phòng" value={room.rentalType === 'WHOLE' ? 'Nguyên căn' : 'Phòng chia sẻ'} />
-                                    {room.furnitureStatus && <DetailRow label="Nội thất" value={room.furnitureStatus} />}
-                                    {room.direction && <DetailRow label="Hướng" value={room.direction} />}
-                                    {room.floorNumber && <DetailRow label="Tầng" value={`Tầng ${room.floorNumber}`} />}
-                                    {room.genderConstraint && (
-                                        <DetailRow
-                                            label="Đối tượng"
-                                            value={room.genderConstraint === 'MALE_ONLY' ? 'Nam' : room.genderConstraint === 'FEMALE_ONLY' ? 'Nữ' : 'Tất cả'}
-                                        />
-                                    )}
+                                    <DetailRow label="Loại" value={room.propertyType || 'Phòng'} />
+                                    {room.furnishingStatus && <DetailRow label="Nội thất" value={room.furnishingStatus} />}
+                                    {room.availabilityStatus && <DetailRow label="Tình trạng" value={room.availabilityStatus} />}
                                     {room.capacity && <DetailRow label="Sức chứa" value={`${room.capacity} người`} />}
                                 </View>
                             </View>
@@ -542,36 +533,36 @@ export default function PropertyDetailScreen() {
                             )}
 
                             {/* Landlord Card */}
-                            {room.landlordInfo && (
-                            <View style={styles.section}>
-                                <Text style={styles.sectionTitle}>👤 Thông tin chủ nhà</Text>
-                                <TouchableOpacity
-                                    style={styles.landlordCard}
-                                    onPress={() => router.push(`/landlord-profile?slug=${(room.landlordInfo as any)?.slug || ''}&landlordId=${room.landlordInfo?.id}` as any)}
-                                    activeOpacity={0.7}
-                                >
-                                    <Image
-                                        source={{ uri: room.landlordInfo.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(room.landlordInfo.fullName || 'User')}&background=0066FF&color=fff` }}
-                                        style={styles.landlordAvatar}
-                                    />
-                                    <View style={styles.landlordInfo}>
-                                        <Text style={styles.landlordName}>{room.landlordInfo.fullName}</Text>
-                                        <View style={styles.verifiedBadge}>
-                                            <Ionicons name="checkmark-circle" size={14} color="#0066FF" />
-                                            <Text style={styles.verifiedText}>Đã xác minh</Text>
+                            {room.ownerId && (
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>👤 Thông tin chủ nhà</Text>
+                                    <TouchableOpacity
+                                        style={styles.landlordCard}
+                                        onPress={() => router.push(`/landlord-profile?landlordId=${room.ownerId}` as any)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Image
+                                            source={{ uri: room.ownerAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(room.ownerFullName || 'User')}&background=0066FF&color=fff` }}
+                                            style={styles.landlordAvatar}
+                                        />
+                                        <View style={styles.landlordInfo}>
+                                            <Text style={styles.landlordName}>{room.ownerFullName || 'Chủ nhà'}</Text>
+                                            <View style={styles.verifiedBadge}>
+                                                <Ionicons name="checkmark-circle" size={14} color="#0066FF" />
+                                                <Text style={styles.verifiedText}>Đã xác minh</Text>
+                                            </View>
+                                            <Text style={{ fontSize: 12, color: '#0066FF', marginTop: 2 }}>Xem hồ sơ →</Text>
                                         </View>
-                                        <Text style={{ fontSize: 12, color: '#0066FF', marginTop: 2 }}>Xem hồ sơ →</Text>
-                                    </View>
-                                    <View style={styles.landlordBtns}>
-                                        <TouchableOpacity style={styles.landlordCallBtn} onPress={handleCall}>
-                                            <Ionicons name="call" size={18} color="white" />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={styles.landlordChatBtn} onPress={handleChat}>
-                                            <Ionicons name="chatbubble-ellipses" size={18} color="#0066FF" />
-                                        </TouchableOpacity>
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
+                                        <View style={styles.landlordBtns}>
+                                            <TouchableOpacity style={styles.landlordCallBtn} onPress={handleCall}>
+                                                <Ionicons name="call" size={18} color="white" />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity style={styles.landlordChatBtn} onPress={handleChat}>
+                                                <Ionicons name="chatbubble-ellipses" size={18} color="#0066FF" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
                             )}
 
                             {/* Owner Management Section */}
@@ -626,14 +617,14 @@ export default function PropertyDetailScreen() {
                     {activeTab === 'reviews' && (
                         <View style={styles.section}>
                             <View style={styles.reviewSummary}>
-                                <Text style={styles.bigRating}>{averageRating.toFixed(1)}</Text>
+                                <Text style={styles.bigRating}>{reviewAvg.toFixed(1)}</Text>
                                 <View>
                                     <View style={styles.stars}>
                                         {[1, 2, 3, 4, 5].map(s => (
-                                            <Ionicons key={s} name={s <= Math.round(averageRating) ? 'star' : 'star-outline'} size={18} color="#FFB800" />
+                                            <Ionicons key={s} name={s <= Math.round(reviewAvg) ? 'star' : 'star-outline'} size={18} color="#FFB800" />
                                         ))}
                                     </View>
-                                    <Text style={styles.reviewCount}>{room.totalReviews} đánh giá</Text>
+                                    <Text style={styles.reviewCount}>{reviewTotal} đánh giá</Text>
                                 </View>
                             </View>
 
@@ -668,7 +659,7 @@ export default function PropertyDetailScreen() {
                     <Text style={styles.bottomUnit}>/tháng</Text>
                 </View>
                 {/* If user is the landlord of this room: show Boost + Edit */}
-                {user?.id === room.landlordInfo?.id ? (
+                {user?.id === room.ownerId ? (
                     <View style={styles.bottomBtns}>
                         <TouchableOpacity
                             style={styles.scheduleBtn}
@@ -704,7 +695,7 @@ export default function PropertyDetailScreen() {
             <Modal visible={showFullMap} animationType="slide" onRequestClose={() => setShowFullMap(false)}>
                 <View style={styles.fullMapContainer}>
                     <StatusBar barStyle="dark-content" />
-                    <View style={styles.fullMapHeader}>
+                    <View style={[styles.fullMapHeader, { paddingTop: insets.top + 8 }]}>
                         <TouchableOpacity onPress={() => setShowFullMap(false)} style={styles.fullMapBack}>
                             <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                         </TouchableOpacity>
@@ -869,7 +860,7 @@ const styles = StyleSheet.create({
     content: { padding: 16 },
     galleryOverlayTop: {
         position: 'absolute',
-        top: Platform.OS === 'ios' ? 50 : 40,
+        top: 0, // overridden by inline style using insets.top,
         left: 12, right: 12,
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1029,7 +1020,7 @@ const styles = StyleSheet.create({
     fullMapContainer: { flex: 1, backgroundColor: 'white' },
     fullMapHeader: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12,
+        paddingHorizontal: 16, paddingTop: 0, /* paddingTop set via inline style using useSafeAreaInsets */ paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     fullMapBack: { width: 40, height: 40, justifyContent: 'center' },

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar,
     Platform, ActivityIndicator,
@@ -41,8 +41,7 @@ function TransactionCard({ item }: { item: Transaction }) {
             </View>
             <View style={styles.cardBody}>
                 <Text style={styles.cardLabel}>{item.description || TYPE_LABELS[item.type] || item.type}</Text>
-                {item.roomTitle && <Text style={styles.cardSub} numberOfLines={1}>{item.roomTitle}</Text>}
-                {item.referenceCode && <Text style={styles.cardRef}>Mã GD: {item.referenceCode}</Text>}
+                {item.vnpayCode && <Text style={styles.cardRef}>Mã GD: {item.vnpayCode}</Text>}
                 <View style={styles.cardFooter}>
                     <Text style={styles.cardDate}>{formatDate(item.createdAt)}</Text>
                     <View style={[styles.statusDot, { backgroundColor: amountColor }]} />
@@ -73,14 +72,20 @@ function groupByMonth(txs: Transaction[]) {
 
 export default function TransactionHistoryScreen() {
     const router = useRouter();
-    const { transactions, isLoading, hasMore, fetchTransactions } = useWalletStore();
+    const insets = useSafeAreaInsets();
+    const { transactions, isLoading, fetchTransactions } = useWalletStore();
     const [activeFilter, setActiveFilter] = useState('');
 
     useEffect(() => {
-        fetchTransactions(true, activeFilter || undefined);
-    }, [activeFilter]);
+        fetchTransactions();
+    }, []);
 
-    const groups = groupByMonth(transactions);
+    // Client-side filtering theo type
+    const filteredTx = activeFilter
+        ? transactions.filter(tx => activeFilter.split(',').includes(tx.type))
+        : transactions;
+
+    const groups = groupByMonth(filteredTx);
 
     const renderItem = ({ item }: { item: { title: string; data: Transaction[] } }) => (
         <View>
@@ -94,7 +99,7 @@ export default function TransactionHistoryScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -132,8 +137,6 @@ export default function TransactionHistoryScreen() {
                     keyExtractor={(item) => item.title}
                     renderItem={renderItem}
                     contentContainerStyle={styles.listContent}
-                    onEndReached={() => hasMore && fetchTransactions(false, activeFilter || undefined)}
-                    onEndReachedThreshold={0.3}
                     ListFooterComponent={isLoading ? <ActivityIndicator color="#0066FF" style={{ marginVertical: 16 }} /> : null}
                 />
             )}
@@ -145,7 +148,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16, paddingBottom: 12,
+        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },

@@ -1,14 +1,16 @@
 import React, { useRef } from 'react';
-import { View, StyleSheet, Platform, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useWalletStore } from '../../store/walletStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function VNPayWebViewScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { paymentUrl, amount } = useLocalSearchParams<{ paymentUrl: string; amount: string }>();
-    const { fetchBalance } = useWalletStore();
+    const { fetchTransactions } = useWalletStore();
     const hasNavigated = useRef(false);
 
     const handleNavigationChange = async (navState: { url: string }) => {
@@ -23,8 +25,7 @@ export default function VNPayWebViewScreen() {
                 const responseCode = params.get('vnp_ResponseCode');
                 const txRef = params.get('vnp_TxnRef') || params.get('vnp_TransactionNo') || '';
 
-                // Refresh balance regardless
-                await fetchBalance();
+                await fetchTransactions();
 
                 if (responseCode === '00') {
                     router.replace({ pathname: '/wallet/success' as any, params: { amount, txRef } });
@@ -50,8 +51,8 @@ export default function VNPayWebViewScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar style="dark" />
 
-            {/* Safe area top padding for iOS */}
-            {Platform.OS === 'ios' && <View style={styles.safeTop} />}
+            {/* Safe area top padding for status bar */}
+            <View style={[styles.safeTop, { height: insets.top }]} />
 
             <WebView
                 source={{ uri: paymentUrl }}
@@ -73,7 +74,7 @@ export default function VNPayWebViewScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'white' },
-    safeTop: { height: 54, backgroundColor: 'white' },
+    safeTop: { height: 0, backgroundColor: 'white' }, // height set via inline style using useSafeAreaInsets
     webview: { flex: 1 },
     loading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
     loadingText: { fontSize: 14, color: '#666' },

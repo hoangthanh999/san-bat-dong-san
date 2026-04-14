@@ -4,11 +4,15 @@ import { API_BASE_URL, STORAGE_KEYS } from '../../constants';
 
 // Create Axios instance cho gateway (identity, customer, media, notification)
 // KHÔNG set default Content-Type ở đây — interceptor sẽ xử lý
+
 const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout: 30000,
 });
-
+apiClient.interceptors.request.use(config => {
+    console.log('[Request Body]', JSON.stringify(config.data));
+    return config;
+});
 // Request Interceptor - Attach JWT token + tự động set Content-Type
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
@@ -60,6 +64,7 @@ apiClient.interceptors.response.use(
     async (error: AxiosError) => {
         const status = error.response?.status;
         console.error('[API Error]', status, error.message);
+        console.log('[API Error Body]', JSON.stringify(error.response?.data));
 
         // Handle 401 Unauthorized - Token expired
         if (status === 401) {

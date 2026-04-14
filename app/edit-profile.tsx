@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, StatusBar, Platform, Alert, ActivityIndicator, Switch,
@@ -10,12 +10,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../store/authStore';
 import { useUserStore } from '../store/userStore';
 import { LifestyleProfile } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PERSONALITY_OPTIONS = ['Hướng ngoại', 'Hướng nội', 'Linh hoạt'];
 const SLEEP_OPTIONS = ['Trước 22h', '22h - 23h', '23h - 0h', 'Sau 0h'];
 
 export default function EditProfileScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { user } = useAuthStore();
     const { profile, updateProfile, updateAvatar, updateBanner, isUpdating, fetchProfile } = useUserStore();
 
@@ -108,7 +110,7 @@ export default function EditProfileScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
 
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
@@ -284,7 +286,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 54 : 16,
+        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
         paddingBottom: 12, backgroundColor: 'white',
         borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },

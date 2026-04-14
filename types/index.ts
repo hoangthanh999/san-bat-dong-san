@@ -21,77 +21,51 @@ export interface PaginatedResponse<T> {
 }
 
 // ============================
-// Property (từ property-service PropertyResponseDTO)
+// Property (khớp backend PropertyResponseDTO)
 // ============================
-export type RentalType = 'WHOLE' | 'SHARED';
-export type GenderConstraint = 'MALE_ONLY' | 'FEMALE_ONLY' | 'MIXED';
-export type PropertyStatus = 'PENDING' | 'ACTIVE' | 'FULL' | 'HIDDEN' | 'EXPIRED' | 'APPROVED' | 'REJECTED';
-
-export interface PropertyLandlordInfo {
-    id: number;
-    fullName: string;
-    email?: string;
-    phone?: string;
-    avatarUrl?: string;
-}
+export type PropertyStatus = 'PENDING' | 'ACTIVE' | 'FULL' | 'HIDDEN' | 'EXPIRED' | 'APPROVED' | 'REJECTED' | 'DELETED';
 
 export interface Room {
     id: number;
+    projectId?: number;
+    projectNameSnapshot?: string;
+    transactionType: string;  // "FOR_SALE" | "FOR_RENT"  ← sửa comment
     title: string;
-    description: string;
-    price: number;
-    deposit: number;
+    description?: string;
+    price: number;                  // BigDecimal → number
     area: number;
+    address: string;                // Backend dùng 1 trường address duy nhất
 
-    // Địa chỉ tách chi tiết
-    province: string;
-    district: string;
-    ward: string;
-    addressDetail: string;
-
-    // Tọa độ (backend tách từ PostGIS Point)
     latitude: number;
     longitude: number;
 
-    // Media
-    images: string[];        // mảng URL Cloudinary
-    videoUrl?: string;
-
-    // Chi tiết
-    furnitureStatus?: string;
-    legalStatus?: string;
-    direction?: string;
-    floorNumber?: number;
-    numBedrooms?: number;
-    numBathrooms?: number;
-
-    // Loại hình thuê
-    rentalType: RentalType;
+    propertyType: string;           // "APARTMENT" | "HOUSE" | "LAND" | "ROOM" ...
     capacity?: number;
-    currentTenants?: number;
-    genderConstraint?: GenderConstraint;
 
+    images: string[];               // List<String> URL Cloudinary
     amenities?: string[];
+    videoUrl?: string;
+    isQuotaDeducted?: boolean;
 
-    // Package & Status
     status: PropertyStatus;
-    packageType?: string;
-    priorityLevel?: number;
-    autoRenew?: boolean;
+    ownerId: number;
+    // Owner info (not in PropertyResponseDTO but may be enriched by frontend)
+    ownerFullName?: string;
+    ownerAvatarUrl?: string;
+    ownerPhone?: string;
 
-    // Thông tin chủ trọ (từ identity-service, embed trong response)
-    landlordInfo?: PropertyLandlordInfo;
+    createdAt: string;              // LocalDateTime → ISO string
+    expiresAt?: string;
 
-    // Stats
-    averageRating: number;
-    totalReviews: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    hasBalcony?: boolean;
 
-    // Timestamps
-    createdAt: string;
-    updatedAt?: string;
-    expirationDate?: string;
-    lastPushedAt?: string;
-    approvedAt?: string;
+    furnishingStatus?: string;      // "UNFURNISHED" | "FULLY_FURNISHED" ...
+    availabilityStatus?: string;    // "IMMEDIATELY" | "NEGOTIABLE" ...
+    electricityPrice?: string;      // "STATE_PRICE" | "FREE" ...
+    waterPrice?: string;
+    internetPrice?: string;
 }
 
 // Backward compatibility alias
@@ -226,43 +200,104 @@ export interface KYCStatusResponse {
 }
 
 // ============================
-// Property Create/Update DTO (property-service)
+// Property Create/Update DTO (khớp backend PropertyCreateDTO)
 // ============================
 export interface PropertyRequestDTO {
+    projectId?: number;
+    transactionType: string;           // "FOR_SALE" | "FOR_RENT" 
     title: string;
     description?: string;
     price: number;
-    deposit?: number;
     area: number;
-
-    province?: string;
-    district?: string;
-    ward?: string;
-    addressDetail?: string;
-
+    address: string;                   // Backend: 1 trường address duy nhất
     latitude: number;
     longitude: number;
+    propertyType: string;              // "APARTMENT" | "HOUSE" | "LAND" | "ROOM"
 
-    furnitureStatus?: string;
-    legalStatus?: string;
-    direction?: string;
-    floorNumber?: number;
-    numBedrooms?: number;
-    numBathrooms?: number;
+    ownerNameSnapshot?: string;
+    ownerAvatarSnapshot?: string;
+    ownerSlugSnapshot?: string;
 
-    rentalType: RentalType;
     capacity?: number;
-    genderConstraint?: GenderConstraint;
+    validityDays?: number;
 
     images: string[];
     videoUrl?: string;
     amenities?: string[];
 
-    servicePackageId?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    hasBalcony?: boolean;
+
+    furnishingStatus?: string;         // "UNFURNISHED" | "PARTIALLY_FURNISHED" | "FULLY_FURNISHED" 
+    availabilityStatus?: string;    // "IMMEDIATELY" | "THIS_MONTH" | "NEXT_MONTH" | "NEGOTIABLE"
+    electricityPrice?: string;         // "STATE_PRICE" | "FREE"
+    waterPrice?: string;
+    internetPrice?: string;
 }
 
 // Backward compatibility
 export type RoomCreateDTO = PropertyRequestDTO;
+
+// ============================
+// Reels Types (khớp backend PropertyReelResponseDTO + ReelsFeedResponse)
+// ============================
+export interface PropertyReelItem {
+    id: number;
+    title: string;
+    price: number;
+    address: string;
+    videoUrl: string;
+    isLiked: boolean;
+    isSaved: boolean;
+    likeCount: number;
+    ownerSlug?: string;
+    ownerNameSnapshot?: string;
+    ownerAvatarSnapshot?: string;
+    createdAt: string;
+}
+
+export interface ReelsFeedResponse {
+    items: PropertyReelItem[];
+    nextCursor: string | null;
+    hasNext: boolean;
+}
+
+// ============================
+// Amenity (khớp backend Amenity entity)
+// ============================
+export interface Amenity {
+    id: number;
+    name: string;
+    icon?: string;
+}
+
+// ============================
+// Project (khớp backend ProjectResponseDTO)
+// ============================
+export interface ProjectResponseDTO {
+    id: number;
+    name: string;
+    description?: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    projectType: string;
+    amenities?: string[];
+    createdBy: number;
+    status: string;
+    createdAt: string;
+}
+
+export interface ProjectCreateDTO {
+    name: string;
+    description?: string;
+    address: string;
+    latitude: number;
+    longitude: number;
+    projectType: string;
+    amenities?: string[];
+}
 
 // ============================
 // Notification (notification-service)
@@ -312,26 +347,21 @@ export interface Conversation {
 }
 
 // ============================
-// Filter / Search (khớp với PropertyController.searchProperties params)
+// Filter / Search (client-side filtering, backend chưa có search endpoint)
 // ============================
 export interface RoomFilters {
-    type?: string;          // RentalType: "WHOLE" | "SHARED"
+    transactionType?: string;   // "SALE" | "RENT"
+    propertyType?: string;      // "APARTMENT" | "HOUSE" | "LAND" | "ROOM"
     minPrice?: number;
     maxPrice?: number;
     minArea?: number;
     maxArea?: number;
     bedroomList?: number[];
-    bathroomList?: number[];
-    directionList?: string[];
-    furniture?: string;
     sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'nearest';
 }
 
 export interface SearchParams extends RoomFilters {
     keyword?: string;
-    lat?: number;
-    lng?: number;
-    radius?: number;
     page?: number;
     size?: number;
 }
@@ -386,30 +416,26 @@ export interface Appointment {
 }
 
 // ============================
-// Wallet & Transaction Types (chưa có backend)
+// Transaction Types (khớp backend Transaction entity)
 // ============================
 export type TransactionType = 'DEPOSIT' | 'POST_FEE' | 'MEMBERSHIP' | 'BOOST' | 'REFUND';
 export type TransactionStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
 
 export interface Transaction {
     id: number;
-    type: TransactionType;
-    amount: number;
-    status: TransactionStatus;
+    userId: number;
     description?: string;
-    referenceCode?: string;
-    roomTitle?: string;
+    amount: number;
+    type: string;              // "DEPOSIT", "POST_FEE", etc.
+    vnpayCode?: string;
+    couponId?: number;
+    status: string;            // "SUCCESS", "FAILED", etc.
     createdAt: string;
 }
 
-export interface WalletBalance {
-    balance: number;
-    userId: number;
-}
-
+// VNPay response (backend trả về { url: string })
 export interface VNPayPaymentResponse {
-    paymentUrl: string;
-    orderId?: string;
+    url: string;
 }
 
 // ============================
