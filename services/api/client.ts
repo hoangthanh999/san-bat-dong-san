@@ -63,13 +63,32 @@ apiClient.interceptors.response.use(
     },
     async (error: AxiosError) => {
         const status = error.response?.status;
-        console.error('[API Error]', status, error.message);
-        console.log('[API Error Body]', JSON.stringify(error.response?.data));
+        const url = error.config?.url || '';
+        console.error('[API Error]', status, error.message, url);
+
+        // ============================================================
+        // Import Toast để hiện thông báo thân thiện
+        // ============================================================
+        let showToast: ((msg: string, type?: string) => void) | null = null;
+        try {
+            const toastModule = require('../../components/ui/Toast');
+            showToast = toastModule.showToast;
+        } catch (e) {
+            // Toast chưa sẵn sàng — fallback console
+        }
 
         // Handle 401 Unauthorized - Token expired
         if (status === 401) {
             await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
             await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+
+            // Reset zustand auth state
+            try {
+                const { useAuthStore } = require('../../store/authStore');
+                useAuthStore.getState().forceLogout();
+            } catch (e) { }
+
+            showToast?.('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
 
             return Promise.reject({
                 ...error,
@@ -77,17 +96,53 @@ apiClient.interceptors.response.use(
             });
         }
 
-        // Handle Network Error
-        if (error.message === 'Network Error') {
+        // Handle 403 Forbidden
+        if (status === 403) {
+            showToast?.('Bạn không có quyền thực hiện hành động này.', 'error');
             return Promise.reject({
                 ...error,
-                message: 'Không thể kết nối đến server. Kiểm tra kết nối mạng.',
+                message: 'Bạn không có quyền thực hiện hành động này.',
             });
         }
 
-        // Handle backend error response
+        // Handle Network Error
+        if (error.message === 'Network Error' || !error.response) {
+            const msg = 'Không thể kết nối đến server. Kiểm tra kết nối mạng.';
+            showToast?.(msg, 'error');
+            return Promise.reject({
+                ...error,
+                message: msg,
+            });
+        }
+
+        // Handle 5xx Server Error
+        if (status && status >= 500) {
+            const msg = 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau.';
+            showToast?.(msg, 'error');
+            return Promise.reject({
+                ...error,
+                message: msg,
+            });
+        }
+
+        // Handle 404 Not Found
+        if (status === 404) {
+            const msg = 'Không tìm thấy dữ liệu yêu cầu.';
+            showToast?.(msg, 'warning');
+            return Promise.reject({
+                ...error,
+                message: msg,
+            });
+        }
+
+        // Handle backend error response (400, 422, etc.)
         const backendMessage = (error.response?.data as any)?.message;
         const errorMessage = backendMessage || error.message || 'Đã xảy ra lỗi';
+
+        // Chỉ hiện toast cho lỗi không phải validation (validation đã hiện Alert riêng)
+        if (status !== 400) {
+            showToast?.(errorMessage, 'error');
+        }
 
         return Promise.reject({
             ...error,
@@ -95,5 +150,6 @@ apiClient.interceptors.response.use(
         });
     }
 );
+
 
 export default apiClient;

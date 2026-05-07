@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User, Room, Favorite, PaginatedResponse, CustomerResponseDTO, CustomerProfileDTO } from '../types';
+import { User, Room, PaginatedResponse, CustomerResponseDTO, CustomerProfileDTO } from '../types';
 import { userService } from '../services/api/user';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
@@ -7,35 +7,27 @@ import { STORAGE_KEYS } from '../constants';
 interface UserState {
     profile: User | null;
     myRooms: Room[];
-    favorites: Favorite[];
     isLoading: boolean;
     isUpdating: boolean;
     error: string | null;
     myRoomsHasMore: boolean;
-    favoritesHasMore: boolean;
     myRoomsPage: number;
-    favoritesPage: number;
 
     fetchProfile: () => Promise<void>;
     updateProfile: (data: CustomerProfileDTO) => Promise<void>;
     updateAvatar: (formData: FormData) => Promise<void>;
     updateBanner: (formData: FormData) => Promise<void>;
     fetchMyRooms: (reset?: boolean) => Promise<void>;
-    fetchFavorites: (reset?: boolean) => Promise<void>;
-    removeFavorite: (roomId: number) => Promise<void>;
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
     profile: null,
     myRooms: [],
-    favorites: [],
     isLoading: false,
     isUpdating: false,
     error: null,
     myRoomsHasMore: true,
-    favoritesHasMore: true,
     myRoomsPage: 0,
-    favoritesPage: 0,
 
     fetchProfile: async () => {
         set({ isLoading: true, error: null });
@@ -161,34 +153,6 @@ export const useUserStore = create<UserState>((set, get) => ({
             }));
         } catch (error: any) {
             set({ error: error.message, isLoading: false });
-        }
-    },
-
-    fetchFavorites: async (reset = false) => {
-        const page = reset ? 0 : get().favoritesPage;
-        if (!reset && !get().favoritesHasMore) return;
-        set({ isLoading: true });
-        try {
-            const data = await userService.getFavorites(page);
-            set(state => ({
-                favorites: reset ? data.content : [...state.favorites, ...data.content],
-                favoritesHasMore: !data.last,
-                favoritesPage: data.number + 1,
-                isLoading: false,
-            }));
-        } catch (error: any) {
-            set({ error: error.message, isLoading: false });
-        }
-    },
-
-    removeFavorite: async (roomId: number) => {
-        try {
-            await userService.removeFavorite(roomId);
-            set(state => ({
-                favorites: state.favorites.filter(f => f.roomId !== roomId),
-            }));
-        } catch (error) {
-            console.error('Remove favorite error', error);
         }
     },
 }));

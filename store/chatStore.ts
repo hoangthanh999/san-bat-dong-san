@@ -18,7 +18,6 @@ interface ChatState {
     sendMessage: (partnerId: number, content: string, type?: string, metadata?: any) => Promise<void>;
     receiveMessage: (message: ChatMessage) => void;
     markAsRead: (partnerId: number) => Promise<void>;
-    deleteConversation: (partnerId: number) => Promise<void>;
     connectWebSocket: () => void;
     disconnectWebSocket: () => void;
 }
@@ -80,7 +79,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }));
 
         try {
-            const sent = await chatService.sendMessage(partnerId, content, type, metadata);
+            const sent = await chatService.sendMessage(user.id, partnerId, content, type);
             // Update with real message from server
             set(state => ({
                 messages: {
@@ -93,8 +92,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             // Update conversation last message
             set(state => ({
                 conversations: state.conversations.map(c =>
-                    c.partnerId === partnerId
-                        ? { ...c, lastMessage: content, lastMessageAt: sent.createdAt }
+                    c.id === partnerId
+                        ? { ...c, lastMessage: content, lastTime: sent.createdAt }
                         : c
                 ),
             }));
@@ -117,11 +116,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 [partnerId]: [...(state.messages[partnerId] || []), message],
             },
             conversations: state.conversations.map(c =>
-                c.partnerId === partnerId
+                c.id === partnerId
                     ? {
                         ...c,
                         lastMessage: message.content,
-                        lastMessageAt: message.createdAt,
+                        lastTime: message.createdAt,
                         unreadCount: c.unreadCount + 1,
                     }
                     : c
@@ -134,11 +133,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         try {
             await chatService.markAsRead(partnerId);
             set(state => {
-                const conv = state.conversations.find(c => c.partnerId === partnerId);
+                const conv = state.conversations.find(c => c.id === partnerId);
                 const prevUnread = conv?.unreadCount || 0;
                 return {
                     conversations: state.conversations.map(c =>
-                        c.partnerId === partnerId ? { ...c, unreadCount: 0 } : c
+                        c.id === partnerId ? { ...c, unreadCount: 0 } : c
                     ),
                     totalUnread: Math.max(0, state.totalUnread - prevUnread),
                 };
@@ -148,16 +147,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
     },
 
-    deleteConversation: async (partnerId: number) => {
-        try {
-            await chatService.deleteConversation(partnerId);
-            set(state => ({
-                conversations: state.conversations.filter(c => c.partnerId !== partnerId),
-            }));
-        } catch (error) {
-            console.error('Delete conversation error', error);
-        }
-    },
 
     connectWebSocket: () => {
         const { token } = useAuthStore.getState();

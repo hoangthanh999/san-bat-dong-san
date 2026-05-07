@@ -1,16 +1,18 @@
 import { create } from 'zustand';
-import { Transaction } from '../types';
+import { Transaction, WalletInfo } from '../types';
 import { walletService } from '../services/api/wallet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
 
 interface WalletState {
+    wallet: WalletInfo | null;
     transactions: Transaction[];
     paymentUrl: string | null;
     isLoading: boolean;
     isCreatingPayment: boolean;
     error: string | null;
 
+    fetchWallet: () => Promise<void>;
     createPayment: (amount: number) => Promise<string>;
     fetchTransactions: () => Promise<void>;
     clearPaymentUrl: () => void;
@@ -27,11 +29,27 @@ async function getUserId(): Promise<number> {
 }
 
 export const useWalletStore = create<WalletState>((set, get) => ({
+    wallet: null,
     transactions: [],
     paymentUrl: null,
     isLoading: false,
     isCreatingPayment: false,
     error: null,
+
+    /**
+     * Lấy thông tin ví (số dư, hold amount)
+     * Backend: GET /api/wallets/me (JWT)
+     * Trả về: WalletInfo { id, userId, balance, holdAmount }
+     */
+    fetchWallet: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const walletData = await walletService.getMyWallet();
+            set({ wallet: walletData, isLoading: false });
+        } catch (error: any) {
+            set({ error: error.message || 'Không thể tải thông tin ví', isLoading: false });
+        }
+    },
 
     /**
      * Tạo URL thanh toán VNPay

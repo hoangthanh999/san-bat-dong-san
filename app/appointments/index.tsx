@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar,
     Platform, ActivityIndicator, RefreshControl, Alert,
@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { Appointment } from '../../types';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     PENDING: { label: 'Chờ xác nhận', color: '#FF9500', bg: '#FFF3E0' },
@@ -123,6 +124,17 @@ function AppointmentCard({ appt, onPress, onCancel }: {
 }
 
 export default function AppointmentsScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xem lịch hẹn xem phòng"
+            icon="calendar-outline"
+        >
+            <AppointmentsContent />
+        </AuthGuardScreen>
+    );
+}
+
+function AppointmentsContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { appointments, isLoading, fetchAppointments, cancelAppointment } = useAppointmentStore();
@@ -169,6 +181,14 @@ export default function AppointmentsScreen() {
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Lịch hẹn của tôi</Text>
                 <View style={{ width: 40 }} />
+            </View>
+
+            {/* Development Banner */}
+            <View style={styles.devBanner}>
+                <Ionicons name="construct-outline" size={18} color="#E65100" />
+                <Text style={styles.devBannerText}>
+                    🚧 Tính năng đang phát triển — Dữ liệu sẽ được cập nhật khi backend hoàn thiện
+                </Text>
             </View>
 
             {/* Tabs */}
@@ -221,6 +241,12 @@ export default function AppointmentsScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
+    devBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 10,
+        borderBottomWidth: 1, borderBottomColor: '#FFE0B2',
+    },
+    devBannerText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 17 },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,

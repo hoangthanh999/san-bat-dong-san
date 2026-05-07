@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, StatusBar,
     Platform, ScrollView, TextInput, Alert, ActivityIndicator,
@@ -6,10 +6,23 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { useWalletStore } from '../../store/walletStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const QUICK_AMOUNTS = [100000, 200000, 500000, 1000000, 2000000, 5000000];
 
 export default function DepositScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để nạp tiền vào ví"
+            icon="wallet-outline"
+        >
+            <DepositContent />
+        </AuthGuardScreen>
+    );
+}
+
+function DepositContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { transactions, createPayment, isCreatingPayment } = useWalletStore();
@@ -145,7 +158,7 @@ export default function DepositScreen() {
                 </View>
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={[styles.continueBtn, (amount < 10000 || isCreatingPayment) && styles.continueBtnDisabled]}
                     onPress={handleContinue}
@@ -224,7 +237,7 @@ const styles = StyleSheet.create({
     paymentName: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
     paymentSub: { fontSize: 12, color: '#888', marginTop: 2 },
     footer: {
-        padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        padding: 16, paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0',
     },
     continueBtn: {

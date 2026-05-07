@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar,
     Platform, ActivityIndicator, RefreshControl,
@@ -8,6 +8,7 @@ import { useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useContractStore } from '../../store/contractStore';
 import { Contract, ContractStatus } from '../../types';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     PENDING: { label: 'Chờ ký', color: '#FF9500', bg: '#FFF3E0' },
@@ -69,6 +70,17 @@ function ContractCard({ contract, onPress }: { contract: Contract; onPress: () =
 }
 
 export default function ContractsScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xem hợp đồng thuê"
+            icon="document-text-outline"
+        >
+            <ContractsContent />
+        </AuthGuardScreen>
+    );
+}
+
+function ContractsContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { contracts, isLoading, fetchContracts } = useContractStore();
@@ -98,6 +110,14 @@ export default function ContractsScreen() {
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Hợp đồng của tôi</Text>
                 <View style={{ width: 40 }} />
+            </View>
+
+            {/* Development Banner */}
+            <View style={styles.devBanner}>
+                <Ionicons name="construct-outline" size={18} color="#E65100" />
+                <Text style={styles.devBannerText}>
+                    🚧 Tính năng đang phát triển — Dữ liệu sẽ được cập nhật khi backend hoàn thiện
+                </Text>
             </View>
 
             <View style={styles.tabBar}>
@@ -144,6 +164,12 @@ export default function ContractsScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
+    devBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 10,
+        borderBottomWidth: 1, borderBottomColor: '#FFE0B2',
+    },
+    devBannerText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 17 },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,

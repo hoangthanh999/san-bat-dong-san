@@ -29,7 +29,7 @@ function ConversationItem({ item, onPress, onDelete }: {
     onPress: () => void;
     onDelete: () => void;
 }) {
-    const avatarUri = item.partnerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.partnerName)}&background=0066FF&color=fff&size=100`;
+    const avatarUri = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.fullName)}&background=0066FF&color=fff&size=100`;
     return (
         <TouchableOpacity style={styles.convItem} onPress={onPress} activeOpacity={0.7}>
             <View style={styles.avatarWrapper}>
@@ -38,8 +38,8 @@ function ConversationItem({ item, onPress, onDelete }: {
             </View>
             <View style={styles.convInfo}>
                 <View style={styles.convHeader}>
-                    <Text style={[styles.convName, item.unreadCount > 0 && styles.convNameBold]} numberOfLines={1}>{item.partnerName}</Text>
-                    <Text style={styles.convTime}>{formatTime(item.lastMessageAt)}</Text>
+                    <Text style={[styles.convName, item.unreadCount > 0 && styles.convNameBold]} numberOfLines={1}>{item.fullName}</Text>
+                    <Text style={styles.convTime}>{formatTime(item.lastTime)}</Text>
                 </View>
                 <View style={styles.convFooter}>
                     <Text style={[styles.lastMsg, item.unreadCount > 0 && styles.lastMsgBold]} numberOfLines={1}>
@@ -58,7 +58,7 @@ function ConversationItem({ item, onPress, onDelete }: {
 
 export default function ChatListScreen() {
     const router = useRouter();
-    const { conversations, fetchConversations, isLoading, deleteConversation } = useChatStore();
+    const { conversations, fetchConversations, isLoading } = useChatStore();
     const { isAuthenticated } = useAuthStore();
     const [refreshing, setRefreshing] = useState(false);
     const { headerPaddingTop } = useHeaderHeight();
@@ -119,12 +119,9 @@ export default function ChatListScreen() {
                     renderItem={({ item }) => (
                         <ConversationItem
                             item={item}
-                            onPress={() => router.push(`/chat/${item.partnerId}`)}
+                            onPress={() => router.push(`/chat/${item.id}`)}
                             onDelete={() => {
-                                Alert.alert('Xoá cuộc trò chuyện', 'Bạn có chắc muốn xoá?', [
-                                    { text: 'Huỷ', style: 'cancel' },
-                                    { text: 'Xoá', style: 'destructive', onPress: () => deleteConversation(item.partnerId) },
-                                ]);
+                                Alert.alert('Xoá cuộc trò chuyện', 'Chức năng đang phát triển.');
                             }}
                         />
                     )}

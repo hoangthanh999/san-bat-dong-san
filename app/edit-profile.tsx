@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, StatusBar, Platform, Alert, ActivityIndicator, Switch,
@@ -11,11 +11,23 @@ import { useAuthStore } from '../store/authStore';
 import { useUserStore } from '../store/userStore';
 import { LifestyleProfile } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthGuardScreen } from '../components/auth/AuthGuardScreen';
 
 const PERSONALITY_OPTIONS = ['Hướng ngoại', 'Hướng nội', 'Linh hoạt'];
 const SLEEP_OPTIONS = ['Trước 22h', '22h - 23h', '23h - 0h', 'Sau 0h'];
 
 export default function EditProfileScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để chỉnh sửa hồ sơ"
+            icon="person-outline"
+        >
+            <EditProfileContent />
+        </AuthGuardScreen>
+    );
+}
+
+function EditProfileContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { user } = useAuthStore();

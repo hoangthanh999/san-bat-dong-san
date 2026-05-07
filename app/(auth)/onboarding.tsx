@@ -1,12 +1,13 @@
 import React, { useState, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, Dimensions,
-    StatusBar, Platform, ScrollView, Animated,
+    StatusBar, ScrollView, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
@@ -50,6 +51,7 @@ const STEPS = [
 
 export default function OnboardingScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [currentStep, setCurrentStep] = useState(0);
     const [answers, setAnswers] = useState<Record<string, string[]>>({});
     const progressAnim = useRef(new Animated.Value(0)).current;
@@ -112,7 +114,7 @@ export default function OnboardingScreen() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
                 <View style={styles.progressBar}>
                     {STEPS.map((_, idx) => (
                         <View
@@ -170,7 +172,7 @@ export default function OnboardingScreen() {
             </View>
 
             {/* Bottom */}
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
                 <Text style={styles.stepIndicator}>
                     {currentStep + 1} / {STEPS.length}
                 </Text>
@@ -196,7 +198,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: Platform.OS === 'ios' ? 60 : 20,
+        paddingTop: 0, // overridden by inline style using useSafeAreaInsets
         paddingBottom: 16,
     },
     progressBar: {
@@ -312,7 +314,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+        paddingBottom: 24, // thêm insets.bottom inline nếu cần
         paddingTop: 16,
         backgroundColor: 'white',
         borderTopWidth: 1,

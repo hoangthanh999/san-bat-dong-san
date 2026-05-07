@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 
 export default function PaymentSuccessScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { amount, txRef } = useLocalSearchParams<{ amount: string; txRef: string }>();
     const amountNum = parseInt(amount || '0', 10);
 
@@ -29,7 +31,7 @@ export default function PaymentSuccessScreen() {
                 </View>
             </View>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.walletBtn}
                     onPress={() => router.replace('/wallet' as any)}
@@ -67,7 +69,7 @@ const styles = StyleSheet.create({
     },
     infoText: { flex: 1, fontSize: 14, color: '#333', lineHeight: 20 },
     footer: {
-        padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        padding: 16, paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#E0E0E0', gap: 10,
     },
     walletBtn: {

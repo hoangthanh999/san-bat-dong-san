@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     FlatList, RefreshControl, StatusBar, Platform, Alert, Switch,
@@ -12,6 +12,7 @@ import { useAppointmentStore } from '../../store/appointmentStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 import { Room, Appointment } from '../../types';
 
 function MiniRoomCard({ room, onPress }: { room: Room; onPress: () => void }) {
@@ -54,17 +55,28 @@ function AppointmentChip({ appt }: { appt: Appointment }) {
 }
 
 export default function ProfileScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xem hồ sơ cá nhân"
+            icon="person-circle-outline"
+        >
+            <ProfileScreenContent />
+        </AuthGuardScreen>
+    );
+}
+
+function ProfileScreenContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { user, isAuthenticated, logout } = useAuthStore();
-    const { profile, myRooms, favorites, fetchProfile, fetchMyRooms, fetchFavorites, isLoading } = useUserStore();
+    const { profile, myRooms, fetchProfile, fetchMyRooms, isLoading } = useUserStore();
     const { appointments, fetchAppointments } = useAppointmentStore();
     const {
         isNotificationsEnabled,
         initializePushNotifications: enablePush,
         disableNotifications: disablePush,
     } = useNotificationStore();
-    const [activeTab, setActiveTab] = useState<'myrooms' | 'favorites' | 'appointments'>('myrooms');
+    const [activeTab, setActiveTab] = useState<'myrooms' | 'appointments'>('myrooms');
     const [refreshing, setRefreshing] = useState(false);
     const [togglingNotif, setTogglingNotif] = useState(false);
 
@@ -72,14 +84,13 @@ export default function ProfileScreen() {
         if (isAuthenticated) {
             fetchProfile();
             fetchMyRooms(true);
-            fetchFavorites(true);
             fetchAppointments(true);
         }
     }, [isAuthenticated]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([fetchProfile(), fetchMyRooms(true), fetchFavorites(true), fetchAppointments(true)]);
+        await Promise.all([fetchProfile(), fetchMyRooms(true), fetchAppointments(true)]);
         setRefreshing(false);
     };
 
@@ -114,22 +125,6 @@ export default function ProfileScreen() {
             setTogglingNotif(false);
         }
     };
-
-    if (!isAuthenticated) {
-        return (
-            <View style={styles.authRequired}>
-                <StatusBar barStyle="dark-content" />
-                <Ionicons name="person-circle-outline" size={80} color="#CCC" />
-                <Text style={styles.authTitle}>Đăng nhập để xem hồ sơ</Text>
-                <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/(auth)/login')}>
-                    <Text style={styles.loginBtnText}>Đăng nhập</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-                    <Text style={styles.registerLink}>Chưa có tài khoản? Đăng ký</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
 
     const displayUser = profile || user;
 
@@ -187,11 +182,6 @@ export default function ProfileScreen() {
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.stat}>
-                        <Text style={styles.statNum}>{favorites.length}</Text>
-                        <Text style={styles.statLbl}>Yêu thích</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.stat}>
                         <Text style={styles.statNum}>{appointments.length}</Text>
                         <Text style={styles.statLbl}>Lịch hẹn</Text>
                     </View>
@@ -216,7 +206,6 @@ export default function ProfileScreen() {
             <View style={styles.tabBar}>
                 {[
                     { key: 'myrooms', label: 'Tin của tôi', icon: 'home-outline' },
-                    { key: 'favorites', label: 'Yêu thích', icon: 'heart-outline' },
                     { key: 'appointments', label: 'Lịch hẹn', icon: 'calendar-outline' },
                 ].map(({ key, label, icon }) => (
                     <TouchableOpacity
@@ -254,24 +243,16 @@ export default function ProfileScreen() {
                     )
                 )}
 
-                {activeTab === 'favorites' && (
-                    favorites.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <Ionicons name="heart-outline" size={48} color="#CCC" />
-                            <Text style={styles.emptyTitle}>Chưa có yêu thích</Text>
-                            <Text style={styles.emptySub}>Nhấn tim trên các tin đăng để lưu vào đây</Text>
-                        </View>
-                    ) : (
-                        <View style={styles.cardList}>
-                            {favorites.map(fav => (
-                                <MiniRoomCard key={fav.id} room={fav.room} onPress={() => router.push(`/property/${fav.roomId}` as any)} />
-                            ))}
-                        </View>
-                    )
-                )}
 
                 {activeTab === 'appointments' && (
                     <View>
+                        {/* Development Banner */}
+                        <View style={styles.devBanner}>
+                            <Ionicons name="construct-outline" size={16} color="#E65100" />
+                            <Text style={styles.devBannerText}>
+                                🚧 Tính năng đang phát triển
+                            </Text>
+                        </View>
                         {appointments.length === 0 ? (
                             <View style={styles.emptyState}>
                                 <Ionicons name="calendar-outline" size={48} color="#CCC" />
@@ -437,4 +418,10 @@ const styles = StyleSheet.create({
     seeAllBtn: { paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' as const },
     seeAllText: { fontSize: 14, color: '#0066FF', fontWeight: '600' as const },
     settingsGroupLabel: { fontSize: 12, fontWeight: '700' as const, color: '#AAA', textTransform: 'uppercase' as const, letterSpacing: 0.6, paddingHorizontal: 14, paddingTop: 16, paddingBottom: 4 },
+    devBanner: {
+        flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
+        backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 8,
+        marginHorizontal: 16, marginTop: 12, borderRadius: 8,
+    },
+    devBannerText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 17 },
 });

@@ -1,12 +1,14 @@
 import React from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, StatusBar, Platform,
+    View, Text, StyleSheet, TouchableOpacity, StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 
 export default function KYCPendingScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     return (
         <View style={styles.container}>
@@ -58,7 +60,7 @@ export default function KYCPendingScreen() {
                 </View>
             </View>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.homeBtn}
                     onPress={() => router.replace('/(tabs)' as any)}
@@ -109,7 +111,7 @@ const styles = StyleSheet.create({
     },
     infoText: { flex: 1, fontSize: 13, color: '#0066FF', lineHeight: 20 },
     footer: {
-        padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        padding: 16, paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0',
         gap: 10,
     },

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Platform, Alert, ActivityIndicator, StatusBar,
@@ -8,8 +8,20 @@ import { useRouter, Stack } from 'expo-router';
 import { authService } from '../../services/api/auth';
 import { useAuthStore } from '../../store/authStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 export default function SecuritySettingsScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để quản lý bảo mật tài khoản"
+            icon="shield-checkmark-outline"
+        >
+            <SecuritySettingsContent />
+        </AuthGuardScreen>
+    );
+}
+
+function SecuritySettingsContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { logout } = useAuthStore();

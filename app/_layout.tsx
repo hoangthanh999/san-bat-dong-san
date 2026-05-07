@@ -1,4 +1,4 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
@@ -11,27 +11,9 @@ import {
     setupNotificationHandlers,
     handleInitialNotification,
 } from '../services/pushNotificationService';
+import { ToastProvider } from '../components/ui/Toast';
 
 SplashScreen.preventAutoHideAsync();
-
-const PROTECTED_SEGMENTS = ['post', 'chat', 'profile'];
-
-function AuthGuard() {
-    const { isAuthenticated, isLoading } = useAuthStore();
-    const segments = useSegments();
-    const router = useRouter();
-
-    useEffect(() => {
-        if (isLoading) return;
-        const inTabsGroup = segments[0] === '(tabs)';
-        const currentTab = segments[1] as string;
-        if (inTabsGroup && PROTECTED_SEGMENTS.includes(currentTab) && !isAuthenticated) {
-            router.replace('/(auth)/login');
-        }
-    }, [isAuthenticated, isLoading, segments]);
-
-    return null;
-}
 
 export default function RootLayout() {
     const [loaded] = useFonts({});
@@ -145,8 +127,8 @@ export default function RootLayout() {
                     {/* Landlord profile */}
                     <Stack.Screen name="landlord-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="+not-found" options={{ headerShown: false }} />
-                </Stack>
-                <AuthGuard />
+            </Stack>
+                <ToastProvider />
             </SafeAreaProvider>
         </GestureHandlerRootView>
     );

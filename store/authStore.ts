@@ -16,6 +16,8 @@ interface AuthState {
     login: (credentials: LoginRequest) => Promise<void>;
     register: (data: RegisterRequest) => Promise<void>;
     logout: () => Promise<void>;
+    /** Bị gọi bởi API interceptor khi nhận 401 — không gọi API logout */
+    forceLogout: () => void;
     checkAuth: () => Promise<void>;
     clearError: () => void;
     setUser: (user: User) => void;
@@ -78,18 +80,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             // 1. Xóa push token khỏi server trước khi logout
             await removePushToken();
-            // 2. Xóa local storage
+            // 2. Xóa local storage + gọi API logout
             await authService.logout();
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            // Dù logout API fail, vẫn xóa state local để không bị "kẹt"
             set({
                 user: null,
                 token: null,
                 isAuthenticated: false,
                 isLoading: false
             });
-        } catch (error) {
-            set({ isLoading: false });
-            console.error('Logout error:', error);
         }
+    },
+
+    forceLogout: () => {
+        // Gọi từ API interceptor khi nhận 401 — không gọi API backend
+        set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null,
+        });
     },
 
     checkAuth: async () => {

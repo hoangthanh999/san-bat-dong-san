@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     StatusBar, Platform, Alert, ActivityIndicator,
@@ -8,8 +8,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { useContractStore } from '../../store/contractStore';
 import { contractService } from '../../services/api/contracts';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 export default function ContractDetailScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xem chi tiết hợp đồng"
+            icon="document-text-outline"
+        >
+            <ContractDetailContent />
+        </AuthGuardScreen>
+    );
+}
+
+function ContractDetailContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -165,7 +177,7 @@ export default function ContractDetailScreen() {
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity style={styles.pdfBtn} onPress={handleDownloadPDF} activeOpacity={0.85}>
                     <Ionicons name="download-outline" size={20} color="white" />
                     <Text style={styles.pdfBtnText}>Tải hợp đồng PDF</Text>
@@ -211,7 +223,7 @@ const styles = StyleSheet.create({
     infoValue: { fontSize: 14, fontWeight: '600', color: '#1A1A1A', textAlign: 'right', flex: 1 },
     infoValueAccent: { color: '#0066FF' },
     footer: {
-        padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        padding: 16, paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0',
     },
     pdfBtn: {

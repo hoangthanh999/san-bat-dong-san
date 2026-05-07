@@ -6,16 +6,19 @@ import {
     Platform,
     StyleSheet,
     TouchableOpacity,
-    Image
+    Image,
+    StatusBar,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { login, isLoading, error } = useAuthStore();
 
     const [email, setEmail] = useState('');
@@ -37,7 +40,8 @@ export default function LoginScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
-            <View style={styles.content}>
+            <StatusBar barStyle="dark-content" />
+            <View style={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
                 <View style={styles.header}>
                     <Image
                         source={require('../../assets/icon.png')}

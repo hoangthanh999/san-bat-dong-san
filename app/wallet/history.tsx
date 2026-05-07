@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar,
     Platform, ActivityIndicator,
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { useWalletStore } from '../../store/walletStore';
 import { Transaction } from '../../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const FILTER_TABS = [
     { key: '', label: 'Tất cả' },

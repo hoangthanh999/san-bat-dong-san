@@ -237,17 +237,7 @@ export const roomService = {
     },
 
     // ============================================================
-    // FEATURES ĐANG PHÁT TRIỂN (chưa có backend endpoint)
+    // LƯU Ý: "Lưu tin" (Favorite) dùng toggleSave() ở trên.
+    // Backend KHÔNG có API riêng cho favorite list.
     // ============================================================
-
-    // Toggle favorite (chưa có backend)
-    toggleFavorite: async (roomId: number): Promise<void> => {
-        console.warn('[roomService] toggleFavorite: API chưa có trong backend - đang phát triển');
-    },
-
-    // Check if room is favorited (chưa có backend)
-    checkFavorite: async (roomId: number): Promise<boolean> => {
-        console.warn('[roomService] checkFavorite: API chưa có trong backend - đang phát triển');
-        return false;
-    },
 };

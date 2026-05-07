@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -53,13 +53,13 @@ export default function PropertyDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { currentRoom, fetchRoomDetail, isLoading, toggleFavorite } = usePropertyStore();
+    const { currentRoom, fetchRoomDetail, isLoading, toggleSave } = usePropertyStore();
     const { user, isAuthenticated } = useAuthStore();
     const { reviewsByRoom, totalReviews: totalReviewsMap, fetchReviews, addReview, isSubmitting } = useReviewStore();
     const { createAppointment, isSubmitting: bookingSubmitting } = useAppointmentStore();
 
     const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
-    const [isFavorited, setIsFavorited] = useState(false);
+    const [isSaved, setIsSaved] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [showFullMap, setShowFullMap] = useState(false);
@@ -121,8 +121,8 @@ export default function PropertyDetailScreen() {
     const handleFavorite = async () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setIsFavorited(prev => !prev);
-        await toggleFavorite(roomId);
+        setIsSaved(prev => !prev);
+        await toggleSave(roomId);
     };
 
     const handleShare = async () => {
@@ -326,9 +326,9 @@ export default function PropertyDetailScreen() {
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.overlayBtn} onPress={handleFavorite}>
                                 <Ionicons
-                                    name={isFavorited ? 'heart' : 'heart-outline'}
+                                    name={isSaved ? 'bookmark' : 'bookmark-outline'}
                                     size={22}
-                                    color={isFavorited ? '#FF4757' : 'white'}
+                                    color={isSaved ? '#FFB800' : 'white'}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -653,7 +653,7 @@ export default function PropertyDetailScreen() {
             </ScrollView>
 
             {/* Bottom Action Bar */}
-            <View style={styles.bottomBar}>
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
                 <View style={styles.bottomPriceInfo}>
                     <Text style={styles.bottomPrice}>{formatPrice(room.price)}</Text>
                     <Text style={styles.bottomUnit}>/tháng</Text>
@@ -731,7 +731,7 @@ export default function PropertyDetailScreen() {
                             </>
                         )}
                     </MapView>
-                    <View style={styles.fullMapBottom}>
+                    <View style={[styles.fullMapBottom, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                         <TouchableOpacity style={styles.fullMapNavBtn} onPress={handleNavigate}>
                             <Ionicons name="navigate" size={20} color="white" />
                             <Text style={styles.fullMapNavText}>🧭 Chỉ đường đến đây</Text>
@@ -997,7 +997,7 @@ const styles = StyleSheet.create({
         position: 'absolute', bottom: 0, left: 0, right: 0,
         backgroundColor: 'white', flexDirection: 'row', alignItems: 'center',
         justifyContent: 'space-between', paddingHorizontal: 16,
-        paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+        paddingTop: 12, paddingBottom: 12, // overridden by inline style using insets.bottom
         borderTopWidth: 1, borderTopColor: '#F0F0F0',
         shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 10,
     },
@@ -1026,7 +1026,7 @@ const styles = StyleSheet.create({
     fullMapBack: { width: 40, height: 40, justifyContent: 'center' },
     fullMapTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
     fullMapBottom: {
-        padding: 16, paddingBottom: Platform.OS === 'ios' ? 32 : 16,
+        padding: 16, paddingBottom: 16, // overridden by inline style if needed
         backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0', gap: 8,
     },
     fullMapNavBtn: {
@@ -1040,7 +1040,7 @@ const styles = StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContainer: {
         backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+        padding: 24, paddingBottom: 24, // overridden by inline style if needed
     },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },

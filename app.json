@@ -30,6 +30,7 @@
         "backgroundColor": "#0066FF"
       },
       "package": "com.smartrental.homeswipe",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",

@@ -49,14 +49,18 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         set({ isSubmitting: true, error: null });
         try {
             const review = await reviewService.addReview(roomId, rating, comment, reviewImages);
-            set(state => ({
-                reviewsByRoom: {
-                    ...state.reviewsByRoom,
-                    [roomId]: [review, ...(state.reviewsByRoom[roomId] || [])],
-                },
-                totalReviews: { ...state.totalReviews, [roomId]: (state.totalReviews[roomId] || 0) + 1 },
-                isSubmitting: false,
-            }));
+            if (review) {
+                set(state => ({
+                    reviewsByRoom: {
+                        ...state.reviewsByRoom,
+                        [roomId]: [review, ...(state.reviewsByRoom[roomId] || [])],
+                    },
+                    totalReviews: { ...state.totalReviews, [roomId]: (state.totalReviews[roomId] || 0) + 1 },
+                    isSubmitting: false,
+                }));
+            } else {
+                set({ isSubmitting: false });
+            }
         } catch (error: any) {
             set({ error: error.message || 'Gửi đánh giá thất bại', isSubmitting: false });
             throw error;
@@ -66,14 +70,16 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     replyReview: async (reviewId: number, roomId: number, reply: string) => {
         try {
             const updated = await reviewService.replyReview(reviewId, reply);
-            set(state => ({
-                reviewsByRoom: {
-                    ...state.reviewsByRoom,
-                    [roomId]: (state.reviewsByRoom[roomId] || []).map(r =>
-                        r.id === reviewId ? updated : r
-                    ),
-                },
-            }));
+            if (updated) {
+                set(state => ({
+                    reviewsByRoom: {
+                        ...state.reviewsByRoom,
+                        [roomId]: (state.reviewsByRoom[roomId] || []).map(r =>
+                            r.id === reviewId ? updated : r
+                        ),
+                    },
+                }));
+            }
         } catch (error: any) {
             set({ error: error.message || 'Phản hồi đánh giá thất bại' });
             throw error;

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
     Platform, Modal, Alert, ActivityIndicator,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     },
     modalCard: {
         backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+        padding: 24, paddingBottom: 24, // add insets.bottom inline if needed
     },
     modalTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 16 },
     modalInfoRow: {

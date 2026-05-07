@@ -41,8 +41,15 @@ export const authService = {
         return authData;
     },
 
-    // Logout - chỉ xóa local storage (backend không có logout endpoint)
+    // Logout - gọi backend blacklist token rồi xóa local storage
     logout: async (): Promise<void> => {
+        try {
+            // Gọi backend để blacklist token hiện tại
+            await apiClient.post('/auth/logout');
+        } catch (error) {
+            // Vẫn xóa local dù API lỗi (token có thể đã hết hạn)
+            console.warn('[Auth] Logout API failed, clearing local storage anyway');
+        }
         await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
         await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
     },
@@ -93,5 +100,20 @@ export const authService = {
     changeEmail: async (password: string, newEmail: string): Promise<string> => {
         const response = await apiClient.put(API_ENDPOINTS.CHANGE_EMAIL, { password, newEmail });
         return response.data;
+    },
+
+    // Refresh Token — gọi khi token sắp hết hạn
+    refreshToken: async (): Promise<AuthResponse | null> => {
+        try {
+            const response = await apiClient.post('/auth/refresh');
+            const authData: AuthResponse = response.data;
+            if (authData.token) {
+                await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, authData.token);
+            }
+            return authData;
+        } catch (error) {
+            console.warn('[Auth] Refresh token failed');
+            return null;
+        }
     },
 };

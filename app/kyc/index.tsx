@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     StatusBar, Platform, ScrollView,
@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const BENEFITS = [
     { icon: 'home-outline', text: 'Đăng tin bất động sản không giới hạn' },
@@ -15,6 +16,17 @@ const BENEFITS = [
 ];
 
 export default function KYCIntroScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xác minh danh tính"
+            icon="card-outline"
+        >
+            <KYCIntroContent />
+        </AuthGuardScreen>
+    );
+}
+
+function KYCIntroContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
 
@@ -81,7 +93,7 @@ export default function KYCIntroScreen() {
             </ScrollView>
 
             {/* CTA */}
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.startBtn}
                     onPress={() => router.push('/kyc/upload-front' as any)}
@@ -149,7 +161,7 @@ const styles = StyleSheet.create({
     stepLabel: { fontSize: 14, color: '#333' },
     footer: {
         padding: 16,
-        paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white',
         borderTopWidth: 1, borderTopColor: '#F0F0F0',
     },

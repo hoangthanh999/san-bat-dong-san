@@ -29,12 +29,17 @@ export interface Room {
     id: number;
     projectId?: number;
     projectNameSnapshot?: string;
-    transactionType: string;  // "FOR_SALE" | "FOR_RENT"  ← sửa comment
+    transactionType: string;  // "FOR_SALE" | "FOR_RENT"
     title: string;
     description?: string;
     price: number;                  // BigDecimal → number
+    pricePerSqm?: number;           // Backend tính tự động: price / area
     area: number;
-    address: string;                // Backend dùng 1 trường address duy nhất
+    address: string;
+    province?: string;              // Backend @NotBlank khi tạo
+    street?: string;                // Backend @NotBlank khi tạo
+    ward?: string;                  // Backend @NotBlank khi tạo
+    district?: string;              // Backend @NotBlank khi tạo
 
     latitude: number;
     longitude: number;
@@ -49,7 +54,13 @@ export interface Room {
 
     status: PropertyStatus;
     ownerId: number;
-    // Owner info (not in PropertyResponseDTO but may be enriched by frontend)
+
+    // Owner snapshot info (from PropertyResponseDTO)
+    ownerNameSnapshot?: string;
+    ownerAvatarSnapshot?: string;
+    ownerSlugSnapshot?: string;
+
+    // Legacy/enriched owner info
     ownerFullName?: string;
     ownerAvatarUrl?: string;
     ownerPhone?: string;
@@ -66,6 +77,7 @@ export interface Room {
     electricityPrice?: string;      // "STATE_PRICE" | "FREE" ...
     waterPrice?: string;
     internetPrice?: string;
+    legalDocumentType?: string;     // "SO_DO" | "SO_HONG" ...
 }
 
 // Backward compatibility alias
@@ -209,7 +221,11 @@ export interface PropertyRequestDTO {
     description?: string;
     price: number;
     area: number;
-    address: string;                   // Backend: 1 trường address duy nhất
+    address: string;                   // Backend @NotBlank
+    province: string;                  // Backend @NotBlank
+    street: string;                    // Backend @NotBlank
+    ward: string;                      // Backend @NotBlank
+    district: string;                  // Backend @NotBlank
     latitude: number;
     longitude: number;
     propertyType: string;              // "APARTMENT" | "HOUSE" | "LAND" | "ROOM"
@@ -234,6 +250,7 @@ export interface PropertyRequestDTO {
     electricityPrice?: string;         // "STATE_PRICE" | "FREE"
     waterPrice?: string;
     internetPrice?: string;
+    legalDocumentType?: string;        // "SO_DO" | "SO_HONG" ...
 }
 
 // Backward compatibility
@@ -313,16 +330,19 @@ export interface Notification {
 }
 
 // ============================
-// Chat Types (chưa có backend, giữ cho tương lai)
+// Chat Types (khớp backend ChatMessageResponse + ConversationResponse)
 // ============================
 export type MessageType = 'TEXT' | 'IMAGE' | 'VOICE' | 'LOCATION' | 'PROPERTY' | 'APPOINTMENT';
 
+// Khớp backend ChatMessageResponse
 export interface ChatMessage {
     id: number;
     senderId: number;
     receiverId: number;
     content?: string;
     type: MessageType;
+    createdAt: string;
+    // Frontend-only fields (không từ backend)
     metadata?: {
         latitude?: number;
         longitude?: number;
@@ -331,26 +351,30 @@ export interface ChatMessage {
         appointmentId?: number;
         datetime?: string;
     };
-    isRead: boolean;
-    createdAt: string;
+    isRead?: boolean;  // optional, frontend dùng cho UI
 }
 
+// Khớp backend ConversationResponse
 export interface Conversation {
-    id: number;
-    partnerId: number;
-    partnerName: string;
-    partnerAvatar?: string;
-    lastMessage?: string;
-    lastMessageAt?: string;
-    unreadCount: number;
-    isOnline?: boolean;
+    id: number;                 // partnerId
+    fullName: string;           // backend: fullName
+    avatar?: string;            // backend: avatar
+    lastMessage?: string;       // backend: lastMessage
+    lastTime?: string;          // backend: lastTime
+    isOnline?: boolean;         // backend: isOnline
+    unreadCount: number;        // backend: unreadCount
+    // Frontend aliases cho backward compat
+    partnerId?: number;         // = id
+    partnerName?: string;       // = fullName
+    partnerAvatar?: string;     // = avatar
+    lastMessageAt?: string;     // = lastTime
 }
 
 // ============================
-// Filter / Search (client-side filtering, backend chưa có search endpoint)
+// Filter / Search (khớp backend PropertySearchRequestDTO)
 // ============================
 export interface RoomFilters {
-    transactionType?: string;   // "SALE" | "RENT"
+    transactionType?: string;   // "FOR_SALE" | "FOR_RENT"
     propertyType?: string;      // "APARTMENT" | "HOUSE" | "LAND" | "ROOM"
     minPrice?: number;
     maxPrice?: number;
@@ -364,6 +388,113 @@ export interface SearchParams extends RoomFilters {
     keyword?: string;
     page?: number;
     size?: number;
+    bedrooms?: number;       // single value để gửi lên API (từ bedroomList[0])
+    transactionType?: string;
+}
+
+// Backend PropertySearchRequestDTO — tìm kiếm nâng cao
+export interface PropertySearchRequest {
+    keyword?: string;
+    minPrice?: number;          // BigDecimal
+    maxPrice?: number;
+    minArea?: number;
+    maxArea?: number;
+    propertyTypes?: string[];   // List<String>
+    transactionTypes?: string[];
+    amenities?: string[];
+    district?: string;
+    ward?: string;
+    street?: string;
+    province?: string;
+    latitude?: number;
+    longitude?: number;
+    radiusKm?: number;
+    minBedrooms?: number;
+    minBathrooms?: number;
+    hasBalcony?: boolean;
+    minCapacity?: number;
+    projectId?: number;
+    furnishingStatuses?: string[];
+    availabilityStatuses?: string[];
+    electricityPrices?: string[];
+    waterPrices?: string[];
+    internetPrices?: string[];
+    filterMonth?: string;
+    sortBy?: string;            // default: 'createdAt'
+    sortDir?: string;           // 'asc' | 'desc'
+    page?: number;              // default: 0
+    size?: number;              // default: 12
+}
+
+// Backend PropertySearchItemDTO
+export interface PropertySearchItem {
+    id: number;
+    propertyType: string;
+    transactionType: string;
+    title: string;
+    price: number;
+    area: number;
+    address: string;
+    province?: string;
+    street?: string;
+    ward?: string;
+    district?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+    hasBalcony?: boolean;
+    furnishingStatus?: string;
+    latitude?: number;
+    longitude?: number;
+    thumbnail?: string;
+    createdAt: string;
+}
+
+// Backend PropertyAnalyticsResponse
+export interface MarketInsight {
+    popularPriceText?: string;
+    popularPriceUnit?: string;
+    popularPriceLabel?: string;
+    yearlyGrowthPercent?: number;
+    yearlyGrowthTrend?: string;    // "UP" | "DOWN"
+    yearlyGrowthLabel?: string;
+    diffFromPeakPercent?: number;
+    diffFromPeakTrend?: string;
+    diffFromPeakLabel?: string;
+}
+
+export interface PriceTrendItem {
+    month: string;
+    averagePrice: number;
+    totalPosts: number;
+}
+
+export interface PropertyAnalyticsResponse {
+    marketInsights: MarketInsight;
+    trends: PriceTrendItem[];
+}
+
+export interface WardPriceDTO {
+    wardName: string;
+    averagePrice: string;
+    unit?: string;
+    totalPosts: number;
+}
+
+export interface RegionTransactionStat {
+    regionName: string;
+    totalPosts: number;
+    forSaleCount: number;
+    forRentCount: number;
+}
+
+// ============================
+// Wallet (khớp backend Wallet entity)
+// ============================
+export interface WalletInfo {
+    id: number;
+    userId: number;
+    balance: number;            // BigDecimal → number
+    holdAmount?: number;        // Tiền đang giữ (đặt cọc)
 }
 
 // ============================

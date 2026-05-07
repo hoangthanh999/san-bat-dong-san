@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     StatusBar, Platform, Alert, TextInput, ScrollView, ActivityIndicator,
@@ -8,8 +8,20 @@ import { useRouter, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKYCStore } from '../../store/kycStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 export default function KYCInfoScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xác minh danh tính"
+            icon="card-outline"
+        >
+            <KYCInfoContent />
+        </AuthGuardScreen>
+    );
+}
+
+function KYCInfoContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { submitKYC, isSubmitting, scanResult } = useKYCStore();
@@ -222,7 +234,7 @@ export default function KYCInfoScreen() {
                 </View>
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={[styles.submitBtn, (!agreed || isSubmitting) && styles.submitBtnDisabled]}
                     onPress={handleSubmit}
@@ -298,7 +310,7 @@ const styles = StyleSheet.create({
     consentLink: { color: '#0066FF', fontWeight: '600' },
     footer: {
         padding: 16,
-        paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white',
         borderTopWidth: 1, borderTopColor: '#F0F0F0',
     },

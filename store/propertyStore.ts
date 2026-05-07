@@ -30,6 +30,11 @@ interface PropertyState {
     resetFilters: () => void;
     toggleFavorite: (id: number) => Promise<void>;
 
+    // Search results (từ search-service)
+    searchResults: Room[] | null;   // null = chưa search, [] = search không có kết quả
+    setSearchResults: (results: any) => void;
+    clearSearchResults: () => void;
+
     // Reels actions
     fetchReels: (guestId?: string) => Promise<void>;
     loadMoreReels: (guestId?: string) => Promise<void>;
@@ -53,6 +58,7 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
     page: 0,
     totalElements: 0,
     hasMore: true,
+    searchResults: null,
 
     // Reels state
     reels: [],
@@ -65,9 +71,10 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
      * GET /public/properties?page=0&size=10
      */
     fetchRooms: async () => {
-        set({ isLoading: true, error: null });
+        set({ isLoading: true, error: null, page: 0 });
         try {
-            const response = await roomService.getRooms(get().searchParams);
+            const { searchParams } = get();
+            const response = await roomService.getRooms({ ...searchParams, page: 0 });
 
             set({
                 rooms: response.content,
@@ -89,7 +96,7 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
      */
     loadMoreRooms: async () => {
         const { hasMore, isLoadingMore, searchParams, page, rooms } = get();
-        if (!hasMore || isLoadingMore) return;
+        if (!hasMore || isLoadingMore || get().isLoading) return;
 
         set({ isLoadingMore: true });
         try {
@@ -141,11 +148,47 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
         set({ filters: initialFilters });
     },
 
+    // Search results từ search-service
+    setSearchResults: (page: any) => {
+        // page là Page<PropertySearchItemDTO> từ search-service
+        // Map sang Room[] để hiển thị chung với rooms
+        const items = page?.content ?? [];
+        const mapped: Room[] = items.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            price: item.price,
+            area: item.area,
+            address: item.address,
+            province: item.province,
+            district: item.district,
+            ward: item.ward,
+            street: item.street,
+            propertyType: item.propertyType,
+            transactionType: item.transactionType,
+            images: item.thumbnail ? [item.thumbnail] : [],
+            status: 'ACTIVE' as any,
+            ownerId: 0,
+            bedrooms: item.bedrooms,
+            bathrooms: item.bathrooms,
+            hasBalcony: item.hasBalcony,
+            furnishingStatus: item.furnishingStatus,
+            latitude: item.latitude ?? 0,
+            longitude: item.longitude ?? 0,
+            createdAt: item.createdAt,
+        }));
+        set({ searchResults: mapped });
+    },
+
+    clearSearchResults: () => {
+        set({ searchResults: null });
+    },
+
     toggleFavorite: async (id: number) => {
         try {
-            await roomService.toggleFavorite(id);
+            // Dùng Save API thật của backend: POST /properties/{id}/save
+            await roomService.toggleSave(id);
         } catch (error: any) {
-            console.error('Lỗi khi thêm vào yêu thích', error);
+            console.error('Lỗi khi lưu/bỏ lưu', error);
         }
     },
 

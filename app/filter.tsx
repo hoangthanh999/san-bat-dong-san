@@ -1,16 +1,12 @@
 import React, { useState } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Platform, Modal, StatusBar,
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePropertyStore } from '../store/propertyStore';
 import { RoomFilters } from '../types';
-
-interface FilterSheetProps {
-    visible: boolean;
-    onClose: () => void;
-}
 
 const PRICE_RANGES = [
     { label: 'Dưới 3 triệu', min: 0, max: 3000000 },
@@ -44,25 +40,31 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
     );
 }
 
-export default function FilterScreen({ visible, onClose }: FilterSheetProps) {
-    const { filters, setFilters, resetFilters, fetchRooms } = usePropertyStore();
+/**
+ * FilterScreen — Full-page route screen (KHÔNG phải Modal).
+ * Điều hướng đến bằng router.push('/filter').
+ * Đóng bằng router.back() thay vì onClose prop (prop đó gây crash khi không được truyền).
+ */
+export default function FilterScreen() {
+    const router = useRouter();
+    const insets = useSafeAreaInsets();
+    const { filters, setFilters, resetFilters } = usePropertyStore();
     const [local, setLocal] = useState<RoomFilters & { priceIndex?: number; areaIndex?: number }>({
         ...filters,
     });
 
-    const updateLocal = (key: keyof typeof local, value: any) => setLocal(p => ({ ...p, [key]: value }));
+    const updateLocal = (key: keyof typeof local, value: any) =>
+        setLocal(p => ({ ...p, [key]: value }));
 
     const handleApply = () => {
         setFilters(local);
-        fetchRooms();
-        onClose();
+        router.back();
     };
 
     const handleReset = () => {
         setLocal({});
         resetFilters();
-        fetchRooms();
-        onClose();
+        router.back();
     };
 
     const setBedroom = (num: number) => {
@@ -91,132 +93,162 @@ export default function FilterScreen({ visible, onClose }: FilterSheetProps) {
     };
 
     return (
-        <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-            <View style={styles.container}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={onClose}>
-                        <Ionicons name="close" size={24} color="#1A1A1A" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Bộ lọc</Text>
-                    <TouchableOpacity onPress={handleReset}>
-                        <Text style={styles.resetBtn}>Đặt lại</Text>
-                    </TouchableOpacity>
-                </View>
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" />
 
-                <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                    {/* Loại bất động sản */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionLabel}>Loại bất động sản</Text>
-                        <View style={styles.chipRow}>
-                            {[
-                                { val: undefined, label: 'Tất cả' },
-                                { val: 'ROOM', label: 'Phòng trọ' },
-                                { val: 'APARTMENT', label: 'Căn hộ' },
-                                { val: 'HOUSE', label: 'Nhà' },
-                            ].map(opt => (
-                                <Chip
-                                    key={opt.label}
-                                    label={opt.label}
-                                    selected={local.propertyType === opt.val}
-                                    onPress={() => updateLocal('propertyType', opt.val)}
-                                />
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Khoảng giá */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionLabel}>Khoảng giá thuê</Text>
-                        <View style={styles.chipRow}>
-                            {PRICE_RANGES.map((r, i) => (
-                                <Chip
-                                    key={r.label}
-                                    label={r.label}
-                                    selected={local.priceIndex === i}
-                                    onPress={() => setPriceRange(i)}
-                                />
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Diện tích */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionLabel}>Diện tích</Text>
-                        <View style={styles.chipRow}>
-                            {AREA_RANGES.map((r, i) => (
-                                <Chip
-                                    key={r.label}
-                                    label={r.label}
-                                    selected={local.areaIndex === i}
-                                    onPress={() => setAreaRange(i)}
-                                />
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Số phòng ngủ */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionLabel}>Số phòng ngủ</Text>
-                        <View style={styles.chipRow}>
-                            <Chip
-                                label="Tất cả"
-                                selected={!local.bedroomList || local.bedroomList.length === 0}
-                                onPress={() => updateLocal('bedroomList', [])}
-                            />
-                            {BEDROOM_OPTIONS.map(n => (
-                                <Chip
-                                    key={n}
-                                    label={n === 0 ? 'Studio' : `${n} PN`}
-                                    selected={(local.bedroomList || []).includes(n)}
-                                    onPress={() => setBedroom(n)}
-                                />
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Sắp xếp */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionLabel}>Sắp xếp theo</Text>
-                        <View style={styles.chipRow}>
-                            {SORT_OPTIONS.map(opt => (
-                                <Chip
-                                    key={opt.val}
-                                    label={opt.label}
-                                    selected={local.sortBy === opt.val}
-                                    onPress={() => updateLocal('sortBy', local.sortBy === opt.val ? undefined : opt.val)}
-                                />
-                            ))}
-                        </View>
-                    </View>
-
-                    <View style={{ height: 30 }} />
-                </ScrollView>
-
-                <View style={styles.bottomBar}>
-                    <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
-                        <Text style={styles.applyBtnText}>Áp dụng</Text>
-                    </TouchableOpacity>
-                </View>
+            {/* Header */}
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <TouchableOpacity
+                    onPress={() => router.back()}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                    <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Bộ lọc</Text>
+                <TouchableOpacity onPress={handleReset}>
+                    <Text style={styles.resetBtn}>Đặt lại</Text>
+                </TouchableOpacity>
             </View>
-        </Modal>
+
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+                {/* Loại bất động sản */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>Loại bất động sản</Text>
+                    <View style={styles.chipRow}>
+                        {[
+                            { val: undefined, label: 'Tất cả' },
+                            { val: 'ROOM', label: 'Phòng trọ' },
+                            { val: 'APARTMENT', label: 'Căn hộ' },
+                            { val: 'HOUSE', label: 'Nhà' },
+                        ].map(opt => (
+                            <Chip
+                                key={opt.label}
+                                label={opt.label}
+                                selected={local.propertyType === opt.val}
+                                onPress={() => updateLocal('propertyType', opt.val)}
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                {/* Khoảng giá */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>Khoảng giá thuê</Text>
+                    <View style={styles.chipRow}>
+                        {PRICE_RANGES.map((r, i) => (
+                            <Chip
+                                key={r.label}
+                                label={r.label}
+                                selected={local.priceIndex === i}
+                                onPress={() => setPriceRange(i)}
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                {/* Diện tích */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>Diện tích</Text>
+                    <View style={styles.chipRow}>
+                        {AREA_RANGES.map((r, i) => (
+                            <Chip
+                                key={r.label}
+                                label={r.label}
+                                selected={local.areaIndex === i}
+                                onPress={() => setAreaRange(i)}
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                {/* Số phòng ngủ */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>Số phòng ngủ</Text>
+                    <View style={styles.chipRow}>
+                        <Chip
+                            label="Tất cả"
+                            selected={!local.bedroomList || local.bedroomList.length === 0}
+                            onPress={() => updateLocal('bedroomList', [])}
+                        />
+                        {BEDROOM_OPTIONS.map(n => (
+                            <Chip
+                                key={n}
+                                label={n === 0 ? 'Studio' : `${n} PN`}
+                                selected={(local.bedroomList || []).includes(n)}
+                                onPress={() => setBedroom(n)}
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                {/* Sắp xếp */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionLabel}>Sắp xếp theo</Text>
+                    <View style={styles.chipRow}>
+                        {SORT_OPTIONS.map(opt => (
+                            <Chip
+                                key={opt.val}
+                                label={opt.label}
+                                selected={local.sortBy === opt.val}
+                                onPress={() =>
+                                    updateLocal('sortBy', local.sortBy === opt.val ? undefined : opt.val)
+                                }
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                <View style={{ height: 30 }} />
+            </ScrollView>
+
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
+                    <Text style={styles.applyBtnText}>Áp dụng</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'white' },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'ios' ? 20 : 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F0',
+        backgroundColor: 'white',
+    },
     headerTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
     resetBtn: { color: '#888', fontSize: 15, fontWeight: '600' },
     scrollView: { flex: 1 },
     section: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4 },
     sectionLabel: { fontSize: 15, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    chip: { paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 20 },
+    chip: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderWidth: 1.5,
+        borderColor: '#E0E0E0',
+        borderRadius: 20,
+    },
     chipSelected: { borderColor: '#0066FF', backgroundColor: '#E8F0FF' },
     chipText: { fontSize: 13, color: '#666' },
     chipTextSelected: { color: '#0066FF', fontWeight: '600' },
-    bottomBar: { padding: 16, paddingBottom: Platform.OS === 'ios' ? 32 : 16, borderTopWidth: 1, borderTopColor: '#F0F0F0' },
-    applyBtn: { backgroundColor: '#0066FF', borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+    bottomBar: {
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#F0F0F0',
+        backgroundColor: 'white',
+    },
+    applyBtn: {
+        backgroundColor: '#0066FF',
+        borderRadius: 12,
+        paddingVertical: 16,
+        alignItems: 'center',
+    },
     applyBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
 });

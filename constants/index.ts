@@ -1,15 +1,18 @@
 // API Base URL - Gateway (nginx)
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.30.248.25:8080';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.117:8080';
 
 // Property Service - nginx đã route /properties, /public/properties, /admin/properties → 8086
 // Giữ lại cho trường hợp cần gọi trực tiếp (bypass nginx)
-export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'http://10.30.248.25:8086';
+export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'http://192.168.1.117:8086';
 
 // Payment Service - nginx chỉ route /api/payment/, các endpoint khác cần gọi trực tiếp
-export const PAYMENT_API_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_API_BASE_URL || 'http://10.30.248.25:8087';
+export const PAYMENT_API_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_API_BASE_URL || 'http://192.168.1.117:8087';
 
-// WebSocket (STOMP over SockJS cho notification-service)
-export const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://10.30.248.25:8080/ws-notifier';
+// WebSocket Notification (STOMP/SockJS — notification-service)
+export const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://192.168.1.117:8080/ws-notifier';
+
+// WebSocket Chat (STOMP/SockJS — chat-service) — endpoint KHÁC với notification WS
+export const WS_CHAT_URL = process.env.EXPO_PUBLIC_WS_CHAT_URL || 'ws://192.168.1.117:8080/ws-chat';
 
 // Google Maps
 export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -175,38 +178,43 @@ export const API_ENDPOINTS = {
     PAYMENT_CREATE: '/api/payment/create-payment',                              // POST - params: amount, userId (qua nginx)
     // Các endpoint dưới đây KHÔNG qua nginx, dùng paymentClient (trực tiếp :8087)
     TRANSACTION_HISTORY: (userId: number) => `/api/transactions/my-history/${userId}`, // GET
-    PACKAGE_BUY_MEMBERSHIP: '/api/packages/buy-membership',                     // POST - params: userId, packageId
+    PACKAGE_BUY_MEMBERSHIP: '/api/packages/buy-membership',                     // POST - params: packageId (JWT auth)
+    PACKAGE_BUY_PROMOTION: '/api/packages/buy-promotion',                       // POST - params: packageId, propertyId (JWT auth)
     BILLS_CREATE: '/api/bills',                                                  // POST - body: BillCreateDTO
 
     // ============================================================
-    // FEATURES ĐANG PHÁT TRIỂN (Backend chưa có API - giữ stub)
+    // SEARCH (search-service qua nginx /search, /api/v1/analytics)
     // ============================================================
+    SEARCH_PROPERTIES: '/search/properties',                                    // GET - @ModelAttribute (25+ params)
+    ANALYTICS_PRICE_TRENDS: '/api/v1/analytics/price-trends',                   // GET - params: province?, district?, ward?, propertyType?, transactionType
+    ANALYTICS_WARD_PRICES: '/api/v1/analytics/ward-prices',                     // GET - params: province?, district, propertyType?, transactionType
+    ANALYTICS_TOP_REGIONS: '/api/v1/analytics/top-regions',                     // GET - params: limit?, regionField?
 
-    // Favorites (chưa có backend)
-    FAVORITES: '/favorites',
-    FAVORITE_TOGGLE: (roomId: number) => `/favorites/${roomId}`,
-    FAVORITE_CHECK: (roomId: number) => `/favorites/check/${roomId}`,
+    // ============================================================
+    // WALLET (wallet-service qua nginx /api/wallets)
+    // ============================================================
+    WALLET_ME: '/api/wallets/me',                                               // GET - JWT (lấy số dư ví)
+    WALLET_TRANSACTIONS: '/api/wallets/transactions',                           // GET - JWT, params: page, size
 
-    // Chat (chưa có backend)
-    CHAT_CONVERSATIONS: '/chat/conversations',
-    CHAT_HISTORY: (partnerId: number) => `/chat/history/${partnerId}`,
-    CHAT_SEND: '/chat/send',
-    CHAT_START: '/chat/start',
+    // ============================================================
+    // CHAT (chat-service qua nginx /api/chat)
+    // ============================================================
+    CHAT_CONVERSATIONS: '/api/chat/conversations',                              // GET - JWT
+    CHAT_HISTORY: (partnerId: number) => `/api/chat/history/${partnerId}`,       // GET - JWT
+    CHAT_SEND: '/api/chat/send',                                                // POST - JWT, body: ChatMessageDTO
+    CHAT_START: '/api/chat/start',                                              // POST - JWT, body: { partnerId }
+    CHAT_READ: (partnerId: number) => `/api/chat/read/${partnerId}`,             // PUT - JWT
 
-    // Reviews (chưa có backend)
-    REVIEWS: '/reviews',
-    REVIEWS_ROOM: (roomId: number) => `/reviews/room/${roomId}`,
-    REVIEW_REPLY: (id: number) => `/reviews/${id}/reply`,
+    // ============================================================
+    // AUTH - LOGOUT & REFRESH (identity-service qua nginx /auth)
+    // ============================================================
+    LOGOUT: '/auth/logout',                                             // POST - JWT header
+    REFRESH: '/auth/refresh',                                           // POST - JWT header
 
-    // Appointments (chưa có backend)
-    APPOINTMENTS: '/appointments',
-    APPOINTMENT_BY_ID: (id: number) => `/appointments/${id}`,
-
-    // Contracts (chưa có backend)
-    CONTRACTS: '/contracts',
-    CONTRACT_BY_ID: (id: number) => `/contracts/${id}`,
-    CONTRACT_PDF: (id: number) => `/contracts/${id}/pdf`,
-
-    // Push Token (chưa có backend)
-    PUSH_TOKEN: '/notifications/push-token',
+    // ============================================================
+    // ⚠️ CHỨC NĂNG CHƯA CÓ BACKEND (giữ stub, không gọi API)
+    // Favorites: dùng POST /properties/{id}/save (toggleSave)
+    // Reviews, Appointments, Contracts: KHÔNG có backend
+    // Push Token: KHÔNG có backend
+    // ============================================================
 };

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, StatusBar, Platform, Alert, ActivityIndicator,
@@ -15,6 +15,7 @@ import { useKYCStore } from '../../store/kycStore';
 import { roomService } from '../../services/api/rooms';
 import { mediaService } from '../../services/api/media';
 import { PropertyRequestDTO } from '../../types';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const STEPS = ['Cơ bản', 'Chi tiết', 'Ảnh & Video', 'Hoàn thành'];
 
@@ -175,6 +176,17 @@ function DropdownPicker({ label, options, value, onChange, placeholder }: {
 }
 
 export default function PostScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để đăng tin bất động sản"
+            icon="create-outline"
+        >
+            <PostScreenContent />
+        </AuthGuardScreen>
+    );
+}
+
+function PostScreenContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isAuthenticated } = useAuthStore();
@@ -314,6 +326,10 @@ export default function PostScreen() {
                 price: Number(form.price),
                 area: Number(form.area),
                 address,
+                province: form.province,
+                district: form.district,
+                ward: form.ward || '',
+                street: form.addressDetail || '',
                 latitude: Number(form.latitude),
                 longitude: Number(form.longitude),
                 propertyType: form.propertyType,
@@ -585,7 +601,7 @@ export default function PostScreen() {
             </ScrollView>
 
             {/* Bottom Actions */}
-            <View style={styles.bottomBar}>
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 {step > 0 && (
                     <TouchableOpacity style={styles.backBtnBtn} onPress={() => setStep(s => s - 1)}>
                         <Text style={styles.backBtnText}>Quay lại</Text>
@@ -715,7 +731,7 @@ const styles = StyleSheet.create({
     removeVideoBtn: { position: 'absolute', top: 8, right: 8 },
     videoBadge: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
     videoBadgeText: { color: 'white', fontSize: 11, fontWeight: '700' },
-    bottomBar: { flexDirection: 'row', gap: 12, padding: 16, paddingBottom: Platform.OS === 'ios' ? 28 : 16, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0' },
+    bottomBar: { flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 16, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0' },
     backBtnBtn: { flex: 1, borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
     backBtnText: { fontSize: 15, fontWeight: '600', color: '#555' },
     nextBtn: { flex: 2, backgroundColor: '#0066FF', borderRadius: 12, paddingVertical: 14, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 },

@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     View, StyleSheet, FlatList, Dimensions, StatusBar,
     TouchableOpacity, Text, ScrollView, Animated, Platform, Alert,
@@ -232,7 +232,7 @@ export default function MapScreen() {
             </View>
 
             {/* Near Me Button */}
-            <Animated.View style={[styles.nearMeBtn, { transform: [{ scale: nearMeAnim }] }]}>
+            <Animated.View style={[styles.nearMeBtn, { bottom: Math.max(insets.bottom, 16) + 144, transform: [{ scale: nearMeAnim }] }]}>
                 <TouchableOpacity style={styles.nearMeBtnInner} onPress={handleNearMe} activeOpacity={0.8}>
                     <Ionicons name="navigate" size={20} color="white" />
                     <Text style={styles.nearMeText}>Gần tôi</Text>
@@ -240,14 +240,14 @@ export default function MapScreen() {
             </Animated.View>
 
             {/* Room count badge */}
-            <View style={styles.countBadge}>
+            <View style={[styles.countBadge, { bottom: Math.max(insets.bottom, 16) + 144 }]}>
                 <Text style={styles.countText}>{filteredRooms.length} bất động sản</Text>
             </View>
 
             {/* Selected Room Bottom Card */}
             {selectedRoom && (
                 <TouchableOpacity
-                    style={styles.bottomCard}
+                    style={[styles.bottomCard, { bottom: Math.max(insets.bottom, 16) + 4 }]}
                     onPress={() => router.push(`/property/${selectedRoom.id}`)}
                     activeOpacity={0.92}
                 >

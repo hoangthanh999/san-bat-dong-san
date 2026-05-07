@@ -48,18 +48,22 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
         set({ isSubmitting: true, error: null });
         try {
             const appointment = await appointmentService.createAppointment(data);
-            set(state => ({
-                appointments: [appointment, ...state.appointments],
-                isSubmitting: false,
-            }));
+            if (appointment) {
+                set(state => ({
+                    appointments: [appointment, ...state.appointments],
+                    isSubmitting: false,
+                }));
 
-            scheduleAppointmentReminder({
-                appointmentId: appointment.id,
-                roomId: appointment.roomId,
-                roomTitle: appointment.roomTitle || `Phòng #${appointment.roomId}`,
-                scheduledAt: appointment.scheduledAt,
-                landlordName: appointment.landlordName || 'Chủ nhà',
-            }).catch(console.warn);
+                scheduleAppointmentReminder({
+                    appointmentId: appointment.id,
+                    roomId: appointment.roomId,
+                    roomTitle: appointment.roomTitle || `Phòng #${appointment.roomId}`,
+                    scheduledAt: appointment.scheduledAt,
+                    landlordName: appointment.landlordName || 'Chủ nhà',
+                }).catch(console.warn);
+            } else {
+                set({ isSubmitting: false });
+            }
         } catch (error: any) {
             set({ error: error.message || 'Đặt lịch thất bại', isSubmitting: false });
             throw error;
@@ -83,9 +87,11 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     confirmAppointment: async (id: number) => {
         try {
             const updated = await appointmentService.confirmAppointment(id);
-            set(state => ({
-                appointments: state.appointments.map(a => a.id === id ? updated : a),
-            }));
+            if (updated) {
+                set(state => ({
+                    appointments: state.appointments.map(a => a.id === id ? updated : a),
+                }));
+            }
         } catch (error) {
             console.error('Confirm appointment error', error);
             throw error;
@@ -95,9 +101,11 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     rescheduleAppointment: async (id: number, suggestedMeetTime: string) => {
         try {
             const updated = await appointmentService.rescheduleAppointment(id, suggestedMeetTime);
-            set(state => ({
-                appointments: state.appointments.map(a => a.id === id ? updated : a),
-            }));
+            if (updated) {
+                set(state => ({
+                    appointments: state.appointments.map(a => a.id === id ? updated : a),
+                }));
+            }
         } catch (error) {
             console.error('Reschedule appointment error', error);
             throw error;
@@ -107,9 +115,11 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     acceptReschedule: async (id: number) => {
         try {
             const updated = await appointmentService.acceptReschedule(id);
-            set(state => ({
-                appointments: state.appointments.map(a => a.id === id ? updated : a),
-            }));
+            if (updated) {
+                set(state => ({
+                    appointments: state.appointments.map(a => a.id === id ? updated : a),
+                }));
+            }
         } catch (error) {
             console.error('Accept reschedule error', error);
             throw error;

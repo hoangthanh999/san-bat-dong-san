@@ -7,14 +7,17 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
+    StatusBar,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function RegisterScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const { register, isLoading, error } = useAuthStore();
 
     const [fullName, setFullName] = useState('');
@@ -53,7 +56,8 @@ export default function RegisterScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
-            <ScrollView contentContainerStyle={styles.content}>
+            <StatusBar barStyle="dark-content" />
+            <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Tạo tài khoản</Text>
                     <Text style={styles.subtitle}>Tham gia cộng đồng HomeSwipe ngay</Text>

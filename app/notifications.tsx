@@ -8,6 +8,7 @@ import { useRouter, Stack } from 'expo-router';
 import { useNotificationStore } from '../store/notificationStore';
 import { Notification } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthGuardScreen } from '../components/auth/AuthGuardScreen';
 
 function NotificationItem({ item, onPress }: { item: Notification; onPress: () => void }) {
     const icons: Record<string, { name: string; bg: string; color: string }> = {
@@ -64,6 +65,17 @@ function getSectionTitle(dateStr: string): string {
 }
 
 export default function NotificationsScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xem thông báo của bạn"
+            icon="notifications-outline"
+        >
+            <NotificationsContent />
+        </AuthGuardScreen>
+    );
+}
+
+function NotificationsContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { notifications, fetchNotifications, markAsRead, markAllAsRead, isLoading, unreadCount } = useNotificationStore();

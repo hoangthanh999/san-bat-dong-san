@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 
 export default function PaymentFailedScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
 
     return (
         <View style={styles.container}>
@@ -33,7 +35,7 @@ export default function PaymentFailedScreen() {
                 </View>
             </View>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.retryBtn}
                     onPress={() => router.replace('/wallet/deposit' as any)}
@@ -72,7 +74,7 @@ const styles = StyleSheet.create({
     dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' },
     reasonText: { fontSize: 13, color: '#555' },
     footer: {
-        padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        padding: 16, paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#E0E0E0', gap: 10,
     },
     retryBtn: {

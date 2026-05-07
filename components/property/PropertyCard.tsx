@@ -61,6 +61,21 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
     const heartScale = useSharedValue(1);
     const likeOpacity = useSharedValue(0);
 
+    // ✅ Fix: Release player khi component unmount để tránh lỗi
+    // "Cannot set prop 'player' on view ... Already Released"
+    useEffect(() => {
+        return () => {
+            if (player && item.videoUrl) {
+                try {
+                    player.pause();
+                    player.release();
+                } catch (_) {
+                    // Bỏ qua nếu player đã được release
+                }
+            }
+        };
+    }, []);
+
     useEffect(() => {
         if (!item.videoUrl || !player) return;
         try {

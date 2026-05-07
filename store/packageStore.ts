@@ -58,13 +58,13 @@ export const usePackageStore = create<PackageState>((set) => ({
 
     /**
      * Mua gói hội viên
-     * Backend: POST /api/packages/buy-membership?userId=X&packageId=Y
+     * Backend: POST /api/packages/buy-membership?packageId=Y
+     * JWT Token cung cấp userId tự động
      */
     purchaseMembership: async (packageId: number) => {
         set({ isPurchasing: true, error: null });
         try {
-            const userId = await getUserId();
-            await packageService.purchaseMembership(userId, packageId);
+            await packageService.purchaseMembership(packageId);
             set({ isPurchasing: false });
         } catch (error: any) {
             set({ error: error.message || 'Mua gói thất bại', isPurchasing: false });
@@ -74,12 +74,13 @@ export const usePackageStore = create<PackageState>((set) => ({
 
     /**
      * Boost tin đăng
-     * ⚠️ Backend chưa có API — đang phát triển
+     * Backend: POST /api/packages/buy-promotion?packageId=X&propertyId=Y
+     * JWT Token cung cấp userId tự động
      */
     boostRoom: async (roomId: number, packageId: number) => {
         set({ isPurchasing: true, error: null });
         try {
-            await packageService.boostRoom({ roomId, packageId });
+            await packageService.buyPromotion(packageId, roomId);
             set({ isPurchasing: false });
         } catch (error: any) {
             set({ error: error.message || 'Boost tin thất bại', isPurchasing: false });

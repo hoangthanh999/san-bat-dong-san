@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import {
     View, FlatList, StatusBar, ViewToken,
     TouchableOpacity, Text, StyleSheet, RefreshControl,
@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FeedScreen() {
     const router = useRouter();
-    const { rooms, fetchRooms, isLoading, loadMoreRooms } = usePropertyStore();
+    const { rooms, fetchRooms, isLoading, loadMoreRooms, filters } = usePropertyStore();
     const { unreadCount } = useNotificationStore();
     const [activeId, setActiveId] = useState<number | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -54,7 +54,48 @@ export default function FeedScreen() {
         setRefreshing(false);
     }, []);
 
-    const displayRooms = rooms.length > 0 ? rooms : MOCK_ROOMS;
+    // Filter + Sort rooms tại client (không cần search-service)
+    const sourceRooms = rooms.length > 0 ? rooms : MOCK_ROOMS;
+    const displayRooms = useMemo(() => {
+        let result = [...sourceRooms];
+
+        // Lọc theo loại bất động sản
+        if (filters.propertyType) {
+            result = result.filter(r => r.propertyType === filters.propertyType);
+        }
+
+        // Lọc theo khoảng giá
+        if (filters.minPrice !== undefined) {
+            result = result.filter(r => r.price >= filters.minPrice!);
+        }
+        if (filters.maxPrice !== undefined) {
+            result = result.filter(r => r.price <= filters.maxPrice!);
+        }
+
+        // Lọc theo diện tích
+        if (filters.minArea !== undefined) {
+            result = result.filter(r => r.area >= filters.minArea!);
+        }
+        if (filters.maxArea !== undefined) {
+            result = result.filter(r => r.area <= filters.maxArea!);
+        }
+
+        // Lọc theo số phòng ngủ
+        if (filters.bedroomList && filters.bedroomList.length > 0) {
+            result = result.filter(r => r.bedrooms !== undefined && filters.bedroomList!.includes(r.bedrooms));
+        }
+
+        // Sắp xếp
+        if (filters.sortBy === 'price_asc') {
+            result.sort((a, b) => a.price - b.price);
+        } else if (filters.sortBy === 'price_desc') {
+            result.sort((a, b) => b.price - a.price);
+        } else if (filters.sortBy === 'newest') {
+            result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        }
+
+        return result;
+    }, [sourceRooms, filters]);
 
     if (isLoading && rooms.length === 0) {
         return (

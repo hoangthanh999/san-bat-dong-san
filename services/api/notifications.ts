@@ -5,7 +5,8 @@ import { Platform } from 'react-native';
 
 export const notificationService = {
     // Lấy tất cả thông báo (phân trang)
-    getNotifications: async (page = 0, size = 20): Promise<PaginatedResponse<Notification>> => {
+    // Backend default: size=10. Frontend gửi size=10 để đồng bộ.
+    getNotifications: async (page = 0, size = 10): Promise<PaginatedResponse<Notification>> => {
         const response = await apiClient.get<PaginatedResponse<Notification>>(
             API_ENDPOINTS.NOTIFICATIONS,
             { params: { page, size } }
@@ -14,7 +15,7 @@ export const notificationService = {
     },
 
     // Lấy thông báo chưa đọc
-    getUnreadNotifications: async (page = 0, size = 20): Promise<PaginatedResponse<Notification>> => {
+    getUnreadNotifications: async (page = 0, size = 10): Promise<PaginatedResponse<Notification>> => {
         const response = await apiClient.get<PaginatedResponse<Notification>>(
             API_ENDPOINTS.NOTIFICATIONS_UNREAD,
             { params: { page, size } }

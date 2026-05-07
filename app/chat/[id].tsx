@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View, Text, FlatList, TouchableOpacity, StyleSheet,
     TextInput, KeyboardAvoidingView, Platform, StatusBar,
@@ -14,6 +14,7 @@ import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 import { ChatMessage } from '../../types';
 
 function formatMsgTime(dateStr: string) {
@@ -31,6 +32,17 @@ function formatMsgDate(dateStr: string) {
 }
 
 export default function ChatDetailScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để chat với chủ nhà và người thuê"
+            icon="chatbubble-ellipses-outline"
+        >
+            <ChatDetailContent />
+        </AuthGuardScreen>
+    );
+}
+
+function ChatDetailContent() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const partnerId = Number(id);
     const router = useRouter();
@@ -47,10 +59,10 @@ export default function ChatDetailScreen() {
     const [quickActionsAnim] = useState(new Animated.Value(0));
     const flatListRef = useRef<FlatList>(null);
 
-    const conversation = conversations.find(c => c.partnerId === partnerId);
+    const conversation = conversations.find(c => c.id === partnerId);
     const chatMessages = messages[partnerId] || [];
-    const partnerName = conversation?.partnerName || 'Người dùng';
-    const partnerAvatar = conversation?.partnerAvatar;
+    const partnerName = conversation?.fullName || 'Người dùng';
+    const partnerAvatar = conversation?.avatar;
 
     useEffect(() => {
         fetchHistory(partnerId);
@@ -274,7 +286,7 @@ export default function ChatDetailScreen() {
                     </View>
                 </View>
                 <TouchableOpacity onPress={() => {
-                    const phone = conversation?.partnerName; // ideally from landlord phone
+                    const phone = conversation?.fullName; // ideally from landlord phone
                     Alert.alert('Gọi điện', `Gọi cho ${partnerName}?`, [
                         { text: 'Huỷ', style: 'cancel' },
                         { text: 'Gọi', onPress: () => { } },
@@ -339,7 +351,7 @@ export default function ChatDetailScreen() {
             )}
 
             {/* Input Bar */}
-            <View style={styles.inputBar}>
+            <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
                 <TouchableOpacity
                     style={[styles.plusBtn, showQuickActions && styles.plusBtnActive]}
                     onPress={toggleQuickActions}
@@ -487,7 +499,7 @@ const styles = StyleSheet.create({
     inputBar: {
         flexDirection: 'row', alignItems: 'flex-end', gap: 8,
         paddingHorizontal: 12, paddingTop: 10,
-        paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+        paddingBottom: 10, // overridden by inline style using insets.bottom
         backgroundColor: 'white',
         borderTopWidth: 1, borderTopColor: '#F0F0F0',
     },
@@ -510,7 +522,7 @@ const styles = StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContainer: {
         backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+        padding: 24, paddingBottom: 24, // overridden by inline style using insets.bottom if needed
     },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },

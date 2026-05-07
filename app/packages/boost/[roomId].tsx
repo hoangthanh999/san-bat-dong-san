@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
     Platform, Modal, Alert, ActivityIndicator,
@@ -135,7 +135,7 @@ export default function BoostRoomScreen() {
                 </View>
             </ScrollView>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={[styles.boostBtn, (!selectedPkg || isPurchasing) && styles.boostBtnDisabled]}
                     onPress={handleBoost}
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     balanceValue: { fontSize: 15, fontWeight: '700', color: '#0066FF' },
     topUpLink: { color: '#22C55E', fontWeight: '600', fontSize: 13 },
     footer: {
-        padding: 16, paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        padding: 16, paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0',
     },
     boostBtn: {
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalCard: {
         backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+        padding: 24, paddingBottom: 24, // overridden inline if needed
     },
     modalTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 14 },
     modalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },

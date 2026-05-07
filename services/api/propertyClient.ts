@@ -3,9 +3,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PROPERTY_API_BASE_URL, STORAGE_KEYS } from '../../constants';
 
 /**
- * Axios client riêng cho property-service
- * Vì property-service chưa có trong nginx.conf, 
- * nên frontend phải gọi trực tiếp tại port 8086.
+ * propertyClient.ts
+ * Axios client dự phòng cho property-service (port 8086) — kết nối TRỰC TIẾP.
+ *
+ * ⚠️ Nginx ĐÃ route tất cả endpoints của property-service:
+ *    /properties, /public/properties, /public/projects, /admin/properties,
+ *    /admin/projects, /admin/amenities, /amenities → property-service:8086
+ *
+ * → Ưu tiên dùng apiClient (qua Nginx :8080) cho tất cả property endpoints.
+ * → propertyClient chỉ dùng khi cần bypass Nginx hoặc test trực tiếp.
  */
 const propertyClient: AxiosInstance = axios.create({
     baseURL: PROPERTY_API_BASE_URL,

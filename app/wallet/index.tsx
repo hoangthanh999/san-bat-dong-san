@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, StatusBar,
     Platform, ScrollView, RefreshControl, ActivityIndicator,
@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
 import { useWalletStore } from '../../store/walletStore';
 import { Transaction } from '../../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 function TransactionItem({ item }: { item: Transaction }) {
     const isIncoming = item.type === 'DEPOSIT' || item.type === 'REFUND';
@@ -54,23 +56,35 @@ function TransactionItem({ item }: { item: Transaction }) {
 }
 
 export default function WalletScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xem ví điện tử"
+            icon="wallet-outline"
+        >
+            <WalletContent />
+        </AuthGuardScreen>
+    );
+}
+
+function WalletContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { transactions, isLoading, fetchTransactions } = useWalletStore();
+    const { wallet, transactions, isLoading, fetchWallet, fetchTransactions } = useWalletStore();
     const [refreshing, setRefreshing] = React.useState(false);
 
     useEffect(() => {
+        fetchWallet();
         fetchTransactions();
     }, []);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchTransactions();
+        await Promise.all([fetchWallet(), fetchTransactions()]);
         setRefreshing(false);
     };
 
-    // Tính tổng nạp - chi từ lịch sử giao dịch (backend chưa có wallet balance API)
-    const balance = transactions.reduce((sum, tx) => {
+    // Ưu tiên dùng số dư từ wallet API, fallback tính từ transactions
+    const balance = wallet?.balance ?? transactions.reduce((sum, tx) => {
         if (tx.status !== 'SUCCESS') return sum;
         const amount = Number(tx.amount) || 0;
         if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amount;

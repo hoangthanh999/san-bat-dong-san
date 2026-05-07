@@ -81,17 +81,8 @@ export const userService = {
     },
 
     // ============================================================
-    // FEATURES ĐANG PHÁT TRIỂN (chưa có backend endpoint)
+    // LƯU Ý: Backend KHÔNG có API riêng cho "Favorites list".
+    // Chức năng "Lưu tin" dùng POST /properties/{id}/save (toggle)
+    // nhưng KHÔNG có endpoint để lấy danh sách bài đã lưu.
     // ============================================================
-
-    getFavorites: async (page = 0, size = 10): Promise<PaginatedResponse<Favorite>> => {
-        // TODO: Backend chưa có favorite API — đang phát triển
-        console.warn('[userService] getFavorites: API chưa có trong backend - đang phát triển');
-        return { content: [], totalElements: 0, totalPages: 0, size, number: page, first: true, last: true };
-    },
-
-    removeFavorite: async (roomId: number): Promise<void> => {
-        // TODO: Backend chưa có favorite API — đang phát triển
-        console.warn('[userService] removeFavorite: API chưa có trong backend - đang phát triển');
-    },
 };

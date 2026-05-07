@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     StatusBar, Platform, Alert, TextInput, Modal, ActivityIndicator,
@@ -11,8 +11,20 @@ import { useAppointmentStore } from '../../store/appointmentStore';
 import { useAuthStore } from '../../store/authStore';
 import { appointmentService } from '../../services/api/appointments';
 import { Appointment } from '../../types';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 export default function AppointmentDetailScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xem chi tiết lịch hẹn"
+            icon="calendar-outline"
+        >
+            <AppointmentDetailContent />
+        </AuthGuardScreen>
+    );
+}
+
+function AppointmentDetailContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -371,7 +383,7 @@ const styles = StyleSheet.create({
     },
     modalCard: {
         backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: 24, paddingBottom: Platform.OS === 'ios' ? 44 : 24,
+        padding: 24, paddingBottom: 24, // add insets.bottom inline if needed
     },
     modalTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 6 },
     modalSub: { fontSize: 13, color: '#888', marginBottom: 16 },

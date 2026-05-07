@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     StatusBar, Platform, Alert, Image,
@@ -8,8 +8,20 @@ import { useRouter, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 export default function KYCUploadBackScreen() {
+    return (
+        <AuthGuardScreen
+            message="Đăng nhập để xác minh danh tính"
+            icon="card-outline"
+        >
+            <KYCUploadBackContent />
+        </AuthGuardScreen>
+    );
+}
+
+function KYCUploadBackContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [imageUri, setImageUri] = useState<string | null>(null);
@@ -128,7 +140,7 @@ export default function KYCUploadBackScreen() {
                 </View>
             </View>
 
-            <View style={styles.footer}>
+            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={[styles.nextBtn, !imageUri && styles.nextBtnDisabled]}
                     onPress={handleNext}
@@ -190,7 +202,7 @@ const styles = StyleSheet.create({
     actionBtnText: { color: '#0066FF', fontWeight: '600', fontSize: 15 },
     footer: {
         padding: 16,
-        paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+        paddingBottom: 16, // overridden inline using insets.bottom
         backgroundColor: 'white',
         borderTopWidth: 1, borderTopColor: '#F0F0F0',
     },
