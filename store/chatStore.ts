@@ -11,6 +11,8 @@ interface ChatState {
     isConnected: boolean;
     totalUnread: number;
     ws: WebSocket | null;
+    _reconnectAttempts: number;
+    _reconnectTimeout: ReturnType<typeof setTimeout> | null;
 
     // Actions
     fetchConversations: () => Promise<void>;
@@ -29,6 +31,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     isConnected: false,
     totalUnread: 0,
     ws: null,
+    _reconnectAttempts: 0,
+    _reconnectTimeout: null,
 
     fetchConversations: async () => {
         set({ isLoading: true });
@@ -157,7 +161,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const ws = new WebSocket(`${WS_URL}/chat?token=${token}`);
 
         ws.onopen = () => {
-            set({ isConnected: true });
+            // Đặt lại số lần retry khi kết nối thành công
+            set({ isConnected: true, _reconnectAttempts: 0 });
         };
 
         ws.onmessage = (event) => {
@@ -171,6 +176,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         ws.onclose = () => {
             set({ isConnected: false, ws: null });
+
+            // Exponential backoff reconnect (tối đa 5 lần)
+            const attempts = get()._reconnectAttempts;
+            const MAX_RETRIES = 5;
+            const MAX_DELAY_MS = 30000;
+
+            if (attempts < MAX_RETRIES && useAuthStore.getState().token) {
+                const delay = Math.min(2000 * Math.pow(2, attempts), MAX_DELAY_MS);
+                console.log(`[WS] Mất kết nối. Thử lại sau ${delay / 1000}s (lần ${attempts + 1}/${MAX_RETRIES})`);
+
+                const timeout = setTimeout(() => {
+                    set({ _reconnectTimeout: null });
+                    get().connectWebSocket();
+                }, delay);
+
+                set({ _reconnectAttempts: attempts + 1, _reconnectTimeout: timeout });
+            } else if (attempts >= MAX_RETRIES) {
+                console.warn('[WS] Đã thử kết nối lại quá nhiều lần. Dừng reconnect.');
+                set({ _reconnectAttempts: 0 });
+            }
         };
 
         ws.onerror = () => {
@@ -181,10 +206,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     disconnectWebSocket: () => {
+        // Hủy bất kỳ reconnect timeout đang chờ
+        const timeout = get()._reconnectTimeout;
+        if (timeout) {
+            clearTimeout(timeout);
+        }
         const ws = get().ws;
         if (ws) {
             ws.close();
-            set({ ws: null, isConnected: false });
         }
+        set({ ws: null, isConnected: false, _reconnectAttempts: 0, _reconnectTimeout: null });
     },
 }));
