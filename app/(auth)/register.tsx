@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     ScrollView,
     StatusBar,
+    Alert,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
@@ -29,12 +30,42 @@ export default function RegisterScreen() {
 
     const validate = () => {
         let errors: { [key: string]: string } = {};
-        if (!fullName) errors.fullName = 'Vui lòng nhập họ tên';
-        if (!email) errors.email = 'Vui lòng nhập email';
-        if (!phone) errors.phone = 'Vui lòng nhập số điện thoại';
-        if (!password) errors.password = 'Vui lòng nhập mật khẩu';
-        if (password.length < 6) errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
-        if (password !== confirmPassword) errors.confirmPassword = 'Mật khẩu không khớp';
+
+        if (!fullName.trim()) errors.fullName = 'Vui lòng nhập họ tên';
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email.trim()) {
+            errors.email = 'Vui lòng nhập email';
+        } else if (!emailRegex.test(email.trim())) {
+            errors.email = 'Email không đúng định dạng';
+        }
+
+        // Validate số điện thoại Việt Nam
+        const phoneRegex = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
+        if (!phone.trim()) {
+            errors.phone = 'Vui lòng nhập số điện thoại';
+        } else if (!phoneRegex.test(phone.trim())) {
+            errors.phone = 'Số điện thoại không hợp lệ (VD: 0901234567)';
+        }
+
+        // Validate độ mạnh mật khẩu
+        if (!password) {
+            errors.password = 'Vui lòng nhập mật khẩu';
+        } else if (password.length < 8) {
+            errors.password = 'Mật khẩu phải có ít nhất 8 ký tự';
+        } else if (!/[A-Z]/.test(password)) {
+            errors.password = 'Mật khẩu phải có ít nhất 1 chữ hoa';
+        } else if (!/[0-9]/.test(password)) {
+            errors.password = 'Mật khẩu phải có ít nhất 1 chữ số';
+        } else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+            errors.password = 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt';
+        }
+
+        if (password && confirmPassword && password !== confirmPassword) {
+            errors.confirmPassword = 'Mật khẩu không khớp';
+        }
+
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -43,11 +74,22 @@ export default function RegisterScreen() {
         if (!validate()) return;
 
         try {
-            await register({ email, password, fullName, phone });
-            // Suggest routing to login or auto-login
+            await register({ email: email.trim(), password, fullName: fullName.trim(), phone: phone.trim() });
             router.replace('/(auth)/login');
-        } catch (err) {
-            // Error handled in store
+        } catch (err: any) {
+            const status = err?.response?.status;
+            const backendMsg = err?.response?.data?.message || err?.message;
+            if (status === 409) {
+                Alert.alert('Lỗi', 'Email hoặc số điện thoại đã được đăng ký');
+            } else if (status === 400) {
+                Alert.alert('Lỗi', backendMsg || 'Thông tin không hợp lệ');
+            } else if (status >= 500) {
+                Alert.alert('Lỗi', 'Hệ thống đang bận. Vui lòng thử lại sau.');
+            } else if (!status) {
+                // Network error — đã hiển thị toast từ interceptor
+            } else {
+                Alert.alert('Lỗi', 'Đăng ký thất bại. Vui lòng thử lại.');
+            }
         }
     };
 
