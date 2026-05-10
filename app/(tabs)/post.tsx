@@ -251,7 +251,18 @@ function PostScreenContent() {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Videos, quality: 0.8, videoMaxDuration: 120,
         });
-        if (!result.canceled && result.assets[0]) setVideoUri(result.assets[0].uri);
+        if (!result.canceled && result.assets[0]) {
+            const asset = result.assets[0];
+            const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+            if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
+                Alert.alert(
+                    'Video quá lớn',
+                    `Vui lòng chọn video dưới 50MB. Video bạn chọn có kích thước ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB.`
+                );
+                return;
+            }
+            setVideoUri(asset.uri);
+        }
     };
 
     const generateAIDescription = async () => {
