@@ -1,8 +1,41 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Marker } from 'react-native-maps';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Room } from '../../types';
 
+// ✅ Helper: tạo HTML string cho 1 marker Leaflet (dùng trong buildLeafletHtml)
+export const buildMarkerHtml = (item: Room, isSelected = false): string => {
+    const price = formatPriceStatic(item.price);
+    const bg = isSelected ? '#0066FF' : 'white';
+    const color = isSelected ? 'white' : '#0066FF';
+    const border = isSelected ? '#0044CC' : '#0066FF';
+    const scale = isSelected ? 'scale(1.15)' : 'scale(1)';
+    const arrow = isSelected
+        ? `<div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid #0066FF;position:absolute;bottom:-6px;left:50%;transform:translateX(-50%)"></div>`
+        : '';
+    return `
+        <div style="
+            background:${bg};
+            color:${color};
+            border:1.5px solid ${border};
+            padding:4px 8px;
+            border-radius:12px;
+            font-size:12px;
+            font-weight:bold;
+            white-space:nowrap;
+            box-shadow:0 2px 6px rgba(0,0,0,0.2);
+            transform:${scale};
+            position:relative;
+            cursor:pointer;
+        ">${price}${arrow}</div>
+    `;
+};
+
+const formatPriceStatic = (price: number): string => {
+    if (price >= 1_000_000_000) return `${(price / 1_000_000_000).toFixed(1)} tỷ`;
+    return `${(price / 1_000_000).toFixed(0)} tr`;
+};
+
+// ✅ Component React Native dùng để hiển thị marker dạng badge (ngoài map, VD: list)
 interface PropertyMarkerProps {
     item: Room;
     onPress: () => void;
@@ -11,34 +44,21 @@ interface PropertyMarkerProps {
 
 export default function PropertyMarker({ item, onPress, isSelected }: PropertyMarkerProps) {
     const formatPrice = (price: number) => {
-        if (price >= 1000000000) {
-            return `${(price / 1000000000).toFixed(1)} tỷ`;
-        }
-        return `${(price / 1000000).toFixed(0)} tr`;
+        if (price >= 1_000_000_000) return `${(price / 1_000_000_000).toFixed(1)} tỷ`;
+        return `${(price / 1_000_000).toFixed(0)} tr`;
     };
 
     return (
-        <Marker
-            coordinate={{
-                latitude: item.latitude,
-                longitude: item.longitude,
-            }}
+        <TouchableOpacity
             onPress={onPress}
-            tracksViewChanges={false} // Optimization
+            style={[styles.bubble, isSelected && styles.selectedBubble]}
+            activeOpacity={0.8}
         >
-            <View style={[
-                styles.bubble,
-                isSelected && styles.selectedBubble
-            ]}>
-                <Text style={[
-                    styles.price,
-                    isSelected && styles.selectedPrice
-                ]}>
-                    {formatPrice(item.price)}
-                </Text>
-                {isSelected && <View style={styles.arrow} />}
-            </View>
-        </Marker>
+            <Text style={[styles.price, isSelected && styles.selectedPrice]}>
+                {formatPrice(item.price)}
+            </Text>
+            {isSelected && <View style={styles.arrow} />}
+        </TouchableOpacity>
     );
 }
 
