@@ -4,11 +4,12 @@ import React, {
 import {
     View, Text, FlatList, Dimensions, TouchableOpacity,
     StyleSheet, StatusBar, ActivityIndicator, Image,
-    ViewToken, Share, Platform, useColorScheme,
+    ViewToken, Share, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { useReelsStore } from '../../store/reelsStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { PropertyReel } from '../../services/api/reels';
@@ -53,8 +54,19 @@ const ReelItem = React.memo(({ item, isActive, insetBottom }: ReelItemProps) => 
     const router = useRouter();
     const { toggleLike, toggleSave, isLiked, isSaved } = useInteractionStore();
 
-    // Dùng interactionStore làm source of truth cho like/save
-    // Fallback về item.isLiked / item.isSaved nếu chưa có trong cache
+    // ✅ videoRef nằm TRONG ReelItem
+    const videoRef = useRef<Video>(null);
+
+    // ✅ useEffect dùng isActive nằm TRONG ReelItem
+    useEffect(() => {
+        if (!videoRef.current) return;
+        if (isActive) {
+            videoRef.current.playAsync();
+        } else {
+            videoRef.current.pauseAsync();
+        }
+    }, [isActive]);
+
     const liked = isLiked(item.id) ?? item.isLiked;
     const saved = isSaved(item.id) ?? item.isSaved;
 
@@ -85,33 +97,44 @@ const ReelItem = React.memo(({ item, isActive, insetBottom }: ReelItemProps) => 
 
     return (
         <View style={[styles.reel, { height: H }]}>
-            {/* ── Background ── */}
-            <View style={styles.bg}>
-                {item.videoUrl ? (
-                    // Placeholder video — thay bằng expo-av <Video> nếu cần
-                    <View style={styles.videoBg}>
-                        <View style={styles.playCircle}>
-                            <Ionicons name="play" size={36} color="rgba(255,255,255,0.9)" />
-                        </View>
-                        <Text style={styles.videoLabel}>Video BĐS</Text>
-                    </View>
-                ) : (
-                    <View style={[styles.videoBg, { backgroundColor: '#0d1b2a' }]}>
-                        <Text style={styles.noVideoIcon}>🏠</Text>
-                    </View>
-                )}
-            </View>
 
-            {/* ── Gradient top ── */}
+            {/* ── Background: Video → Thumbnail → Fallback ── */}
+            {item.videoUrl ? (
+                <Video
+                    ref={videoRef}
+                    source={{ uri: item.videoUrl }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode={ResizeMode.COVER}
+                    isLooping
+                    isMuted={false}
+                    shouldPlay={isActive}
+                    usePoster
+                    posterSource={
+                        item.thumbnailUrl
+                            ? { uri: item.thumbnailUrl }
+                            : undefined
+                    }
+                    posterStyle={StyleSheet.absoluteFill}
+                    onPlaybackStatusUpdate={(_: AVPlaybackStatus) => { }}
+                />
+            ) : item.thumbnailUrl ? (
+                <Image
+                    source={{ uri: item.thumbnailUrl }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="cover"
+                />
+            ) : (
+                <View style={styles.noMediaBg}>
+                    <Text style={styles.noMediaIcon}>🏠</Text>
+                </View>
+            )}
+
+            {/* ── Gradient overlays ── */}
             <View style={styles.gradientTop} pointerEvents="none" />
-            {/* ── Gradient bottom ── */}
             <View style={styles.gradientBottom} pointerEvents="none" />
 
             {/* ════ TOP BAR ════ */}
-            <View style={[
-                styles.topBar,
-                { top: Platform.OS === 'ios' ? 54 : 36 }
-            ]}>
+            <View style={[styles.topBar, { top: Platform.OS === 'ios' ? 54 : 36 }]}>
                 <Text style={styles.topTitle}>Reels BĐS</Text>
                 {item.isPromoted && (
                     <View style={styles.promotedBadge}>
@@ -122,11 +145,9 @@ const ReelItem = React.memo(({ item, isActive, insetBottom }: ReelItemProps) => 
             </View>
 
             {/* ════ RIGHT ACTIONS ════ */}
-            <View style={[
-                styles.rightActions,
-                { bottom: insetBottom + 110 }
-            ]}>
-                {/* Avatar */}
+            <View style={[styles.rightActions, { bottom: insetBottom + 110 }]}>
+
+                {/* Avatar chủ nhà */}
                 <TouchableOpacity
                     style={styles.avatarWrap}
                     onPress={goToOwner}
@@ -195,7 +216,7 @@ const ReelItem = React.memo(({ item, isActive, insetBottom }: ReelItemProps) => 
                     <Text style={styles.actionLabel}>Chia sẻ</Text>
                 </TouchableOpacity>
 
-                {/* More */}
+                {/* Chi tiết */}
                 <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={goToDetail}
@@ -222,8 +243,25 @@ const ReelItem = React.memo(({ item, isActive, insetBottom }: ReelItemProps) => 
                         @{item.ownerNameSnapshot ?? 'Chủ nhà'}
                     </Text>
                     <Text style={styles.dot}>·</Text>
-                    <Text style={styles.timeAgo}>{timeAgo(item.createdAt)}</Text>
+                    <Text style={styles.timeText}>{timeAgo(item.createdAt)}</Text>
                 </TouchableOpacity>
+
+                {/* Listing type badge */}
+                <View style={[
+                    styles.listingBadge,
+                    {
+                        backgroundColor:
+                            item.listingType === 'RENT' || item.listingType === 'FOR_RENT'
+                                ? '#0066FF'
+                                : '#FF6B35',
+                    },
+                ]}>
+                    <Text style={styles.listingBadgeText}>
+                        {item.listingType === 'RENT' || item.listingType === 'FOR_RENT'
+                            ? 'Cho thuê'
+                            : 'Bán'}
+                    </Text>
+                </View>
 
                 {/* Title */}
                 <Text style={styles.reelTitle} numberOfLines={2}>
@@ -238,10 +276,17 @@ const ReelItem = React.memo(({ item, isActive, insetBottom }: ReelItemProps) => 
                     </Text>
                 </View>
 
-                {/* Price */}
-                <Text style={styles.priceText}>
-                    💰 {formatPrice(item.price)}
-                </Text>
+                {/* Price + Area */}
+                <View style={styles.priceRow}>
+                    <Text style={styles.priceText}>
+                        💰 {formatPrice(item.price)}
+                    </Text>
+                    {item.area > 0 && (
+                        <Text style={styles.areaText}>
+                            📐 {item.area} m²
+                        </Text>
+                    )}
+                </View>
 
                 {/* CTA */}
                 <TouchableOpacity
@@ -253,6 +298,7 @@ const ReelItem = React.memo(({ item, isActive, insetBottom }: ReelItemProps) => 
                     <Ionicons name="arrow-forward" size={13} color="#fff" />
                 </TouchableOpacity>
             </TouchableOpacity>
+
         </View>
     );
 });
@@ -274,7 +320,6 @@ export default function ReelsScreen() {
         fetchReels();
     }, []);
 
-    // ── Viewability: detect reel đang xem ──
     const onViewableItemsChanged = useCallback(
         ({ viewableItems }: { viewableItems: ViewToken[] }) => {
             const idx = viewableItems[0]?.index ?? 0;
@@ -288,7 +333,6 @@ export default function ReelsScreen() {
         itemVisiblePercentThreshold: 70,
     }).current;
 
-    // ── Render ──
     const renderItem = useCallback(
         ({ item, index }: { item: PropertyReel; index: number }) => (
             <ReelItem
@@ -314,7 +358,6 @@ export default function ReelsScreen() {
         []
     );
 
-    // ── Loading lần đầu ──
     if (loading && reels.length === 0) {
         return (
             <View style={styles.centered}>
@@ -327,11 +370,7 @@ export default function ReelsScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar
-                barStyle="light-content"
-                backgroundColor="transparent"
-                translucent
-            />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
             <FlatList
                 ref={flatListRef}
@@ -339,27 +378,21 @@ export default function ReelsScreen() {
                 keyExtractor={keyExtractor}
                 renderItem={renderItem}
                 getItemLayout={getItemLayout}
-                // ── Snap full screen ──
                 pagingEnabled
                 snapToInterval={H}
                 snapToAlignment="start"
                 decelerationRate={Platform.OS === 'ios' ? 'fast' : 0.98}
                 showsVerticalScrollIndicator={false}
-                // ── Viewability ──
                 onViewableItemsChanged={onViewableItemsChanged}
                 viewabilityConfig={viewabilityConfig}
-                // ── Infinite scroll bằng cursor ──
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
-                // ── Pull-to-refresh ──
                 onRefresh={refresh}
                 refreshing={refreshing}
-                // ── Performance ──
                 removeClippedSubviews
                 maxToRenderPerBatch={3}
                 windowSize={5}
                 initialNumToRender={2}
-                // ── Footer loader ──
                 ListFooterComponent={
                     loading && reels.length > 0 ? (
                         <View style={[styles.centered, { height: H }]}>
@@ -368,7 +401,6 @@ export default function ReelsScreen() {
                         </View>
                     ) : null
                 }
-                // ── Empty ──
                 ListEmptyComponent={
                     <View style={[styles.centered, { height: H }]}>
                         <Text style={styles.emptyIcon}>🎬</Text>
@@ -386,7 +418,7 @@ export default function ReelsScreen() {
                 }
             />
 
-            {/* Dot indicator bên phải */}
+            {/* Dot indicator dọc bên phải */}
             {reels.length > 1 && (
                 <View style={[styles.dotIndicator, { top: H * 0.45 }]}>
                     {reels.slice(0, Math.min(reels.length, 8)).map((_, i) => (
@@ -455,54 +487,40 @@ const styles = StyleSheet.create({
         backgroundColor: '#000',
         overflow: 'hidden',
     },
-    bg: {
+    noMediaBg: {
         ...StyleSheet.absoluteFillObject,
-    },
-    videoBg: {
-        flex: 1,
         backgroundColor: '#0d1b2a',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 12,
     },
-    playCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.4)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    videoLabel: {
-        color: 'rgba(255,255,255,0.4)',
-        fontSize: 13,
-        letterSpacing: 1,
-    },
-    noVideoIcon: {
+    noMediaIcon: {
         fontSize: 80,
         opacity: 0.3,
     },
 
-    // Gradient overlays
+    // ── Gradient overlays ──
     gradientTop: {
         position: 'absolute',
-        top: 0, left: 0, right: 0,
+        top: 0,
+        left: 0,
+        right: 0,
         height: 160,
         backgroundColor: 'rgba(0,0,0,0.45)',
     },
     gradientBottom: {
         position: 'absolute',
-        bottom: 0, left: 0, right: 0,
-        height: 320,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 360,
+        backgroundColor: 'rgba(0,0,0,0.65)',
     },
 
     // ── Top bar ──
     topBar: {
         position: 'absolute',
-        left: 0, right: 0,
+        left: 0,
+        right: 0,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -562,7 +580,8 @@ const styles = StyleSheet.create({
     followDot: {
         position: 'absolute',
         bottom: -6,
-        width: 18, height: 18,
+        width: 18,
+        height: 18,
         borderRadius: 9,
         backgroundColor: '#0066FF',
         justifyContent: 'center',
@@ -588,7 +607,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: 0,
         left: 0,
-        right: 72,          // tránh đè right actions
+        right: 72,
         paddingHorizontal: 16,
         gap: 6,
     },
@@ -607,9 +626,21 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.5)',
         fontSize: 14,
     },
-    timeAgo: {
+    timeText: {
         color: 'rgba(255,255,255,0.6)',
         fontSize: 12,
+    },
+    listingBadge: {
+        alignSelf: 'flex-start',
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        marginBottom: 2,
+    },
+    listingBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
     },
     reelTitle: {
         color: '#fff',
@@ -630,6 +661,11 @@ const styles = StyleSheet.create({
         fontSize: 13,
         flex: 1,
     },
+    priceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
     priceText: {
         color: '#FFD700',
         fontSize: 17,
@@ -637,6 +673,11 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0,0,0,0.4)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 4,
+    },
+    areaText: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 13,
+        fontWeight: '600',
     },
     ctaBtn: {
         flexDirection: 'row',
