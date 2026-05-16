@@ -46,9 +46,10 @@ export const walletService = {
      *
      * Backend trả về: { url: "https://sandbox.vnpay..." }
      */
-    createVNPayPayment: async (amount: number, userId: number): Promise<VNPayPaymentResponse> => {
-        const response = await apiClient.post<VNPayPaymentResponse>(
-            API_ENDPOINTS.PAYMENT_CREATE,
+
+    createVNPayPayment: async (amount: number, userId: number) => {
+        const response = await paymentClient.post<VNPayPaymentResponse>(
+            API_ENDPOINTS.PAYMENT_CREATE,  // /api/payment/create-payment
             null,
             { params: { amount, userId } }
         );
