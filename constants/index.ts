@@ -1,18 +1,19 @@
 // API Base URL - Gateway (nginx)
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.117:8080';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.217.114.46:8080';
 
 // Property Service - nginx đã route /properties, /public/properties, /admin/properties → 8086
 // Giữ lại cho trường hợp cần gọi trực tiếp (bypass nginx)
-export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'http://192.168.1.117:8086';
+export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'http://10.217.114.46:8086';
 
 // Payment Service - nginx chỉ route /api/payment/, các endpoint khác cần gọi trực tiếp
-export const PAYMENT_API_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_API_BASE_URL || 'http://192.168.1.117:8087';
+export const PAYMENT_API_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_API_BASE_URL || 'http://10.217.114.46:8087';
 
 // WebSocket Notification (STOMP/SockJS — notification-service)
-export const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://192.168.1.117:8080/ws-notifier';
+export const WS_URL = process.env.EXPO_PUBLIC_WS_URL
+    || 'http://10.217.114.46:8080/ws-notifier';
 
-// WebSocket Chat (STOMP/SockJS — chat-service) — endpoint KHÁC với notification WS
-export const WS_CHAT_URL = process.env.EXPO_PUBLIC_WS_CHAT_URL || 'ws://192.168.1.117:8080/ws-chat';
+export const WS_CHAT_URL = process.env.EXPO_PUBLIC_WS_CHAT_URL
+    || 'http://10.217.114.46:8080/ws-chat';
 
 // Google Maps
 export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -126,6 +127,8 @@ export const API_ENDPOINTS = {
     // ============================================================
     PROPERTY_LIKE: (id: number) => `/properties/${id}/like`,                   // POST - header: X-Guest-Id (optional)
     PROPERTY_SAVE: (id: number) => `/properties/${id}/save`,                   // POST - header: X-Guest-Id (optional)
+    PROPERTY_ME_LIKED: '/properties/me/liked',                                 // GET - JWT, params: page, size
+    PROPERTY_ME_SAVED: '/properties/me/saved',                                 // GET - JWT, params: page, size
 
     // ============================================================
     // PROPERTY - ADMIN (qua nginx /admin/properties → property-service:8086)
@@ -204,6 +207,9 @@ export const API_ENDPOINTS = {
     CHAT_SEND: '/api/chat/send',                                                // POST - JWT, body: ChatMessageDTO
     CHAT_START: '/api/chat/start',                                              // POST - JWT, body: { partnerId }
     CHAT_READ: (partnerId: number) => `/api/chat/read/${partnerId}`,             // PUT - JWT
+    // AI Chat (via WebSocket @MessageMapping(/ai-chat) → Kafka → AI Worker)
+    // HTTP fallback cho test: POST /api/chat/api/chat/test-ai-flow (JWT)
+    CHAT_AI_TEST: '/api/chat/api/chat/test-ai-flow',                            // POST - JWT, body: AiChatRequest
 
     // ============================================================
     // AUTH - LOGOUT & REFRESH (identity-service qua nginx /auth)
