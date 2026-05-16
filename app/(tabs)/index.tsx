@@ -2,21 +2,23 @@ import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import {
     View, FlatList, StatusBar, ViewToken,
     TouchableOpacity, Text, StyleSheet, RefreshControl,
-    useWindowDimensions, LayoutChangeEvent,
+    useWindowDimensions, LayoutChangeEvent, ScrollView,
 } from 'react-native';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '../../store/propertyStore';
 import { useNotificationStore } from '../../store/notificationStore';
+import { useProjectStore } from '../../store/projectStore';
 import PropertyCard from '../../components/property/PropertyCard';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { Room } from '../../types';
+import { Room, ProjectResponseDTO } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function FeedScreen() {
     const router = useRouter();
     const { rooms, fetchRooms, isLoading, loadMoreRooms, filters } = usePropertyStore();
     const { unreadCount } = useNotificationStore();
+    const { projects, fetchProjects } = useProjectStore();
     const [activeId, setActiveId] = useState<number | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const flatListRef = useRef<FlatList>(null);
@@ -46,6 +48,7 @@ export default function FeedScreen() {
 
     useEffect(() => {
         fetchRooms();
+        fetchProjects(true);
     }, []);
 
     const onRefresh = useCallback(async () => {
@@ -110,13 +113,20 @@ export default function FeedScreen() {
         <View style={{ flex: 1, backgroundColor: 'black' }}>
             <StatusBar barStyle="light-content" translucent />
 
-            {/* Floating Header — vị trí dựa trên insets.top */}
+            {/* Floating Header */}
             <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
                 <View style={styles.logoContainer}>
                     <Text style={styles.logoText}>🏠</Text>
                     <Text style={styles.logoName}>HomeSwipe</Text>
                 </View>
                 <View style={styles.headerActions}>
+                    {/* Analytics button */}
+                    <TouchableOpacity
+                        style={styles.headerBtn}
+                        onPress={() => router.push('/analytics' as any)}
+                    >
+                        <Ionicons name="bar-chart-outline" size={22} color="white" />
+                    </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.headerBtn}
                         onPress={() => router.push('/filter' as any)}
@@ -138,6 +148,38 @@ export default function FeedScreen() {
                     </TouchableOpacity>
                 </View>
             </View>
+
+            {/* Projects strip — floating at bottom of header gradient */}
+            {projects.length > 0 && (
+                <View style={[styles.projectsStrip, { top: insets.top + 66 }]} pointerEvents="box-none">
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
+                        pointerEvents="auto"
+                    >
+                        <TouchableOpacity
+                            style={styles.projectChip}
+                            onPress={() => router.push('/projects' as any)}
+                        >
+                            <MaterialCommunityIcons name="domain" size={13} color="white" />
+                            <Text style={styles.projectChipText}>Dự án BĐS</Text>
+                            <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.7)" />
+                        </TouchableOpacity>
+                        {projects.slice(0, 3).map((proj) => (
+                            <TouchableOpacity
+                                key={proj.id}
+                                style={styles.projectChip}
+                                onPress={() => router.push(`/projects/${proj.id}` as any)}
+                            >
+                                <Text style={styles.projectChipText} numberOfLines={1}>
+                                    {proj.name.length > 18 ? proj.name.slice(0, 16) + '…' : proj.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
 
             <View style={{ flex: 1 }} onLayout={onFeedLayout}>
                 {/* Chỉ render FlatList khi đã đo được chiều cao thực tế */}
@@ -233,6 +275,29 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 9,
         fontWeight: '800',
+    },
+    projectsStrip: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 99,
+        paddingVertical: 4,
+    },
+    projectChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        borderRadius: 20,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.18)',
+    },
+    projectChipText: {
+        color: 'white',
+        fontSize: 11,
+        fontWeight: '700',
     },
 });
 

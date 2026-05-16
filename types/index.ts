@@ -68,6 +68,10 @@ export interface Room {
     createdAt: string;              // LocalDateTime → ISO string
     expiresAt?: string;
 
+    // Promotion / Boost
+    isPromoted?: boolean;           // true nếu đang được boost (PromotionQueue.ACTIVE)
+    promotionExpiresAt?: string;    // Ngày hết hạn boost
+
     bedrooms?: number;
     bathrooms?: number;
     hasBalcony?: boolean;
@@ -292,15 +296,20 @@ export interface Amenity {
 // ============================
 // Project (khớp backend ProjectResponseDTO)
 // ============================
+export type ProjectType = 'APARTMENT_COMPLEX' | 'VILLA_AREA' | 'TOWNHOUSE_AREA' | 'COMMERCIAL' | 'RESORT';
+
 export interface ProjectResponseDTO {
     id: number;
     name: string;
     description?: string;
     address: string;
+    province?: string;
+    district?: string;
     latitude: number;
     longitude: number;
-    projectType: string;
+    projectType: ProjectType | string;
     amenities?: string[];
+    thumbnail?: string;         // URL ảnh đại diện (nếu backend bổ sung sau)
     createdBy: number;
     status: string;
     createdAt: string;
@@ -449,7 +458,7 @@ export interface PropertySearchItem {
     createdAt: string;
 }
 
-// Backend PropertyAnalyticsResponse
+// Backend PropertyAnalyticsResponse (khớp PropertyAnalyticsController)
 export interface MarketInsight {
     popularPriceText?: string;
     popularPriceUnit?: string;
@@ -475,7 +484,7 @@ export interface PropertyAnalyticsResponse {
 
 export interface WardPriceDTO {
     wardName: string;
-    averagePrice: string;
+    averagePrice: string;   // Backend trả string (VD: "12.5 tr/m²")
     unit?: string;
     totalPosts: number;
 }
@@ -485,6 +494,25 @@ export interface RegionTransactionStat {
     totalPosts: number;
     forSaleCount: number;
     forRentCount: number;
+}
+
+// ============================
+// Boost Status (PromotionQueue)
+// ============================
+export type BoostStatus = 'WAITING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+
+export interface BoostStatusItem {
+    id: string;
+    propertyId?: number;
+    propertyTitle?: string;
+    packageName: string;
+    amount: number;
+    status: BoostStatus;
+    activatedAt?: string;
+    expiresAt?: string;
+    createdAt: string;
+    priorityLevel?: number;     // 1=Basic, 2=Silver, 3=Gold
+    durationDays?: number;
 }
 
 // ============================
