@@ -27,7 +27,6 @@ export default function TabLayout() {
     const activeColor = '#0066FF';
     const inactiveColor = isDark ? '#888' : '#999';
 
-    // Tab bar height tự động: content 48 + paddingTop 8 + paddingBottom dựa trên safe area
     const tabBarPaddingBottom = Math.max(insets.bottom, 12);
     const TAB_BAR_HEIGHT = 48 + 8 + tabBarPaddingBottom;
 
@@ -52,63 +51,101 @@ export default function TabLayout() {
                 tabBarLabelStyle: { marginTop: 2, fontSize: 11, fontWeight: '600' },
             }}
         >
+            {/* ── Home ── */}
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: 'Khám phá',
+                    title: 'Trang chủ',
                     tabBarIcon: ({ color, focused }) => (
-                        <View>
-                            <Feather name="home" size={24} color={color} />
+                        <Ionicons
+                            name={focused ? 'home' : 'home-outline'}
+                            size={24}
+                            color={color}
+                        />
+                    ),
+                }}
+            />
+
+            {/* ── Reels — MỚI ── */}
+            <Tabs.Screen
+                name="reels"
+                options={{
+                    title: 'Reels',
+                    tabBarIcon: ({ color, focused }) => (
+                        <View style={styles.reelsIconWrap}>
+                            <Ionicons
+                                name={focused ? 'play-circle' : 'play-circle-outline'}
+                                size={26}
+                                color={focused ? '#fff' : color}
+                            />
                         </View>
                     ),
-                }}
-            />
-
-            <Tabs.Screen
-                name="map"
-                options={{
-                    title: 'Bản đồ',
-                    tabBarIcon: ({ color }) => (
-                        <Feather name="map" size={24} color={color} />
+                    tabBarLabel: ({ focused }) => (
+                        <Text style={[
+                            styles.reelsLabel,
+                            { color: focused ? activeColor : inactiveColor }
+                        ]}>
+                            Reels
+                        </Text>
                     ),
                 }}
             />
 
+            {/* ── Post (FAB center) ── */}
             <Tabs.Screen
                 name="post"
                 options={{
                     title: '',
-                    tabBarIcon: ({ color, focused }) => (
-                        <View style={styles.postButton}>
-                            <Feather name="plus" size={30} color="white" />
+                    tabBarIcon: () => (
+                        <View style={styles.postBtn}>
+                            <Feather name="plus" size={26} color="#fff" />
                         </View>
                     ),
+                    tabBarLabel: () => null,
                 }}
             />
 
+            {/* ── Chat ── */}
             <Tabs.Screen
                 name="chat"
                 options={{
-                    title: 'Tin nhắn',
-                    tabBarIcon: ({ color }) => (
-                        <View style={styles.iconWrapper}>
-                            <Feather name="message-square" size={24} color={color} />
+                    title: 'Chat',
+                    tabBarIcon: ({ color, focused }) => (
+                        <View>
+                            <Ionicons
+                                name={focused ? 'chatbubbles' : 'chatbubbles-outline'}
+                                size={24}
+                                color={color}
+                            />
                             <Badge count={totalUnread} />
                         </View>
                     ),
                 }}
             />
 
+            {/* ── Profile ── */}
             <Tabs.Screen
                 name="profile"
                 options={{
-                    title: 'Cá nhân',
-                    tabBarIcon: ({ color }) => (
-                        <View style={styles.iconWrapper}>
-                            <Feather name="user" size={24} color={color} />
+                    title: 'Tôi',
+                    tabBarIcon: ({ color, focused }) => (
+                        <View>
+                            <Ionicons
+                                name={focused ? 'person' : 'person-outline'}
+                                size={24}
+                                color={color}
+                            />
                             <Badge count={notifUnread} />
                         </View>
                     ),
+                }}
+            />
+
+            {/* ── Map (ẩn khỏi tab bar, vẫn accessible) ── */}
+            <Tabs.Screen
+                name="map"
+                options={{
+                    href: null, // ẩn khỏi tab bar
                 }}
             />
         </Tabs>
@@ -116,23 +153,52 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-    iconWrapper: { position: 'relative' },
     badge: {
-        position: 'absolute', top: -6, right: -10,
-        backgroundColor: '#EF4444', minWidth: 18, height: 18,
-        borderRadius: 9, justifyContent: 'center', alignItems: 'center',
-        paddingHorizontal: 4, borderWidth: 1.5, borderColor: 'white',
+        position: 'absolute',
+        top: -4,
+        right: -8,
+        backgroundColor: '#FF3B30',
+        borderRadius: 8,
+        minWidth: 16,
+        height: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 3,
+        borderWidth: 1.5,
+        borderColor: '#fff',
     },
-    badgeText: { color: 'white', fontSize: 10, fontWeight: '800' },
-    postButton: {
-        top: -18,
+    badgeText: {
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: '800',
+    },
+    // Reels icon — pill tím nhỏ
+    reelsIconWrap: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
         backgroundColor: '#0066FF',
-        width: 56, height: 56, borderRadius: 28,
-        justifyContent: 'center', alignItems: 'center',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    reelsLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginTop: 2,
+    },
+    // Post FAB button
+    postBtn: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: '#0066FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
         shadowColor: '#0066FF',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4,
-        shadowRadius: 10,
+        shadowRadius: 8,
         elevation: 8,
     },
 });
