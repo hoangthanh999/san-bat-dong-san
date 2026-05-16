@@ -594,7 +594,14 @@ export interface Transaction {
 
 // VNPay response (backend trả về { url: string })
 export interface VNPayPaymentResponse {
-    url: string;
+    url?: string;           // field cũ của backend
+    paymentUrl?: string;    // field mới (nếu backend đổi)
+    code?: number;
+    message?: string;
+    result?: {
+        url?: string;
+        paymentUrl?: string;
+    };
 }
 
 // ============================

@@ -3,70 +3,82 @@ import paymentClient from './paymentClient';
 import { API_ENDPOINTS } from '../../constants';
 import { VNPayPaymentResponse, Transaction, WalletInfo, PaginatedResponse } from '../../types';
 
+// ─── Withdraw Request DTO (khớp backend ReleaseRequest) ──────
+export interface WithdrawRequest {
+    amount: number;           // số tiền rút (VND)
+    bankCode: string;         // mã ngân hàng: VCB, TCB, ACB...
+    bankAccountNumber: string;// số tài khoản
+    bankAccountName: string;  // tên chủ tài khoản
+    note?: string;            // ghi chú (optional)
+}
+
+export interface WithdrawResponse {
+    transactionId?: string;
+    status: string;           // PENDING | SUCCESS | FAILED
+    message: string;
+    amount: number;
+    createdAt?: string;
+}
+
 /**
  * Wallet Service
  * - Wallet APIs qua apiClient (Nginx :8080 → /api/wallets → wallet-service:8089)
  * - Payment tạo URL qua apiClient (Nginx :8080 → /api/payment → payment-service:8087)
  * - Transaction history qua paymentClient (trực tiếp :8087 → /api/transactions)
- *   ✅ /api/transactions/ đã được thêm vào Nginx, nhưng paymentClient vẫn hoạt động.
- * - Bills: xem billService.ts (tạo hóa đơn tiền trọ)
  */
 export const walletService = {
     /**
      * Lấy thông tin ví (số dư, hold amount)
      * GET /api/wallets/me (JWT)
-     * Backend: WalletController.getMyWallet()
-     * 
-     * Response: Wallet entity { id, userId, balance, holdAmount }
      */
-    getMyWallet: async (): Promise<WalletInfo> => {
-        const response = await apiClient.get<WalletInfo>(API_ENDPOINTS.WALLET_ME);
-        return response.data;
+    getWallet: async (): Promise<WalletInfo> => {
+        const res = await apiClient.get<WalletInfo>('/api/wallets/me');
+        return res.data;
     },
 
     /**
-     * Lấy lịch sử giao dịch ví (phân trang)
-     * GET /api/wallets/transactions?page=0&size=10 (JWT)
-     * Backend: WalletController.getTransactionHistory()
-     * 
-     * Đi qua nginx /api/wallets → wallet-service:8089
+     * Tạo payment URL VNPay để nạp tiền
+     * POST /api/payment/create (JWT)
      */
-    getWalletTransactions: async (page = 0, size = 10): Promise<PaginatedResponse<Transaction>> => {
-        const response = await apiClient.get<PaginatedResponse<Transaction>>(
-            API_ENDPOINTS.WALLET_TRANSACTIONS,
-            { params: { page, size } }
+    createPayment: async (amount: number): Promise<string> => {
+        const res = await apiClient.post<VNPayPaymentResponse>(
+            '/api/payment/create',
+            { amount }
         );
-        return response.data;
+        return res.data.paymentUrl ?? res.data.result?.paymentUrl ?? '';
     },
 
     /**
-     * Tạo URL thanh toán VNPay để nạp tiền vào ví
-     * POST /api/payment/create-payment?amount=X&userId=Y
-     * Đi qua nginx (nginx route /api/payment/ → payment-service:8087)
-     *
-     * Backend trả về: { url: "https://sandbox.vnpay..." }
+     * Rút tiền — gọi POST /api/wallets/withdraw
+     * Backend có thể map sang /release hoặc endpoint riêng
+     * Body: WithdrawRequest
      */
-
-    createVNPayPayment: async (amount: number, userId: number) => {
-        const response = await paymentClient.post<VNPayPaymentResponse>(
-            API_ENDPOINTS.PAYMENT_CREATE,  // /api/payment/create-payment
-            null,
-            { params: { amount, userId } }
+    withdraw: async (payload: WithdrawRequest): Promise<WithdrawResponse> => {
+        const res = await apiClient.post<WithdrawResponse>(
+            '/api/wallets/withdraw',
+            payload
         );
-        return response.data;
+        // auto-unwrap nếu backend trả { result: ... }
+        return (res.data as any).result ?? res.data;
     },
 
     /**
-     * Lịch sử giao dịch thanh toán của user (payment-service)
+     * Lấy lịch sử giao dịch
      * GET /api/transactions/my-history/{userId}
-     * Gọi trực tiếp payment-service:8087 (không qua nginx vì nginx chỉ route /api/payment/)
-     *
-     * Backend trả về: List<Transaction> (không phân trang)
      */
-    getTransactionHistory: async (userId: number): Promise<Transaction[]> => {
-        const response = await paymentClient.get<Transaction[]>(
-            API_ENDPOINTS.TRANSACTION_HISTORY(userId)
+    fetchTransactions: async (userId: number): Promise<Transaction[]> => {
+        const res = await paymentClient.get<PaginatedResponse<Transaction>>(
+            `/api/transactions/my-history/${userId}`
         );
-        return response.data;
+        return res.data.content ?? [];
+    },
+
+    /**
+     * Lấy danh sách bills
+     * GET /api/bills/my
+     */
+    fetchBills: async (): Promise<any[]> => {
+        const res = await apiClient.get('/api/bills/my');
+        return (res.data as any).result ?? res.data ?? [];
     },
 };

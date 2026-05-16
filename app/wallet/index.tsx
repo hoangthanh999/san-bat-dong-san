@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, StatusBar,
-    Platform, ScrollView, RefreshControl, ActivityIndicator,
+    ScrollView, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
@@ -10,6 +10,7 @@ import { Transaction } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
+// ─── TransactionItem ──────────────────────────────────────────
 function TransactionItem({ item }: { item: Transaction }) {
     const isIncoming = item.type === 'DEPOSIT' || item.type === 'REFUND';
     const isPending = item.status === 'PENDING';
@@ -20,10 +21,13 @@ function TransactionItem({ item }: { item: Transaction }) {
         MEMBERSHIP: 'Mua gói hội viên',
         BOOST: 'Đẩy tin',
         REFUND: 'Hoàn tiền',
+        WITHDRAW: 'Rút tiền',
     };
 
     const formatDate = (d: string) =>
-        new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        new Date(d).toLocaleDateString('vi-VN', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+        });
 
     return (
         <View style={styles.txItem}>
@@ -38,7 +42,9 @@ function TransactionItem({ item }: { item: Transaction }) {
                 />
             </View>
             <View style={styles.txInfo}>
-                <Text style={styles.txLabel}>{item.description || typeLabel[item.type] || item.type}</Text>
+                <Text style={styles.txLabel}>
+                    {item.description || typeLabel[item.type] || item.type}
+                </Text>
                 {item.vnpayCode && (
                     <Text style={styles.txRef}>Mã GD: {item.vnpayCode}</Text>
                 )}
@@ -55,17 +61,16 @@ function TransactionItem({ item }: { item: Transaction }) {
     );
 }
 
+// ─── Main export ──────────────────────────────────────────────
 export default function WalletScreen() {
     return (
-        <AuthGuardScreen
-            message="Đăng nhập để xem ví điện tử"
-            icon="wallet-outline"
-        >
+        <AuthGuardScreen message="Đăng nhập để xem ví điện tử" icon="wallet-outline">
             <WalletContent />
         </AuthGuardScreen>
     );
 }
 
+// ─── WalletContent ────────────────────────────────────────────
 function WalletContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -83,7 +88,6 @@ function WalletContent() {
         setRefreshing(false);
     };
 
-    // Ưu tiên dùng số dư từ wallet API, fallback tính từ transactions
     const balance = wallet?.balance ?? transactions.reduce((sum, tx) => {
         if (tx.status !== 'SUCCESS') return sum;
         const amount = Number(tx.amount) || 0;
@@ -93,12 +97,21 @@ function WalletContent() {
 
     const recentTx = transactions.slice(0, 5);
 
+    // ── Quick actions list ──
+    // ✅ Định nghĩa TRƯỚC return, KHÔNG đặt JSX ngoài map
+    const QUICK_ACTIONS = [
+        { icon: 'add-circle', label: 'Nạp tiền', path: '/wallet/deposit', color: '#0066FF' },
+        { icon: 'receipt', label: 'Lịch sử', path: '/wallet/history', color: '#22C55E' },
+        { icon: 'star', label: 'Gói dịch vụ', path: '/packages', color: '#FF9500' },
+        { icon: 'rocket', label: 'Boost tin', path: '/packages', color: '#8B5CF6' },
+    ];
+
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="light-content" />
 
-            {/* Header gradient */}
+            {/* ── Header ── */}
             <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="white" />
@@ -109,10 +122,12 @@ function WalletContent() {
                 </TouchableOpacity>
             </View>
 
-            {/* Balance card */}
+            {/* ── Balance card ── */}
             <View style={styles.balanceCard}>
                 <Text style={styles.balanceLabel}>💳 Số dư khả dụng</Text>
-                <Text style={styles.balanceAmount}>{balance.toLocaleString('vi-VN')} đ</Text>
+                <Text style={styles.balanceAmount}>
+                    {balance.toLocaleString('vi-VN')} đ
+                </Text>
                 <TouchableOpacity
                     style={styles.depositBtn}
                     onPress={() => router.push('/wallet/deposit' as any)}
@@ -125,31 +140,56 @@ function WalletContent() {
 
             <ScrollView
                 style={styles.body}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor="#0066FF"
+                    />
+                }
                 showsVerticalScrollIndicator={false}
             >
-                {/* Quick actions */}
-                <View style={styles.quickActions}>
-                    {[
-                        { icon: 'add-circle', label: 'Nạp tiền', path: '/wallet/deposit', color: '#0066FF' },
-                        { icon: 'receipt', label: 'Lịch sử', path: '/wallet/history', color: '#22C55E' },
-                        { icon: 'star', label: 'Gói dịch vụ', path: '/packages', color: '#FF9500' },
-                        { icon: 'rocket', label: 'Boost tin', path: '/packages', color: '#8B5CF6' },
-                    ].map((action) => (
-                        <TouchableOpacity
-                            key={action.label}
-                            style={styles.quickAction}
-                            onPress={() => router.push(action.path as any)}
-                        >
-                            <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}15` }]}>
-                                <Ionicons name={action.icon as any} size={26} color={action.color} />
-                            </View>
-                            <Text style={styles.quickActionLabel}>{action.label}</Text>
-                        </TouchableOpacity>
-                    ))}
+                {/* ── Quick actions ── */}
+                {/* ✅ quickActions + nút rút tiền cùng cấp trong 1 View */}
+                <View style={styles.quickActionsCard}>
+                    {/* Row 1: 4 nút thông thường */}
+                    <View style={styles.quickActionsRow}>
+                        {QUICK_ACTIONS.map((action) => (
+                            <TouchableOpacity
+                                key={action.label}
+                                style={styles.quickAction}
+                                onPress={() => router.push(action.path as any)}
+                                activeOpacity={0.75}
+                            >
+                                <View style={[
+                                    styles.quickActionIcon,
+                                    { backgroundColor: `${action.color}15` },
+                                ]}>
+                                    <Ionicons
+                                        name={action.icon as any}
+                                        size={26}
+                                        color={action.color}
+                                    />
+                                </View>
+                                <Text style={styles.quickActionLabel}>{action.label}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {/* ✅ Divider + nút Rút tiền — NGOÀI map, cùng cấp */}
+                    <View style={styles.divider} />
+                    <TouchableOpacity
+                        style={styles.withdrawBtn}
+                        onPress={() => router.push('/wallet/withdraw' as any)}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="arrow-up-circle-outline" size={20} color="#E31837" />
+                        <Text style={styles.withdrawBtnText}>Rút tiền về tài khoản ngân hàng</Text>
+                        <Ionicons name="chevron-forward" size={16} color="#E31837" />
+                    </TouchableOpacity>
                 </View>
 
-                {/* Recent transactions */}
+                {/* ── Recent transactions ── */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
@@ -176,17 +216,21 @@ function WalletContent() {
     );
 }
 
+// ════════════════════════════════════════════════════════════
+// Styles
+// ════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F0F4FF' },
+
+    // ── Header ──
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
-        paddingBottom: 16,
-        backgroundColor: '#0066FF',
+        paddingHorizontal: 16, paddingBottom: 16, backgroundColor: '#0066FF',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },
     headerTitle: { fontSize: 18, fontWeight: '700', color: 'white' },
+
+    // ── Balance card ──
     balanceCard: {
         backgroundColor: '#0055DD', marginHorizontal: 16, marginTop: -1,
         borderRadius: 20, padding: 24, alignItems: 'center', gap: 10,
@@ -201,17 +245,40 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24, paddingVertical: 10, marginTop: 4,
     },
     depositBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
+
     body: { flex: 1, marginTop: 16 },
-    quickActions: {
-        flexDirection: 'row', justifyContent: 'space-around',
+
+    // ── Quick actions card ──
+    quickActionsCard: {
         backgroundColor: 'white', marginHorizontal: 16, borderRadius: 16,
         paddingVertical: 16, paddingHorizontal: 8,
         shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
     },
+    quickActionsRow: {
+        flexDirection: 'row', justifyContent: 'space-around',
+    },
     quickAction: { alignItems: 'center', gap: 6 },
-    quickActionIcon: { width: 52, height: 52, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+    quickActionIcon: {
+        width: 52, height: 52, borderRadius: 15,
+        justifyContent: 'center', alignItems: 'center',
+    },
     quickActionLabel: { fontSize: 12, color: '#333', fontWeight: '500' },
+
+    // ✅ Divider + nút rút tiền
+    divider: {
+        height: 1, backgroundColor: '#F0F0F0',
+        marginHorizontal: 8, marginTop: 14, marginBottom: 10,
+    },
+    withdrawBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        paddingHorizontal: 12, paddingVertical: 8,
+    },
+    withdrawBtnText: {
+        flex: 1, color: '#E31837', fontSize: 14, fontWeight: '600',
+    },
+
+    // ── Transactions ──
     section: {
         backgroundColor: 'white', marginHorizontal: 16, marginTop: 16,
         borderRadius: 16, overflow: 'hidden',
@@ -228,10 +295,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
         paddingVertical: 13, borderTopWidth: 1, borderTopColor: '#F5F5F5', gap: 12,
     },
-    txIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    txIconWrap: {
+        width: 44, height: 44, borderRadius: 14,
+        justifyContent: 'center', alignItems: 'center',
+    },
     txInfo: { flex: 1, gap: 2 },
     txLabel: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
-    txSub: { fontSize: 12, color: '#888' },
     txRef: { fontSize: 11, color: '#AAA' },
     txDate: { fontSize: 12, color: '#888', marginTop: 2 },
     txAmount: { fontSize: 15, fontWeight: '700' },
