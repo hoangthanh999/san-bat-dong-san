@@ -5,7 +5,7 @@ import {
     ActivityIndicator, Alert, Animated, Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -144,21 +144,33 @@ function ChatDetailContent() {
         setBookingNote('');
     };
 
+
     const renderLocationMessage = (content: string, isMe: boolean) => {
         try {
             const loc = JSON.parse(content);
+            const html = `<!DOCTYPE html><html><head>
+            <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>*{margin:0;padding:0}html,body,#map{width:100%;height:100%}</style>
+            </head><body><div id="map"></div>
+            <script>
+                var map = L.map('map',{zoomControl:false,dragging:false,scrollWheelZoom:false})
+                    .setView([${loc.latitude},${loc.longitude}],15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                L.marker([${loc.latitude},${loc.longitude}]).addTo(map);
+            </script></body></html>`;
             return (
                 <View style={styles.locationCard}>
                     <View style={styles.locationMapContainer}>
-                        <MapView
+                        <WebView
+                            source={{ html }}
                             style={styles.locationMap}
-                            provider={PROVIDER_GOOGLE}
-                            initialRegion={{ ...loc, latitudeDelta: 0.005, longitudeDelta: 0.005 }}
                             scrollEnabled={false}
-                            zoomEnabled={false}
-                        >
-                            <Marker coordinate={loc} />
-                        </MapView>
+                            javaScriptEnabled
+                            originWhitelist={['*']}
+                            mixedContentMode="always"
+                        />
                     </View>
                     <View style={styles.locationBottom}>
                         <Ionicons name="location" size={14} color="#0066FF" />

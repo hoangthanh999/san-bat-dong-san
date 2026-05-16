@@ -161,10 +161,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const ws = new WebSocket(`${WS_URL}/chat?token=${token}`);
 
         ws.onopen = () => {
-            // Đặt lại số lần retry khi kết nối thành công
             set({ isConnected: true, _reconnectAttempts: 0 });
-        };
 
+            // ✅ Gửi STOMP CONNECT với Authorization header
+            const { token } = useAuthStore.getState();
+            const connectFrame = [
+                'CONNECT',
+                'accept-version:1.2',
+                'heart-beat:0,0',
+                `Authorization:Bearer ${token}`,  // ← Thêm dòng này
+                '',
+                '\0',
+            ].join('\n');
+
+            ws.send(connectFrame);
+        };
         ws.onmessage = (event) => {
             try {
                 const message: ChatMessage = JSON.parse(event.data);
