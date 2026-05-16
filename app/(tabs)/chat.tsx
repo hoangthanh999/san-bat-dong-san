@@ -96,26 +96,48 @@ export default function ChatListScreen() {
             {/* Header */}
             <View style={[styles.header, { paddingTop: headerPaddingTop }]}>
                 <Text style={styles.headerTitle}>Tin nhắn</Text>
-                <TouchableOpacity>
-                    <Ionicons name="create-outline" size={24} color="#0066FF" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                        style={styles.aiHeaderBtn}
+                        onPress={() => router.push('/chat/ai' as any)}
+                    >
+                        <Ionicons name="sparkles" size={18} color="white" />
+                        <Text style={styles.aiHeaderBtnText}>AI</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity>
+                        <Ionicons name="create-outline" size={24} color="#0066FF" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {isLoading && conversations.length === 0 ? (
                 <View style={{ padding: 16, gap: 12 }}>
                     {[1, 2, 3, 4].map(i => <Skeleton key={i} width="100%" height={72} borderRadius={12} />)}
                 </View>
-            ) : conversations.length === 0 ? (
-                <View style={styles.empty}>
-                    <Ionicons name="chatbubbles-outline" size={64} color="#CCC" />
-                    <Text style={styles.emptyTitle}>Chưa có cuộc trò chuyện nào</Text>
-                    <Text style={styles.emptySub}>Nhấn chat với chủ nhà từ tin đăng để bắt đầu</Text>
-                </View>
             ) : (
                 <FlatList
                     data={conversations}
                     keyExtractor={item => item.id.toString()}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
+                    ListHeaderComponent={
+                        // AI Chat Banner — luôn hiển thị đầu danh sách
+                        <TouchableOpacity
+                            style={styles.aiBanner}
+                            onPress={() => router.push('/chat/ai' as any)}
+                            activeOpacity={0.88}
+                        >
+                            <View style={styles.aiBannerIcon}>
+                                <Ionicons name="sparkles" size={26} color="white" />
+                            </View>
+                            <View style={styles.aiBannerBody}>
+                                <Text style={styles.aiBannerTitle}>HomeVerse AI</Text>
+                                <Text style={styles.aiBannerSub}>Tìm kiếm BĐS thông minh với Gemini AI</Text>
+                            </View>
+                            <View style={styles.aiBannerBadge}>
+                                <Text style={styles.aiBannerBadgeText}>AI</Text>
+                            </View>
+                        </TouchableOpacity>
+                    }
                     renderItem={({ item }) => (
                         <ConversationItem
                             item={item}
@@ -126,6 +148,13 @@ export default function ChatListScreen() {
                         />
                     )}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <Ionicons name="chatbubbles-outline" size={64} color="#CCC" />
+                            <Text style={styles.emptyTitle}>Chưa có cuộc trò chuyện nào</Text>
+                            <Text style={styles.emptySub}>Nhấn chat với chủ nhà từ tin đăng để bắt đầu</Text>
+                        </View>
+                    }
                 />
             )}
         </View>
@@ -140,6 +169,32 @@ const styles = StyleSheet.create({
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     headerTitle: { fontSize: 22, fontWeight: '700', color: '#1A1A1A' },
+    aiHeaderBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 4,
+        backgroundColor: '#0066FF', borderRadius: 16,
+        paddingHorizontal: 12, paddingVertical: 6,
+    },
+    aiHeaderBtnText: { color: 'white', fontWeight: '700', fontSize: 13 },
+    // AI Banner — entry point to AI chat
+    aiBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        backgroundColor: 'white', paddingHorizontal: 16, paddingVertical: 14,
+        borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+    },
+    aiBannerIcon: {
+        width: 52, height: 52, borderRadius: 26,
+        backgroundColor: '#0066FF', justifyContent: 'center', alignItems: 'center',
+        shadowColor: '#0066FF', shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+    },
+    aiBannerBody: { flex: 1 },
+    aiBannerTitle: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
+    aiBannerSub: { fontSize: 12, color: '#888', marginTop: 2 },
+    aiBannerBadge: {
+        backgroundColor: '#E8F0FF', paddingHorizontal: 10, paddingVertical: 4,
+        borderRadius: 12,
+    },
+    aiBannerBadgeText: { fontSize: 11, fontWeight: '800', color: '#0066FF' },
     convItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: 'white' },
     avatarWrapper: { position: 'relative' },
     avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#E0E0E0' },

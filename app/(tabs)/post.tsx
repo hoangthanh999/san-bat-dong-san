@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    TextInput, StatusBar, Platform, Alert, ActivityIndicator,
+    TextInput, StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
 import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,15 +13,13 @@ import { useAuthStore } from '../../store/authStore';
 import { useKYCStore } from '../../store/kycStore';
 import { roomService } from '../../services/api/rooms';
 import { mediaService } from '../../services/api/media';
-import { PropertyRequestDTO } from '../../types';
+import { amenityService } from '../../services/api/amenities'; // ✅ Dùng service có sẵn
+import { PropertyRequestDTO, Amenity } from '../../types';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const STEPS = ['Cơ bản', 'Chi tiết', 'Ảnh & Video', 'Hoàn thành'];
 
-const AMENITY_OPTIONS = ['WiFi', 'Điều hoà', 'Bếp', 'Máy giặt', 'Tủ lạnh', 'Ban công', 'Chỗ để xe', 'Thang máy', 'Bảo vệ', 'Hồ bơi', 'Gym'];
-const DIRECTION_OPTIONS = ['Đông', 'Tây', 'Nam', 'Bắc', 'Đông-Nam', 'Đông-Bắc', 'Tây-Nam', 'Tây-Bắc'];
 const FURNITURE_OPTIONS = ['Không có', 'Cơ bản', 'Đầy đủ', 'Cao cấp'];
-
 
 const FURNITURE_MAP: Record<string, string> = {
     'Không có': 'UNFURNISHED',
@@ -31,14 +28,12 @@ const FURNITURE_MAP: Record<string, string> = {
     'Cao cấp': 'FULLY_FURNISHED',
 };
 
-// Label hiển thị ngược lại (để ChipSelector show đúng)
 const FURNITURE_REVERSE_MAP: Record<string, string> = {
     'UNFURNISHED': 'Không có',
     'PARTIALLY_FURNISHED': 'Cơ bản',
     'FULLY_FURNISHED': 'Đầy đủ',
 };
 
-// ====== DỮ LIỆU TỈNH/HUYỆN/XÃ (rút gọn, phổ biến nhất) ======
 const PROVINCES: Record<string, Record<string, string[]>> = {
     'Hồ Chí Minh': {
         'Quận 1': ['Phường Bến Nghé', 'Phường Bến Thành', 'Phường Cầu Kho', 'Phường Cô Giang', 'Phường Đa Kao', 'Phường Nguyễn Cư Trinh', 'Phường Nguyễn Thái Bình', 'Phường Phạm Ngũ Lão', 'Phường Tân Định'],
@@ -89,7 +84,9 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
     );
 }
 
-function ChipSelector({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (val: string) => void }) {
+function ChipSelector({ options, selected, onToggle }: {
+    options: string[]; selected: string[]; onToggle: (val: string) => void;
+}) {
     return (
         <View style={styles.chipRow}>
             {options.map(opt => (
@@ -110,24 +107,12 @@ function VideoPreviewPlayer({ uri, onRemove }: { uri: string; onRemove: () => vo
         p.loop = false;
         p.muted = true;
     });
-
-    // ✅ Cleanup player khi unmount
     useEffect(() => {
-        return () => {
-            try {
-                player.release();
-            } catch (_) { }
-        };
+        return () => { try { player.release(); } catch (_) { } };
     }, []);
-
     return (
         <View style={styles.videoPreviewContainer}>
-            <VideoView
-                style={styles.videoPreview}
-                player={player}
-                allowsPictureInPicture={false}
-                contentFit="cover"
-            />
+            <VideoView style={styles.videoPreview} player={player} allowsPictureInPicture={false} contentFit="cover" />
             <TouchableOpacity style={styles.removeVideoBtn} onPress={onRemove}>
                 <Ionicons name="close-circle" size={24} color="#EF4444" />
             </TouchableOpacity>
@@ -139,7 +124,6 @@ function VideoPreviewPlayer({ uri, onRemove }: { uri: string; onRemove: () => vo
     );
 }
 
-// ========== DROPDOWN SELECTOR ==========
 function DropdownPicker({ label, options, value, onChange, placeholder }: {
     label: string; options: string[]; value: string; onChange: (v: string) => void; placeholder: string;
 }) {
@@ -148,17 +132,11 @@ function DropdownPicker({ label, options, value, onChange, placeholder }: {
         <View style={styles.formField}>
             <Text style={styles.fieldLabel}>{label}</Text>
             <TouchableOpacity style={styles.dropdownBtn} onPress={() => setIsOpen(!isOpen)}>
-                <Text style={value ? styles.dropdownValue : styles.dropdownPlaceholder}>
-                    {value || placeholder}
-                </Text>
+                <Text style={value ? styles.dropdownValue : styles.dropdownPlaceholder}>{value || placeholder}</Text>
                 <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#999" />
             </TouchableOpacity>
             {isOpen && (
-                <ScrollView
-                    style={styles.dropdownList}
-                    nestedScrollEnabled
-                    showsVerticalScrollIndicator
-                >
+                <ScrollView style={styles.dropdownList} nestedScrollEnabled showsVerticalScrollIndicator>
                     {options.map(opt => (
                         <TouchableOpacity
                             key={opt}
@@ -177,10 +155,7 @@ function DropdownPicker({ label, options, value, onChange, placeholder }: {
 
 export default function PostScreen() {
     return (
-        <AuthGuardScreen
-            message="Đăng nhập để đăng tin bất động sản"
-            icon="create-outline"
-        >
+        <AuthGuardScreen message="Đăng nhập để đăng tin bất động sản" icon="create-outline">
             <PostScreenContent />
         </AuthGuardScreen>
     );
@@ -198,9 +173,42 @@ function PostScreenContent() {
     const [videoUri, setVideoUri] = useState<string | null>(null);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
-    React.useEffect(() => {
+    // ✅ Amenities từ API
+    const [amenityList, setAmenityList] = useState<Amenity[]>([]);
+    const [amenityLoading, setAmenityLoading] = useState(false);
+
+    useEffect(() => {
         if (isAuthenticated) fetchKYCStatus();
     }, [isAuthenticated]);
+
+    // ✅ Fetch amenities khi mount — dùng amenityService.getAll()
+    useEffect(() => {
+        const fetchAmenities = async () => {
+            setAmenityLoading(true);
+            try {
+                const data = await amenityService.getAll();
+                setAmenityList(data || []);
+            } catch (err) {
+                console.warn('[Post] Failed to fetch amenities:', err);
+                // Fallback hardcode nếu API lỗi
+                setAmenityList([
+                    { id: 2, name: 'Wifi', icon: 'wifi' },
+                    { id: 3, name: 'Điều hòa', icon: 'air-conditioner' },
+                    { id: 4, name: 'Máy giặt', icon: 'washing-machine' },
+                    { id: 5, name: 'Bãi đỗ xe', icon: 'parking' },
+                    { id: 6, name: 'Hồ bơi', icon: 'pool' },
+                    { id: 7, name: 'Gym', icon: 'gym' },
+                    { id: 8, name: 'Thang máy', icon: 'elevator' },
+                    { id: 9, name: 'Bảo vệ 24/7', icon: 'security' },
+                    { id: 10, name: 'Camera an ninh', icon: 'camera' },
+                    { id: 11, name: 'Sân vườn', icon: 'garden' },
+                ] as Amenity[]);
+            } finally {
+                setAmenityLoading(false);
+            }
+        };
+        fetchAmenities();
+    }, []);
 
     const [form, setForm] = useState({
         title: '',
@@ -222,18 +230,24 @@ function PostScreenContent() {
         electricityPrice: 'STATE_PRICE',
         waterPrice: 'STATE_PRICE',
         internetPrice: 'FREE',
-        amenities: [] as string[],
+        amenities: [] as string[], // ✅ Lưu name khớp DB
         latitude: '10.762622',
         longitude: '106.660172',
     });
 
-    const updateForm = (key: keyof typeof form, value: any) => setForm(prev => ({ ...prev, [key]: value }));
+    const updateForm = (key: keyof typeof form, value: any) =>
+        setForm(prev => ({ ...prev, [key]: value }));
 
-    const toggleAmenity = (val: string) => {
-        updateForm('amenities', form.amenities.includes(val) ? form.amenities.filter(a => a !== val) : [...form.amenities, val]);
+    // ✅ Toggle theo name từ API
+    const toggleAmenity = (name: string) => {
+        updateForm(
+            'amenities',
+            form.amenities.includes(name)
+                ? form.amenities.filter(a => a !== name)
+                : [...form.amenities, name]
+        );
     };
 
-    // Derived dropdown options
     const districtOptions = form.province ? Object.keys(PROVINCES[form.province] || {}) : [];
     const wardOptions = form.province && form.district ? (PROVINCES[form.province]?.[form.district] || []) : [];
 
@@ -253,12 +267,8 @@ function PostScreenContent() {
         });
         if (!result.canceled && result.assets[0]) {
             const asset = result.assets[0];
-            const MAX_VIDEO_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
-            if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_BYTES) {
-                Alert.alert(
-                    'Video quá lớn',
-                    `Vui lòng chọn video dưới 50MB. Video bạn chọn có kích thước ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB.`
-                );
+            if (asset.fileSize && asset.fileSize > 50 * 1024 * 1024) {
+                Alert.alert('Video quá lớn', `Vui lòng chọn video dưới 50MB. Video bạn chọn có kích thước ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB.`);
                 return;
             }
             setVideoUri(asset.uri);
@@ -302,7 +312,6 @@ function PostScreenContent() {
     const handleSubmit = async () => {
         setIsSubmitting(true);
         try {
-            // 1. Upload images qua media-service
             setUploadProgress('Đang tải ảnh lên...');
             const imageFiles = images.map((uri, i) => ({
                 uri, name: `property_${Date.now()}_${i}.jpg`, type: 'image/jpeg',
@@ -311,12 +320,10 @@ function PostScreenContent() {
             try {
                 imageUrls = await mediaService.uploadMultiple(imageFiles, 'properties');
             } catch (uploadErr) {
-                // Fallback: gửi URI trực tiếp nếu media-service không hoạt động
                 console.warn('[Post] Media upload failed, using local URIs:', uploadErr);
                 imageUrls = images;
             }
 
-            // 2. Upload video nếu có
             let videoUrl: string | undefined;
             if (videoUri) {
                 setUploadProgress('Đang tải video...');
@@ -327,7 +334,6 @@ function PostScreenContent() {
                 }
             }
 
-            // 3. Build JSON body đúng PropertyCreateDTO (khớp backend)
             setUploadProgress('Đang đăng tin...');
             const address = [form.addressDetail, form.ward, form.district, form.province].filter(Boolean).join(', ');
             const body: PropertyRequestDTO = {
@@ -347,7 +353,7 @@ function PostScreenContent() {
                 capacity: form.capacity ? Number(form.capacity) : undefined,
                 images: imageUrls,
                 videoUrl,
-                amenities: form.amenities,
+                amenities: form.amenities, // ✅ name khớp DB
                 bedrooms: Number(form.bedrooms),
                 bathrooms: Number(form.bathrooms),
                 hasBalcony: form.hasBalcony,
@@ -359,7 +365,7 @@ function PostScreenContent() {
             };
 
             await roomService.createRoom(body);
-            setStep(3); // Success
+            setStep(3);
         } catch (error: any) {
             Alert.alert('Lỗi', error.message || 'Đăng bài thất bại. Vui lòng thử lại.');
         } finally {
@@ -369,12 +375,10 @@ function PostScreenContent() {
     };
 
     const resetForm = () => {
-        setStep(0);
-        setImages([]);
-        setVideoUri(null);
+        setStep(0); setImages([]); setVideoUri(null);
         setForm({
             title: '', province: '', district: '', ward: '', addressDetail: '',
-            price: '', area: '', transactionType: 'FOR_RENT' as 'FOR_RENT' | 'FOR_SALE', propertyType: 'ROOM', description: '',
+            price: '', area: '', transactionType: 'FOR_RENT', propertyType: 'ROOM', description: '',
             bedrooms: '1', bathrooms: '1', capacity: '', furnishingStatus: 'PARTIALLY_FURNISHED',
             hasBalcony: false, availabilityStatus: 'IMMEDIATELY',
             electricityPrice: 'STATE_PRICE', waterPrice: 'STATE_PRICE', internetPrice: 'FREE',
@@ -400,9 +404,7 @@ function PostScreenContent() {
             <View style={styles.authRequired}>
                 <StatusBar barStyle="dark-content" />
                 <Ionicons name="shield-checkmark-outline" size={72} color="#0066FF" />
-                <Text style={styles.authTitle}>
-                    {kycStatus === 'PENDING' ? 'Đang chờ xác minh' : 'Xác minh danh tính'}
-                </Text>
+                <Text style={styles.authTitle}>{kycStatus === 'PENDING' ? 'Đang chờ xác minh' : 'Xác minh danh tính'}</Text>
                 <Text style={{ fontSize: 14, color: '#666', textAlign: 'center', marginTop: 4, paddingHorizontal: 20, lineHeight: 20 }}>
                     {kycStatus === 'PENDING'
                         ? 'Hồ sơ KYC của bạn đang được xét duyệt. Vui lòng đợi kết quả!'
@@ -417,7 +419,6 @@ function PostScreenContent() {
         );
     }
 
-    // Success Screen
     if (step === 3) {
         return (
             <View style={styles.successScreen}>
@@ -451,37 +452,25 @@ function PostScreenContent() {
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
                 <View style={styles.formContent}>
-                    {/* Step 0: Basic Info */}
+
+                    {/* ===== STEP 0: Cơ bản ===== */}
                     {step === 0 && (
                         <>
                             <FormField label="Tiêu đề tin đăng *" required>
                                 <TextInput style={styles.input} placeholder="VD: Căn hộ 2PN view đẹp, full nội thất..." value={form.title} onChangeText={v => updateForm('title', v)} />
                             </FormField>
 
-                            {/* ====== DROPDOWN TỈNH/HUYỆN/XÃ ====== */}
-                            <DropdownPicker
-                                label="Tỉnh/Thành phố *"
-                                options={Object.keys(PROVINCES)}
-                                value={form.province}
+                            <DropdownPicker label="Tỉnh/Thành phố *" options={Object.keys(PROVINCES)} value={form.province}
                                 onChange={v => { updateForm('province', v); updateForm('district', ''); updateForm('ward', ''); }}
-                                placeholder="Chọn tỉnh/thành phố"
-                            />
+                                placeholder="Chọn tỉnh/thành phố" />
 
-                            <DropdownPicker
-                                label="Quận/Huyện *"
-                                options={districtOptions}
-                                value={form.district}
+                            <DropdownPicker label="Quận/Huyện *" options={districtOptions} value={form.district}
                                 onChange={v => { updateForm('district', v); updateForm('ward', ''); }}
-                                placeholder={form.province ? 'Chọn quận/huyện' : 'Chọn tỉnh trước'}
-                            />
+                                placeholder={form.province ? 'Chọn quận/huyện' : 'Chọn tỉnh trước'} />
 
-                            <DropdownPicker
-                                label="Phường/Xã"
-                                options={wardOptions}
-                                value={form.ward}
+                            <DropdownPicker label="Phường/Xã" options={wardOptions} value={form.ward}
                                 onChange={v => updateForm('ward', v)}
-                                placeholder={form.district ? 'Chọn phường/xã' : 'Chọn quận trước'}
-                            />
+                                placeholder={form.district ? 'Chọn phường/xã' : 'Chọn quận trước'} />
 
                             <FormField label="Địa chỉ chi tiết">
                                 <TextInput style={styles.input} placeholder="Số nhà, tên đường..." value={form.addressDetail} onChangeText={v => updateForm('addressDetail', v)} />
@@ -491,7 +480,6 @@ function PostScreenContent() {
                                 <TextInput style={styles.input} placeholder="VD: 5000000" value={form.price} onChangeText={v => updateForm('price', v)} keyboardType="numeric" />
                             </FormField>
 
-
                             <FormField label="Diện tích (m²) *">
                                 <TextInput style={styles.input} placeholder="VD: 30" value={form.area} onChangeText={v => updateForm('area', v)} keyboardType="numeric" />
                             </FormField>
@@ -499,11 +487,9 @@ function PostScreenContent() {
                             <FormField label="Loại BĐS">
                                 <View style={styles.toggleRow}>
                                     {[{ val: 'ROOM', label: 'Phòng trọ' }, { val: 'APARTMENT', label: 'Căn hộ' }, { val: 'HOUSE', label: 'Nhà' }].map(opt => (
-                                        <TouchableOpacity
-                                            key={opt.val}
+                                        <TouchableOpacity key={opt.val}
                                             style={[styles.toggleBtn, form.propertyType === opt.val && styles.toggleBtnActive]}
-                                            onPress={() => updateForm('propertyType', opt.val)}
-                                        >
+                                            onPress={() => updateForm('propertyType', opt.val)}>
                                             <Text style={[styles.toggleText, form.propertyType === opt.val && styles.toggleTextActive]}>{opt.label}</Text>
                                         </TouchableOpacity>
                                     ))}
@@ -520,7 +506,7 @@ function PostScreenContent() {
                         </>
                     )}
 
-                    {/* Step 1: Details */}
+                    {/* ===== STEP 1: Chi tiết ===== */}
                     {step === 1 && (
                         <>
                             <View style={styles.row2}>
@@ -550,13 +536,27 @@ function PostScreenContent() {
                                 />
                             </FormField>
 
+                            {/* ✅ Tiện ích từ API */}
                             <FormField label="Tiện ích">
-                                <ChipSelector options={AMENITY_OPTIONS} selected={form.amenities} onToggle={toggleAmenity} />
+                                {amenityLoading ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+                                        <ActivityIndicator size="small" color="#0066FF" />
+                                        <Text style={{ color: '#999', fontSize: 13 }}>Đang tải tiện ích...</Text>
+                                    </View>
+                                ) : amenityList.length === 0 ? (
+                                    <Text style={{ color: '#999', fontSize: 13, paddingVertical: 8 }}>Không có tiện ích nào.</Text>
+                                ) : (
+                                    <ChipSelector
+                                        options={amenityList.map(a => a.name)}
+                                        selected={form.amenities}
+                                        onToggle={toggleAmenity}
+                                    />
+                                )}
                             </FormField>
                         </>
                     )}
 
-                    {/* Step 2: Images & Video */}
+                    {/* ===== STEP 2: Ảnh & Video ===== */}
                     {step === 2 && (
                         <>
                             <View style={styles.imagePickerSection}>
@@ -573,9 +573,7 @@ function PostScreenContent() {
                                 </View>
                             </View>
 
-                            {videoUri && (
-                                <VideoPreviewPlayer key={videoUri} uri={videoUri} onRemove={() => setVideoUri(null)} />
-                            )}
+                            {videoUri && <VideoPreviewPlayer key={videoUri} uri={videoUri} onRemove={() => setVideoUri(null)} />}
 
                             {images.length === 0 ? (
                                 <View style={styles.imagePlaceholder}>
@@ -588,11 +586,7 @@ function PostScreenContent() {
                                     {images.map((uri, index) => (
                                         <View key={index} style={styles.imageWrapper}>
                                             <Image source={{ uri }} style={styles.imageThumb} contentFit="cover" />
-                                            {index === 0 && (
-                                                <View style={styles.mainBadge}>
-                                                    <Text style={styles.mainBadgeText}>Ảnh bìa</Text>
-                                                </View>
-                                            )}
+                                            {index === 0 && <View style={styles.mainBadge}><Text style={styles.mainBadgeText}>Ảnh bìa</Text></View>}
                                             <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeImage(index)}>
                                                 <Ionicons name="close-circle" size={22} color="white" />
                                             </TouchableOpacity>
@@ -626,9 +620,7 @@ function PostScreenContent() {
                 ) : (
                     <TouchableOpacity
                         style={[styles.nextBtn, isSubmitting && styles.nextBtnDisabled]}
-                        onPress={handleSubmit}
-                        disabled={isSubmitting}
-                    >
+                        onPress={handleSubmit} disabled={isSubmitting}>
                         {isSubmitting ? (
                             <View style={{ alignItems: 'center' }}>
                                 <ActivityIndicator color="white" />
@@ -676,7 +668,7 @@ const styles = StyleSheet.create({
     authTitle: { fontSize: 20, fontWeight: '700', color: '#1A1A1A', textAlign: 'center' },
     loginBtn: { backgroundColor: '#0066FF', borderRadius: 12, paddingHorizontal: 36, paddingVertical: 14 },
     loginBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
     headerTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A' },
     stepIndicator: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
     stepItem: { alignItems: 'center', gap: 4 },
@@ -708,7 +700,6 @@ const styles = StyleSheet.create({
     stepper: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: 'white', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12 },
     stepperBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
     stepperValue: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', minWidth: 30, textAlign: 'center' },
-    // Dropdown
     dropdownBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13 },
     dropdownValue: { fontSize: 15, color: '#1A1A1A' },
     dropdownPlaceholder: { fontSize: 15, color: '#BBB' },
@@ -717,7 +708,6 @@ const styles = StyleSheet.create({
     dropdownItemSelected: { backgroundColor: '#E8F0FF' },
     dropdownItemText: { fontSize: 14, color: '#333' },
     dropdownItemTextSelected: { color: '#0066FF', fontWeight: '600' },
-    // Images
     imagePickerSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
     imageCount: { fontSize: 15, fontWeight: '600', color: '#333' },
     addImageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },

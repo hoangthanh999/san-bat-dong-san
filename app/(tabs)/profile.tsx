@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    FlatList, RefreshControl, StatusBar, Platform, Alert, Switch,
+    FlatList, RefreshControl, StatusBar, Platform, Alert, Switch, ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,10 +10,12 @@ import { useAuthStore } from '../../store/authStore';
 import { useUserStore } from '../../store/userStore';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { useNotificationStore } from '../../store/notificationStore';
+import { useInteractionStore } from '../../store/interactionStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 import { Room, Appointment } from '../../types';
+import { InteractionPropertyDTO } from '../../services/api/interaction';
 
 function MiniRoomCard({ room, onPress }: { room: Room; onPress: () => void }) {
     const formatPrice = (p: number) => `${(p / 1000000).toFixed(0)} tr/th`;
@@ -29,6 +31,58 @@ function MiniRoomCard({ room, onPress }: { room: Room; onPress: () => void }) {
                     </Text>
                 </View>
             </View>
+        </TouchableOpacity>
+    );
+}
+
+function SavedPropertyCard({
+    item,
+    onPress,
+    onUnsave,
+}: {
+    item: InteractionPropertyDTO;
+    onPress: () => void;
+    onUnsave: () => void;
+}) {
+    const formatPrice = (p: number) => {
+        if (p >= 1_000_000_000) return `${(p / 1_000_000_000).toFixed(1)} tỷ`;
+        return `${(p / 1_000_000).toFixed(0)} tr`;
+    };
+    return (
+        <TouchableOpacity style={styles.savedCard} onPress={onPress} activeOpacity={0.85}>
+            <Image
+                source={{ uri: item.imageUrl || 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400' }}
+                style={styles.savedCardImg}
+                contentFit="cover"
+            />
+            <View style={styles.savedCardBody}>
+                <Text numberOfLines={2} style={styles.savedCardTitle}>{item.title}</Text>
+                <Text style={styles.savedCardPrice}>{formatPrice(item.price)}</Text>
+                <Text style={styles.savedCardAddr} numberOfLines={1}>
+                    <Ionicons name="location-outline" size={11} color="#888" /> {item.district || item.address}
+                </Text>
+                <View style={styles.savedCardBadgeRow}>
+                    {item.propertyType && (
+                        <View style={styles.typeBadge}>
+                            <Text style={styles.typeBadgeText}>{item.propertyType}</Text>
+                        </View>
+                    )}
+                    {item.transactionType && (
+                        <View style={[styles.typeBadge, { backgroundColor: item.transactionType === 'FOR_SALE' ? '#FFF3E0' : '#E8F5E9' }]}>
+                            <Text style={[styles.typeBadgeText, { color: item.transactionType === 'FOR_SALE' ? '#E65100' : '#2E7D32' }]}>
+                                {item.transactionType === 'FOR_SALE' ? 'Mua bán' : 'Cho thuê'}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            </View>
+            <TouchableOpacity
+                style={styles.unsaveBtn}
+                onPress={onUnsave}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+                <Ionicons name="bookmark" size={20} color="#FFB800" />
+            </TouchableOpacity>
         </TouchableOpacity>
     );
 }
@@ -76,7 +130,12 @@ function ProfileScreenContent() {
         initializePushNotifications: enablePush,
         disableNotifications: disablePush,
     } = useNotificationStore();
-    const [activeTab, setActiveTab] = useState<'myrooms' | 'appointments'>('myrooms');
+    const {
+        savedProperties, isLoadingSaved, savedHasMore,
+        fetchSavedProperties, loadMoreSaved, toggleSave,
+    } = useInteractionStore();
+
+    const [activeTab, setActiveTab] = useState<'myrooms' | 'appointments' | 'saved'>('myrooms');
     const [refreshing, setRefreshing] = useState(false);
     const [togglingNotif, setTogglingNotif] = useState(false);
 
@@ -85,12 +144,18 @@ function ProfileScreenContent() {
             fetchProfile();
             fetchMyRooms(true);
             fetchAppointments(true);
+            fetchSavedProperties(true);
         }
     }, [isAuthenticated]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([fetchProfile(), fetchMyRooms(true), fetchAppointments(true)]);
+        await Promise.all([
+            fetchProfile(),
+            fetchMyRooms(true),
+            fetchAppointments(true),
+            fetchSavedProperties(true),
+        ]);
         setRefreshing(false);
     };
 
@@ -206,6 +271,7 @@ function ProfileScreenContent() {
             <View style={styles.tabBar}>
                 {[
                     { key: 'myrooms', label: 'Tin của tôi', icon: 'home-outline' },
+                    { key: 'saved', label: 'Đã lưu', icon: 'bookmark-outline' },
                     { key: 'appointments', label: 'Lịch hẹn', icon: 'calendar-outline' },
                 ].map(({ key, label, icon }) => (
                     <TouchableOpacity
@@ -244,6 +310,63 @@ function ProfileScreenContent() {
                 )}
 
 
+                {/* Tab: BĐS đã lưu */}
+                {activeTab === 'saved' && (
+                    <View style={{ minHeight: 200 }}>
+                        {isLoadingSaved && savedProperties.length === 0 ? (
+                            <View style={{ gap: 12, padding: 16 }}>
+                                {[1, 2, 3].map(i => <Skeleton key={i} width="100%" height={110} borderRadius={12} />)}
+                            </View>
+                        ) : savedProperties.length === 0 ? (
+                            <View style={styles.emptyState}>
+                                <Ionicons name="bookmark-outline" size={48} color="#CCC" />
+                                <Text style={styles.emptyTitle}>Chưa có BĐS nào được lưu</Text>
+                                <Text style={styles.emptySub}>Nhấn biểu tượng bookmark trên tin đăng để lưu lại</Text>
+                                <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/(tabs)' as any)}>
+                                    <Text style={styles.ctaBtnText}>Khám phá BĐS</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View style={styles.cardList}>
+                                {savedProperties.map(item => (
+                                    <SavedPropertyCard
+                                        key={item.id}
+                                        item={item}
+                                        onPress={() => router.push(`/property/${item.id}` as any)}
+                                        onUnsave={() => {
+                                            Alert.alert(
+                                                'Bỏ lưu BĐS',
+                                                `Bỏ lưu "${item.title}"?`,
+                                                [
+                                                    { text: 'Huỷ', style: 'cancel' },
+                                                    {
+                                                        text: 'Bỏ lưu',
+                                                        style: 'destructive',
+                                                        onPress: () => toggleSave(item.id),
+                                                    },
+                                                ]
+                                            );
+                                        }}
+                                    />
+                                ))}
+                                {savedHasMore && (
+                                    <TouchableOpacity
+                                        style={styles.loadMoreBtn}
+                                        onPress={loadMoreSaved}
+                                        disabled={isLoadingSaved}
+                                    >
+                                        {isLoadingSaved
+                                            ? <ActivityIndicator size="small" color="#0066FF" />
+                                            : <Text style={styles.loadMoreText}>Tải thêm</Text>
+                                        }
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {/* Tab: Lịch hẹn */}
                 {activeTab === 'appointments' && (
                     <View>
                         {/* Development Banner */}
@@ -424,4 +547,25 @@ const styles = StyleSheet.create({
         marginHorizontal: 16, marginTop: 12, borderRadius: 8,
     },
     devBannerText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 17 },
+    // Saved Property Card
+    savedCard: {
+        flexDirection: 'row', backgroundColor: 'white', borderRadius: 14,
+        overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08, shadowRadius: 6, elevation: 3, alignItems: 'center',
+    },
+    savedCardImg: { width: 100, height: 100 },
+    savedCardBody: { flex: 1, paddingVertical: 10, paddingHorizontal: 10, gap: 3 },
+    savedCardTitle: { fontSize: 13, fontWeight: '600', color: '#1A1A1A', lineHeight: 18 },
+    savedCardPrice: { fontSize: 14, fontWeight: '800', color: '#0066FF' },
+    savedCardAddr: { fontSize: 11, color: '#888', marginTop: 1 },
+    savedCardBadgeRow: { flexDirection: 'row', gap: 4, marginTop: 2, flexWrap: 'wrap' },
+    typeBadge: { backgroundColor: '#F0F4FF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+    typeBadgeText: { fontSize: 10, fontWeight: '600', color: '#0066FF' },
+    unsaveBtn: { padding: 12 },
+    // Load more
+    loadMoreBtn: {
+        alignItems: 'center', paddingVertical: 14, borderRadius: 12,
+        backgroundColor: '#F0F4FF', marginTop: 4,
+    },
+    loadMoreText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
 });
