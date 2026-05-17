@@ -419,6 +419,7 @@ function ProfileScreenContent() {
                 <Text style={styles.settingsGroupLabel}>Tài khoản</Text>
                 {[
                     { icon: 'person-outline', label: 'Thông tin cá nhân', onPress: () => router.push('/edit-profile' as any) },
+                    { icon: 'heart-outline', label: 'Sở thích của tôi', onPress: () => router.push('/profile/lifestyle' as any) },
                     { icon: 'card-outline', label: 'Xác minh danh tính (KYC)', onPress: () => router.push('/kyc' as any) },
                     { icon: 'wallet-outline', label: 'Ví điện tử', onPress: () => router.push('/wallet' as any) },
                 ].map(({ icon, label, onPress }) => (
