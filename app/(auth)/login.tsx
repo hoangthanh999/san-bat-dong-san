@@ -92,14 +92,7 @@ export default function LoginScreen() {
                         <View style={styles.line} />
                     </View>
 
-                    <View style={styles.socialButtons}>
-                        <TouchableOpacity style={styles.socialBtn}>
-                            <Ionicons name="logo-google" size={24} color="#DB4437" />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.socialBtn}>
-                            <Ionicons name="logo-facebook" size={24} color="#4267B2" />
-                        </TouchableOpacity>
-                    </View>
+                    <GoogleLoginButton />
 
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>Chưa có tài khoản? </Text>
@@ -112,6 +105,73 @@ export default function LoginScreen() {
                 </View>
             </View>
         </KeyboardAvoidingView>
+    );
+}
+
+// ============================================================
+// Google Login Button — dùng expo-web-browser + deep link
+// ============================================================
+function GoogleLoginButton() {
+    const router = useRouter();
+    const { loginWithGoogle } = useAuthStore();
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+    const handleGoogleLogin = async () => {
+        setIsGoogleLoading(true);
+        try {
+            const WebBrowser = require('expo-web-browser');
+            const { Alert } = require('react-native');
+
+            // URL backend Google OAuth2 (qua nginx gateway)
+            const BACKEND_OAUTH_URL = 'http://10.184.58.46:8080/oauth2/authorization/google';
+
+            // Mở in-app browser để đăng nhập Google
+            // Deep link: homeswipe://login-success?token=xxx (cần cấu hình trong app.json)
+            const result = await WebBrowser.openAuthSessionAsync(
+                BACKEND_OAUTH_URL,
+                'homeswipe://login-success'
+            );
+
+            if (result.type === 'success' && result.url) {
+                // Parse token từ callback URL
+                const url = result.url;
+                const tokenMatch = url.match(/[?&]token=([^&]+)/);
+                if (tokenMatch && tokenMatch[1]) {
+                    const token = decodeURIComponent(tokenMatch[1]);
+                    await loginWithGoogle(token);
+                    router.replace('/(tabs)');
+                } else {
+                    Alert.alert('Lỗi', 'Không nhận được token từ Google. Vui lòng thử lại.');
+                }
+            }
+            // Nếu type === 'cancel' → user đóng browser, không làm gì
+        } catch (error: any) {
+            const { Alert } = require('react-native');
+            Alert.alert(
+                'Đăng nhập Google thất bại',
+                error?.message || 'Không thể kết nối đến Google. Vui lòng thử lại.',
+            );
+        } finally {
+            setIsGoogleLoading(false);
+        }
+    };
+
+    return (
+        <TouchableOpacity
+            style={styles.googleBtn}
+            onPress={handleGoogleLogin}
+            disabled={isGoogleLoading}
+            activeOpacity={0.8}
+        >
+            <View style={styles.googleBtnInner}>
+                <View style={styles.googleIconBox}>
+                    <Ionicons name="logo-google" size={20} color="#DB4437" />
+                </View>
+                <Text style={styles.googleBtnText}>
+                    {isGoogleLoading ? 'Đang kết nối...' : 'Tiếp tục với Google'}
+                </Text>
+            </View>
+        </TouchableOpacity>
     );
 }
 
@@ -168,7 +228,7 @@ const styles = StyleSheet.create({
     divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: 16,
     },
     line: {
         flex: 1,
@@ -179,20 +239,38 @@ const styles = StyleSheet.create({
         marginHorizontal: 16,
         color: '#999',
     },
-    socialButtons: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 16,
-        marginBottom: 32,
-    },
-    socialBtn: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        borderWidth: 1,
+    googleBtn: {
+        borderWidth: 1.5,
         borderColor: '#E0E0E0',
+        borderRadius: 12,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        marginBottom: 24,
+        backgroundColor: 'white',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    googleBtnInner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+    },
+    googleIconBox: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#FFF0EE',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    googleBtnText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#333',
     },
     footer: {
         flexDirection: 'row',

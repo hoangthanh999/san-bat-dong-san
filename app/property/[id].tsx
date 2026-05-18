@@ -153,7 +153,6 @@ export default function PropertyDetailScreen() {
     const [bookingNote, setBookingNote] = useState('');
     const [userDistance, setUserDistance] = useState<string | null>(null);
     const [descExpanded, setDescExpanded] = useState(false);
-    const [isTogglingStatus, setIsTogglingStatus] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
     const roomId = Number(id);
@@ -326,32 +325,6 @@ export default function PropertyDetailScreen() {
         if (price >= 1_000_000_000) return `${(price / 1_000_000_000).toFixed(1)} tỷ`;
         if (price >= 1_000_000) return `${(price / 1_000_000).toFixed(0)} triệu`;
         return `${price.toLocaleString('vi-VN')}đ`;
-    };
-
-    const handleToggleStatus = async () => {
-        if (!room) return;
-        const newStatus = room.status === 'ACTIVE' ? 'HIDDEN' : 'ACTIVE';
-        const label = newStatus === 'ACTIVE' ? 'hiện' : 'ẩn';
-        Alert.alert(
-            `${newStatus === 'ACTIVE' ? 'Hiện' : 'Ẩn'} tin đăng`,
-            `Bạn có chắc muốn ${label} tin "${room.title}"?`,
-            [
-                { text: 'Huỷ', style: 'cancel' },
-                {
-                    text: `${newStatus === 'ACTIVE' ? 'Hiện' : 'Ẩn'} tin`,
-                    onPress: async () => {
-                        setIsTogglingStatus(true);
-                        try {
-                            await roomService.updatePropertyStatus(room.id, newStatus);
-                            fetchRoomDetail(room.id);
-                            Alert.alert('Thành công', `Tin đã được ${label}`);
-                        } catch (e: any) {
-                            Alert.alert('Lỗi', e.message || `Không thể ${label} tin`);
-                        } finally { setIsTogglingStatus(false); }
-                    },
-                },
-            ]
-        );
     };
 
     const handleDeleteProperty = () => {
@@ -668,22 +641,6 @@ export default function PropertyDetailScreen() {
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>⚙️ Quản lý tin đăng</Text>
                                     <View style={{ gap: 10 }}>
-                                        <TouchableOpacity
-                                            style={[styles.ownerActionBtn, { backgroundColor: room.status === 'ACTIVE' ? '#FFF3E0' : '#E8F5E9' }]}
-                                            onPress={handleToggleStatus} disabled={isTogglingStatus}
-                                        >
-                                            {isTogglingStatus ? <ActivityIndicator size="small" color="#999" /> : (
-                                                <>
-                                                    <Ionicons
-                                                        name={room.status === 'ACTIVE' ? 'eye-off-outline' : 'eye-outline'}
-                                                        size={20} color={room.status === 'ACTIVE' ? '#E65100' : '#2E7D32'}
-                                                    />
-                                                    <Text style={[styles.ownerActionText, { color: room.status === 'ACTIVE' ? '#E65100' : '#2E7D32' }]}>
-                                                        {room.status === 'ACTIVE' ? 'Ẩn tin đăng' : 'Hiện tin đăng'}
-                                                    </Text>
-                                                </>
-                                            )}
-                                        </TouchableOpacity>
                                         <TouchableOpacity
                                             style={[styles.ownerActionBtn, { backgroundColor: '#FFEBEE' }]}
                                             onPress={handleDeleteProperty} disabled={isDeleting}

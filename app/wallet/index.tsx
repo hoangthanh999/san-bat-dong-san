@@ -101,8 +101,7 @@ function WalletContent() {
     // ✅ Định nghĩa TRƯỚC return, KHÔNG đặt JSX ngoài map
     const QUICK_ACTIONS = [
         { icon: 'add-circle', label: 'Nạp tiền', path: '/wallet/deposit', color: '#0066FF' },
-        { icon: 'history', label: 'Lịch sử', path: '/wallet/history', color: '#b14ca2ff' }, // Thay đổi biểu tượng ở đây
-        { icon: 'transaction', label: 'Giao dịch', path: '/wallet/transactions', color: '#22C55E' },
+        { icon: 'history', label: 'Lịch sử', path: '/wallet/history', color: '#22C55E' },
         { icon: 'star', label: 'Gói dịch vụ', path: '/packages', color: '#FF9500' },
         { icon: 'rocket', label: 'Boost tin', path: '/packages', color: '#8B5CF6' },
     ];

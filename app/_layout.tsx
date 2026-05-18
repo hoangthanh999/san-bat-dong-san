@@ -113,6 +113,10 @@ export default function RootLayout() {
                     <Stack.Screen name="wallet/success" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="wallet/failed" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="wallet/history" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    <Stack.Screen name="wallet/withdraw" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    <Stack.Screen name="liked-properties" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    <Stack.Screen name="property/trash" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    <Stack.Screen name="bills/create" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     {/* Appointment screens */}
                     <Stack.Screen name="appointments/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="appointments/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />

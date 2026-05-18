@@ -16,8 +16,14 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 import { Room, Appointment } from '../../types';
 import { InteractionPropertyDTO } from '../../services/api/interaction';
+import { roomService } from '../../services/api/rooms';
 
-function MiniRoomCard({ room, onPress }: { room: Room; onPress: () => void }) {
+function MiniRoomCard({ room, onPress, onEdit, onDelete }: {
+    room: Room;
+    onPress: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+}) {
     const formatPrice = (p: number) => `${(p / 1000000).toFixed(0)} tr/th`;
     return (
         <TouchableOpacity style={styles.miniCard} onPress={onPress} activeOpacity={0.8}>
@@ -29,6 +35,17 @@ function MiniRoomCard({ room, onPress }: { room: Room; onPress: () => void }) {
                     <Text style={[styles.statusText, room.status === 'ACTIVE' ? styles.statusActiveText : styles.statusPendingText]}>
                         {room.status === 'ACTIVE' ? 'Đang đăng' : room.status === 'PENDING' ? 'Chờ duyệt' : room.status}
                     </Text>
+                </View>
+                {/* Action buttons */}
+                <View style={styles.miniCardActions}>
+                    <TouchableOpacity style={styles.editBtn} onPress={onEdit} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                        <Ionicons name="create-outline" size={14} color="#0066FF" />
+                        <Text style={styles.editBtnText}>Sửa</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                        <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                        <Text style={styles.deleteBtnText}>Xóa</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </TouchableOpacity>
@@ -164,6 +181,29 @@ function ProfileScreenContent() {
             { text: 'Huỷ', style: 'cancel' },
             { text: 'Đăng xuất', style: 'destructive', onPress: logout },
         ]);
+    };
+
+    const handleDeleteRoom = (room: Room) => {
+        Alert.alert(
+            'Xóa tin đăng',
+            `Bạn có chắc muốn xóa "${room.title}"? Tin sẽ được chuyển vào thùng rác.`,
+            [
+                { text: 'Huỷ', style: 'cancel' },
+                {
+                    text: 'Xóa',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await roomService.deleteRoom(room.id);
+                            Alert.alert('Đã xóa', 'Tin đăng đã được chuyển vào thùng rác.');
+                            fetchMyRooms(true);
+                        } catch (err: any) {
+                            Alert.alert('Lỗi', err?.message || 'Không thể xóa tin đăng');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handleToggleNotifications = async (value: boolean) => {
@@ -303,7 +343,13 @@ function ProfileScreenContent() {
                     ) : (
                         <View style={styles.cardList}>
                             {myRooms.map(room => (
-                                <MiniRoomCard key={room.id} room={room} onPress={() => router.push(`/property/${room.id}` as any)} />
+                                <MiniRoomCard
+                                    key={room.id}
+                                    room={room}
+                                    onPress={() => router.push(`/property/${room.id}` as any)}
+                                    onEdit={() => router.push(`/property/edit/${room.id}` as any)}
+                                    onDelete={() => handleDeleteRoom(room)}
+                                />
                             ))}
                         </View>
                     )
@@ -420,6 +466,7 @@ function ProfileScreenContent() {
                 {[
                     { icon: 'person-outline', label: 'Thông tin cá nhân', onPress: () => router.push('/edit-profile' as any) },
                     { icon: 'heart-outline', label: 'Sở thích của tôi', onPress: () => router.push('/profile/lifestyle' as any) },
+                    { icon: 'heart-circle-outline', label: 'BĐS đã Like', onPress: () => router.push('/liked-properties' as any) },
                     { icon: 'card-outline', label: 'Xác minh danh tính (KYC)', onPress: () => router.push('/kyc' as any) },
                     { icon: 'wallet-outline', label: 'Ví điện tử', onPress: () => router.push('/wallet' as any) },
                 ].map(({ icon, label, onPress }) => (
@@ -435,6 +482,10 @@ function ProfileScreenContent() {
                 {[
                     { icon: 'calendar-outline', label: 'Lịch hẹn xem phòng', onPress: () => router.push('/appointments' as any) },
                     { icon: 'document-text-outline', label: 'Hợp đồng của tôi', onPress: () => router.push('/contracts' as any) },
+                    ...(user?.role === 'OWNER' || user?.role === 'ADMIN' ? [
+                        { icon: 'trash-outline', label: 'Thùng rác bài đăng', onPress: () => router.push('/property/trash' as any) },
+                        { icon: 'receipt-outline', label: 'Tạo hóa đơn tiền trọ', onPress: () => router.push('/bills/create' as any) },
+                    ] : []),
                     { icon: 'star-outline', label: 'Gói dịch vụ & Boost tin', onPress: () => router.push('/packages' as any) },
                     { icon: 'flame-outline', label: '📦 Trạng thái Boost', onPress: () => router.push('/packages/status' as any) },
                     { icon: 'bar-chart-outline', label: '📊 Thống kê thị trường', onPress: () => router.push('/analytics' as any) },
@@ -520,6 +571,11 @@ const styles = StyleSheet.create({
     statusText: { fontSize: 11, fontWeight: '600' },
     statusActiveText: { color: '#2E7D32' },
     statusPendingText: { color: '#E65100' },
+    miniCardActions: { flexDirection: 'row', gap: 8, marginTop: 6 },
+    editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8F0FF', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+    editBtnText: { fontSize: 12, color: '#0066FF', fontWeight: '600' },
+    deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF0F0', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+    deleteBtnText: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
     emptyState: { alignItems: 'center', paddingVertical: 40, gap: 8 },
     emptyTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
     emptySub: { fontSize: 13, color: '#999', textAlign: 'center', paddingHorizontal: 40 },

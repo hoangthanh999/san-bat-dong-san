@@ -32,6 +32,13 @@ export default function LandlordProfileScreen() {
             if (slug) {
                 const p = await userService.getPublicProfile(slug);
                 setProfile(p);
+            } else if (landlordId) {
+                const summary = await userService.getUserSummary(Number(landlordId));
+                setProfile({
+                    id: String(summary.id),
+                    fullName: summary.fullName,
+                    avatarUrl: summary.avatarUrl,
+                });
             }
             // Load landlord's properties
             if (landlordId) {
