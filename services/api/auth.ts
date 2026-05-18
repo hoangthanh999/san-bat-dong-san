@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from '../../constants';
 import { AuthResponse, LoginRequest, RegisterRequest, User } from '../../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../../constants';
+import { jwtDecode } from 'jwt-decode';
 
 export const authService = {
     // Register - trả về UserResponseDTO (đã unwrap result)
@@ -81,6 +82,53 @@ export const authService = {
     resetPassword: async (token: string, newPassword: string): Promise<string> => {
         const response = await apiClient.post(API_ENDPOINTS.RESET_PASSWORD, { token, newPassword });
         return response.data; // unwrapped string
+    },
+
+    // Google OAuth2 — lưu token nhận từ deep link callback sau khi Google Login
+    googleLoginWithToken: async (jwtToken: string): Promise<AuthResponse> => {
+        try {
+            // Decode JWT để lấy userId, role
+            const decoded: any = jwtDecode(jwtToken);
+            const userId = decoded.userId || decoded.sub || '';
+            const role = decoded.role || 'USER';
+
+            // Gọi backend để lấy thông tin user đầy đủ
+            await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, jwtToken);
+
+            // Lấy user info từ customer-service
+            let fullName = decoded.fullName || decoded.name || '';
+            let email = decoded.email || decoded.sub || '';
+
+            try {
+                const profileRes = await apiClient.get('/customers/profile');
+                const profile = profileRes.data;
+                fullName = profile.fullName || fullName;
+                email = profile.email || email;
+            } catch {
+                console.warn('[Auth] Could not fetch profile after Google login');
+            }
+
+            const authData: AuthResponse = {
+                token: jwtToken,
+                id: userId,
+                email,
+                fullName,
+                role,
+            };
+
+            const user: User = {
+                id: authData.id,
+                email: authData.email,
+                fullName: authData.fullName,
+                role: authData.role as User['role'],
+            };
+            await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+
+            return authData;
+        } catch (error) {
+            console.error('[Auth] googleLoginWithToken error:', error);
+            throw error;
+        }
     },
 
     // Change Password (yêu cầu JWT)

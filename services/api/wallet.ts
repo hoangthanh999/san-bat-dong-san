@@ -1,7 +1,8 @@
 import apiClient from './client';
-import paymentClient from './paymentClient';
-import { API_ENDPOINTS } from '../../constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_ENDPOINTS, STORAGE_KEYS } from '../../constants';
 import { VNPayPaymentResponse, Transaction, WalletInfo, PaginatedResponse } from '../../types';
+import paymentClient from './paymentClient';
 
 // ─── Withdraw Request DTO (khớp backend ReleaseRequest) ──────
 export interface WithdrawRequest {
@@ -18,6 +19,27 @@ export interface WithdrawResponse {
     message: string;
     amount: number;
     createdAt?: string;
+}
+
+interface ReleaseRequest {
+    userId: number;
+    amount: number;
+    referenceId: string;
+}
+
+async function getStoredUserId(): Promise<number> {
+    const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+    if (!userData) {
+        throw new Error('Chưa đăng nhập. Vui lòng đăng nhập lại.');
+    }
+
+    const user = JSON.parse(userData);
+    const userId = user.id ?? user.userId;
+    if (!userId) {
+        throw new Error('Không tìm thấy userId. Vui lòng đăng nhập lại.');
+    }
+
+    return Number(userId);
 }
 
 /**
@@ -38,37 +60,61 @@ export const walletService = {
 
     /**
      * Tạo payment URL VNPay để nạp tiền
-     * POST /api/payment/create (JWT)
+     * POST /api/payment/create-payment?amount=&userId= (JWT)
      */
     createPayment: async (amount: number): Promise<string> => {
-        const res = await apiClient.post<VNPayPaymentResponse>(
-            '/api/payment/create',
-            { amount }
+        const userId = await getStoredUserId();
+        const res = await paymentClient.post<VNPayPaymentResponse>(
+            API_ENDPOINTS.PAYMENT_CREATE,
+            null,
+            { params: { amount, userId } }
         );
-        return res.data.paymentUrl ?? res.data.result?.paymentUrl ?? '';
+        return res.data.url
+            ?? res.data.paymentUrl
+            ?? res.data.result?.url
+            ?? res.data.result?.paymentUrl
+            ?? '';
     },
 
     /**
-     * Rút tiền — gọi POST /api/wallets/withdraw
-     * Backend có thể map sang /release hoặc endpoint riêng
-     * Body: WithdrawRequest
+     * Rút tiền — backend hiện expose POST /api/wallets/release
+     * Body backend cần: { userId, amount, referenceId }
      */
     withdraw: async (payload: WithdrawRequest): Promise<WithdrawResponse> => {
-        const res = await apiClient.post<WithdrawResponse>(
-            '/api/wallets/withdraw',
-            payload
+        const userId = await getStoredUserId();
+        const releasePayload: ReleaseRequest = {
+            userId,
+            amount: payload.amount,
+            referenceId: [
+                payload.bankCode,
+                payload.bankAccountNumber,
+                payload.bankAccountName,
+                payload.note,
+            ].filter(Boolean).join(' | '),
+        };
+        const res = await apiClient.post<string | WithdrawResponse>(
+            API_ENDPOINTS.WALLET_RELEASE,
+            releasePayload
         );
-        // auto-unwrap nếu backend trả { result: ... }
-        return (res.data as any).result ?? res.data;
+        const data = (res.data as any).result ?? res.data;
+        if (typeof data === 'string') {
+            return {
+                status: 'SUCCESS',
+                message: data,
+                amount: payload.amount,
+            };
+        }
+        return data;
     },
 
     /**
      * Lấy lịch sử giao dịch
-     * GET /api/transactions/my-history/{userId}
+     * GET /api/wallets/transactions
      */
-    fetchTransactions: async (userId: number): Promise<Transaction[]> => {
-        const res = await paymentClient.get<PaginatedResponse<Transaction>>(
-            `/api/transactions/my-history/${userId}`
+    fetchTransactions: async (_userId?: number): Promise<Transaction[]> => {
+        const res = await apiClient.get<PaginatedResponse<Transaction>>(
+            API_ENDPOINTS.WALLET_TRANSACTIONS,
+            { params: { page: 0, size: 50 } }
         );
         return res.data.content ?? [];
     },

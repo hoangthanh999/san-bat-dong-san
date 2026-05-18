@@ -1,4 +1,4 @@
-import apiClient from './client';
+import paymentClient from './paymentClient';
 import { API_ENDPOINTS } from '../../constants';
 import { ServicePackage, PackageType } from '../../types';
 
@@ -31,7 +31,7 @@ export const packageService = {
      * JWT Token cung cấp userId tự động
      */
     purchaseMembership: async (packageId: number): Promise<void> => {
-        await apiClient.post(API_ENDPOINTS.PACKAGE_BUY_MEMBERSHIP, null, {
+        await paymentClient.post(API_ENDPOINTS.PACKAGE_BUY_MEMBERSHIP, null, {
             params: { packageId },
         });
     },
@@ -45,7 +45,7 @@ export const packageService = {
      * JWT Token cung cấp userId tự động
      */
     buyPromotion: async (packageId: number, propertyId: number): Promise<void> => {
-        await apiClient.post(API_ENDPOINTS.PACKAGE_BUY_PROMOTION, null, {
+        await paymentClient.post(API_ENDPOINTS.PACKAGE_BUY_PROMOTION, null, {
             params: { packageId, propertyId },
         });
     },

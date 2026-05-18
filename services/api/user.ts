@@ -2,6 +2,12 @@ import apiClient from './client';
 import { API_ENDPOINTS } from '../../constants';
 import { User, CustomerResponseDTO, CustomerProfileDTO, Room, Favorite, PaginatedResponse } from '../../types';
 
+export interface UserSummaryDTO {
+    id: number;
+    fullName: string;
+    avatarUrl?: string;
+}
+
 export const userService = {
     /**
      * Lấy profile từ customer-service
@@ -64,6 +70,15 @@ export const userService = {
      */
     getPublicProfile: async (slug: string) => {
         const response = await apiClient.get(API_ENDPOINTS.CUSTOMER_PUBLIC_PROFILE(slug));
+        return response.data;
+    },
+
+    /**
+     * Lấy thông tin gọn của user theo id
+     * GET /customers/{id}/summary
+     */
+    getUserSummary: async (id: number): Promise<UserSummaryDTO> => {
+        const response = await apiClient.get<UserSummaryDTO>(API_ENDPOINTS.CUSTOMER_SUMMARY(id));
         return response.data;
     },
 

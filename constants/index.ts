@@ -1,19 +1,19 @@
 // API Base URL - Gateway (nginx)
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.217.114.46:8080';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.184.58.46:8080';
 
 // Property Service - nginx đã route /properties, /public/properties, /admin/properties → 8086
 // Giữ lại cho trường hợp cần gọi trực tiếp (bypass nginx)
-export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'http://10.217.114.46:8086';
+export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'http://10.184.58.46:8086';
 
 // Payment Service - nginx chỉ route /api/payment/, các endpoint khác cần gọi trực tiếp
-export const PAYMENT_API_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_API_BASE_URL || 'http://10.217.114.46:8087';
+export const PAYMENT_API_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_API_BASE_URL || 'http://10.184.58.46:8087';
 
 // WebSocket Notification (STOMP/SockJS — notification-service)
 export const WS_URL = process.env.EXPO_PUBLIC_WS_URL
-    || 'http://10.217.114.46:8080/ws-notifier';
+    || 'http://10.184.58.46:8080/ws-notifier';
 
 export const WS_CHAT_URL = process.env.EXPO_PUBLIC_WS_CHAT_URL
-    || 'http://10.217.114.46:8080/ws-chat';
+    || 'http://10.184.58.46:8080/ws-chat';
 
 // Google Maps
 export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -96,6 +96,7 @@ export const API_ENDPOINTS = {
     // ============================================================
     CUSTOMER_PROFILE: '/customers/profile',                                    // GET / PUT
     CUSTOMER_PUBLIC_PROFILE: (slug: string) => `/customers/${slug}/public-profile`, // GET
+    CUSTOMER_SUMMARY: (id: number) => `/customers/${id}/summary`,                   // GET
     CUSTOMER_AVATAR: '/customers/avatar',                                      // POST multipart
     CUSTOMER_BANNER: '/customers/banner',                                      // POST multipart
     CUSTOMER_KYC_SCAN: '/customers/kyc/scan',                                  // POST multipart (field: image)
@@ -198,6 +199,7 @@ export const API_ENDPOINTS = {
     // ============================================================
     WALLET_ME: '/api/wallets/me',                                               // GET - JWT (lấy số dư ví)
     WALLET_TRANSACTIONS: '/api/wallets/transactions',                           // GET - JWT, params: page, size
+    WALLET_RELEASE: '/api/wallets/release',                                      // POST - body: ReleaseRequest
 
     // ============================================================
     // CHAT (chat-service qua nginx /api/chat)
