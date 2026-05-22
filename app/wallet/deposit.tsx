@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, StatusBar,
-    Platform, ScrollView, TextInput, Alert, ActivityIndicator,
+    ScrollView, TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
@@ -25,15 +25,24 @@ export default function DepositScreen() {
 function DepositContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { transactions, createPayment, isCreatingPayment } = useWalletStore();
 
-    // Tính balance từ transaction history (backend chưa có wallet balance API)
-    const balance = transactions.reduce((sum, tx) => {
-        if (tx.status !== 'SUCCESS') return sum;
-        const amt = Number(tx.amount) || 0;
-        if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amt;
-        return sum - amt;
-    }, 0);
+    // ✅ THAY ĐỔI 1: Lấy thêm wallet + fetchWallet
+    const { wallet, transactions, createPayment, isCreatingPayment, fetchWallet } = useWalletStore();
+
+    // ✅ THAY ĐỔI 2: Ưu tiên wallet.balance từ API, fallback tính từ transactions
+    const balance = wallet?.balance
+        ?? transactions.reduce((sum, tx) => {
+            if (tx.status !== 'SUCCESS') return sum;
+            const amt = Number(tx.amount) || 0;
+            if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amt;
+            return sum - amt;
+        }, 0);
+
+    // ✅ THAY ĐỔI 3: Fetch wallet khi mount (đảm bảo balance luôn mới nhất)
+    useEffect(() => {
+        fetchWallet();
+    }, []);
+
     const [selectedAmount, setSelectedAmount] = useState<number>(500000);
     const [customAmount, setCustomAmount] = useState('');
 
@@ -183,7 +192,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,
+        paddingHorizontal: 16, paddingTop: 0, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },
@@ -237,7 +246,7 @@ const styles = StyleSheet.create({
     paymentName: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
     paymentSub: { fontSize: 12, color: '#888', marginTop: 2 },
     footer: {
-        padding: 16, paddingBottom: 16, // overridden inline using insets.bottom
+        padding: 16, paddingBottom: 16,
         backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0',
     },
     continueBtn: {

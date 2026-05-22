@@ -4,30 +4,45 @@ import {
     TouchableOpacity, Text, StyleSheet, RefreshControl,
     useWindowDimensions, LayoutChangeEvent, ScrollView,
 } from 'react-native';
-import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { usePropertyStore } from '../../store/propertyStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useProjectStore } from '../../store/projectStore';
 import PropertyCard from '../../components/property/PropertyCard';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { Room, ProjectResponseDTO } from '../../types';
+import { useIsFocused } from '@react-navigation/native';
+import { AppState } from 'react-native';
+import { Room } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// ─── Category config ──────────────────────────────────────
+const CATEGORIES = [
+    { key: 'all', label: '✨ Tất cả', icon: null },
+    { key: 'FOR_RENT', label: '🔑 Cho thuê', icon: null },
+    { key: 'FOR_SALE', label: '🏷️ Bán', icon: null },
+    { key: 'APARTMENT', label: '🏢 Căn hộ', icon: null },
+    { key: 'HOUSE', label: '🏠 Nhà phố', icon: null },
+    { key: 'LAND', label: '🌿 Đất nền', icon: null },
+];
 
 export default function FeedScreen() {
     const router = useRouter();
-    const { rooms, fetchRooms, isLoading, loadMoreRooms, filters } = usePropertyStore();
+    const {
+        rooms, fetchRooms, isLoading, isLoadingMore,
+        loadMoreRooms, filters, error,
+    } = usePropertyStore();
     const { unreadCount } = useNotificationStore();
     const { projects, fetchProjects } = useProjectStore();
+
     const [activeId, setActiveId] = useState<number | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [activeCategory, setActiveCategory] = useState('all'); // ← NEW
     const flatListRef = useRef<FlatList>(null);
     const insets = useSafeAreaInsets();
-    const { height, width } = useWindowDimensions();
+    const { height } = useWindowDimensions();
+     const isFocused = useIsFocused();
 
-    // Dùng onLayout để đo chiều cao THỰC TẾ của container FlatList
-    // Cách này chính xác 100% trên mọi thiết bị (notch, punch-hole, home indicator...)
-    // Không cần tính thủ công tab bar / insets
     const [feedHeight, setFeedHeight] = useState(0);
     const onFeedLayout = useCallback((e: LayoutChangeEvent) => {
         const h = e.nativeEvent.layout.height;
@@ -35,16 +50,22 @@ export default function FeedScreen() {
     }, []);
     const CARD_HEIGHT = feedHeight > 0 ? feedHeight : height;
 
-    const viewabilityConfig = useRef({
-        itemVisiblePercentThreshold: 50,
-    }).current;
+    const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
     const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
         if (viewableItems.length > 0) {
-            const activeItem = viewableItems[0].item as Room;
-            setActiveId(activeItem.id);
+            setActiveId((viewableItems[0].item as Room).id);
         }
     }, []);
+    const [appActive, setAppActive] = useState(true);
+
+useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+        setAppActive(state === 'active');
+    });
+
+    return () => sub.remove();
+}, []);
 
     useEffect(() => {
         fetchRooms();
@@ -57,50 +78,45 @@ export default function FeedScreen() {
         setRefreshing(false);
     }, []);
 
-    // Filter + Sort rooms tại client (không cần search-service)
-    const sourceRooms = rooms.length > 0 ? rooms : MOCK_ROOMS;
+    const { searchResults } = usePropertyStore();
+    const sourceRooms = searchResults ?? rooms;
+
     const displayRooms = useMemo(() => {
         let result = [...sourceRooms];
 
-        // Lọc theo loại bất động sản
-        if (filters.propertyType) {
+        // ── Category filter ──────────────────────────────
+        if (activeCategory !== 'all') {
+            if (activeCategory === 'FOR_RENT' || activeCategory === 'FOR_SALE') {
+                result = result.filter(r => r.transactionType === activeCategory);
+            } else {
+                // propertyType: APARTMENT, HOUSE, LAND ...
+                result = result.filter(r => r.propertyType === activeCategory);
+            }
+        }
+
+        // ── Existing filters ─────────────────────────────
+        if (filters.propertyType)
             result = result.filter(r => r.propertyType === filters.propertyType);
-        }
-
-        // Lọc theo khoảng giá
-        if (filters.minPrice !== undefined) {
+        if (filters.minPrice !== undefined)
             result = result.filter(r => r.price >= filters.minPrice!);
-        }
-        if (filters.maxPrice !== undefined) {
+        if (filters.maxPrice !== undefined)
             result = result.filter(r => r.price <= filters.maxPrice!);
-        }
-
-        // Lọc theo diện tích
-        if (filters.minArea !== undefined) {
+        if (filters.minArea !== undefined)
             result = result.filter(r => r.area >= filters.minArea!);
-        }
-        if (filters.maxArea !== undefined) {
+        if (filters.maxArea !== undefined)
             result = result.filter(r => r.area <= filters.maxArea!);
-        }
-
-        // Lọc theo số phòng ngủ
-        if (filters.bedroomList && filters.bedroomList.length > 0) {
+        if (filters.bedroomList?.length)
             result = result.filter(r => r.bedrooms !== undefined && filters.bedroomList!.includes(r.bedrooms));
-        }
-
-        // Sắp xếp
-        if (filters.sortBy === 'price_asc') {
-            result.sort((a, b) => a.price - b.price);
-        } else if (filters.sortBy === 'price_desc') {
-            result.sort((a, b) => b.price - a.price);
-        } else if (filters.sortBy === 'newest') {
+        if (filters.sortBy === 'price_asc') result.sort((a, b) => a.price - b.price);
+        else if (filters.sortBy === 'price_desc') result.sort((a, b) => b.price - a.price);
+        else if (filters.sortBy === 'newest')
             result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        }
 
         return result;
-    }, [sourceRooms, filters]);
+    }, [sourceRooms, filters, activeCategory]); // ← thêm activeCategory
 
-    if (isLoading && rooms.length === 0) {
+    // ── Loading / Error / Empty states ───────────────────
+    if (isLoading && rooms.length === 0 && !error) {
         return (
             <View style={{ flex: 1, backgroundColor: 'black' }}>
                 <StatusBar barStyle="light-content" />
@@ -109,18 +125,118 @@ export default function FeedScreen() {
         );
     }
 
+    if (error && rooms.length === 0) {
+        return (
+            <View style={styles.errorContainer}>
+                <StatusBar barStyle="light-content" />
+                <Text style={styles.errorIcon}>😕</Text>
+                <Text style={styles.errorTitle}>Không tải được dữ liệu</Text>
+                <Text style={styles.errorMsg}>{error}</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={fetchRooms}>
+                    <Ionicons name="refresh" size={16} color="#fff" />
+                    <Text style={styles.retryText}>Thử lại</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    if (!isLoading && rooms.length === 0 && !error) {
+        return (
+            <View style={styles.errorContainer}>
+                <StatusBar barStyle="light-content" />
+                <Text style={styles.errorIcon}>🏠</Text>
+                <Text style={styles.errorTitle}>Chưa có bài đăng nào</Text>
+                <Text style={styles.errorMsg}>Hãy quay lại sau nhé!</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={onRefresh}>
+                    <Ionicons name="refresh" size={16} color="#fff" />
+                    <Text style={styles.retryText}>Làm mới</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
+    // ── Layout constants ──────────────────────────────────
+    // Header height:   insets.top + 8 (paddingTop) + ~44 (content) + 12 (paddingBottom) ≈ insets.top + 64
+    // Category bar:    insets.top + 64  → height 40
+    // Projects strip:  insets.top + 108 (nếu có)
+    const HEADER_BOTTOM = insets.top + 64;
+    const CATEGORY_TOP = HEADER_BOTTOM;          // ngay dưới header
+    const PROJECTS_TOP = CATEGORY_TOP + 44;      // ngay dưới category bar
+   
+
     return (
         <View style={{ flex: 1, backgroundColor: 'black' }}>
             <StatusBar barStyle="light-content" translucent />
 
-            {/* Floating Header */}
-            <View style={[styles.header, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+            {/* ════ Feed ════ */}
+            <View style={{ flex: 1 }} onLayout={onFeedLayout}>
+                {CARD_HEIGHT > 0 && (
+                    <FlatList
+                        ref={flatListRef}
+                        data={displayRooms}
+                        keyExtractor={(item) => item.id.toString()}
+                        renderItem={({ item }) => (
+                          <PropertyCard
+    item={item}
+  isActive={isFocused && appActive && item.id === activeId}
+    cardHeight={CARD_HEIGHT}
+/>
+                        )}
+                        pagingEnabled
+                        snapToInterval={CARD_HEIGHT}
+                        snapToAlignment="start"
+                        decelerationRate="fast"
+                        showsVerticalScrollIndicator={false}
+                        onViewableItemsChanged={onViewableItemsChanged}
+                        viewabilityConfig={viewabilityConfig}
+                        onEndReached={() => loadMoreRooms()}
+                        onEndReachedThreshold={0.5}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                tintColor="white"
+                                progressBackgroundColor="rgba(0,0,0,0.5)"
+                            />
+                        }
+                        ListFooterComponent={
+                            isLoadingMore ? (
+                                <View style={styles.footerLoading}>
+                                    <Text style={styles.footerLoadingText}>Đang tải thêm...</Text>
+                                </View>
+                            ) : null
+                        }
+                        ListEmptyComponent={
+                            <View style={[styles.errorContainer, { height }]}>
+                                <Text style={styles.errorIcon}>🔍</Text>
+                                <Text style={styles.errorTitle}>Không có kết quả</Text>
+                                <Text style={styles.errorMsg}>Thử chọn danh mục khác nhé!</Text>
+                                <TouchableOpacity
+                                    style={styles.retryBtn}
+                                    onPress={() => setActiveCategory('all')}
+                                >
+                                    <Text style={styles.retryText}>Xem tất cả</Text>
+                                </TouchableOpacity>
+                            </View>
+                        }
+                        removeClippedSubviews={false}
+                        windowSize={3}
+                        initialNumToRender={1}
+                        maxToRenderPerBatch={1}
+                    />
+                )}
+            </View>
+
+            {/* ════ Floating Header ════ */}
+            <View
+                style={[styles.header, { paddingTop: insets.top + 8 }]}
+                pointerEvents="box-none"
+            >
                 <View style={styles.logoContainer}>
                     <Text style={styles.logoText}>🏠</Text>
                     <Text style={styles.logoName}>HomeSwipe</Text>
                 </View>
                 <View style={styles.headerActions}>
-                    {/* Analytics button */}
                     <TouchableOpacity
                         style={styles.headerBtn}
                         onPress={() => router.push('/analytics' as any)}
@@ -149,9 +265,44 @@ export default function FeedScreen() {
                 </View>
             </View>
 
-            {/* Projects strip — floating at bottom of header gradient */}
+            {/* ════ Category Bar ════ */}
+            <View
+                style={[styles.categoryBar, { top: CATEGORY_TOP }]}
+                pointerEvents="box-none"
+            >
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
+                    pointerEvents="auto"
+                >
+                    {CATEGORIES.map(cat => (
+                        <TouchableOpacity
+                            key={cat.key}
+                            style={[
+                                styles.catChip,
+                                activeCategory === cat.key && styles.catChipActive,
+                            ]}
+                            onPress={() => setActiveCategory(cat.key)}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={[
+                                styles.catText,
+                                activeCategory === cat.key && styles.catTextActive,
+                            ]}>
+                                {cat.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
+
+            {/* ════ Projects Strip ════ */}
             {projects.length > 0 && (
-                <View style={[styles.projectsStrip, { top: insets.top + 66 }]} pointerEvents="box-none">
+                <View
+                    style={[styles.projectsStrip, { top: PROJECTS_TOP }]}
+                    pointerEvents="box-none"
+                >
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -180,215 +331,111 @@ export default function FeedScreen() {
                     </ScrollView>
                 </View>
             )}
-
-            <View style={{ flex: 1 }} onLayout={onFeedLayout}>
-                {/* Chỉ render FlatList khi đã đo được chiều cao thực tế */}
-                {CARD_HEIGHT > 0 && (
-                    <FlatList
-                        ref={flatListRef}
-                        data={displayRooms}
-                        keyExtractor={(item) => item.id.toString()}
-                        renderItem={({ item }) => (
-                            <PropertyCard item={item} isActive={item.id === activeId} cardHeight={CARD_HEIGHT} />
-                        )}
-                        pagingEnabled
-                        snapToInterval={CARD_HEIGHT}
-                        snapToAlignment="start"
-                        decelerationRate="fast"
-                        showsVerticalScrollIndicator={false}
-                        onViewableItemsChanged={onViewableItemsChanged}
-                        viewabilityConfig={viewabilityConfig}
-                        onEndReached={() => loadMoreRooms()}
-                        onEndReachedThreshold={0.5}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={onRefresh}
-                                tintColor="white"
-                                progressBackgroundColor="rgba(0,0,0,0.5)"
-                            />
-                        }
-                        removeClippedSubviews={false}
-                        windowSize={3}
-                        initialNumToRender={1}
-                        maxToRenderPerBatch={1}
-                    />
-                )}
-            </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    // ── Error / Empty ──
+    errorContainer: {
+        flex: 1,
+        backgroundColor: '#0d1b2a',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 12,
+        paddingHorizontal: 32,
+    },
+    errorIcon: { fontSize: 56 },
+    errorTitle: { color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' },
+    errorMsg: { color: 'rgba(255,255,255,0.55)', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+    retryBtn: {
+        marginTop: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#0066FF',
+        paddingHorizontal: 28,
+        paddingVertical: 12,
+        borderRadius: 24,
+    },
+    retryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+    // ── Header ──
     header: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingBottom: 12,
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: 16, paddingBottom: 12,
+        backgroundColor: 'rgba(0,0,0,0.3)',   // ← subtle bg để phân biệt với content
     },
-    logoContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
+    logoContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     logoText: { fontSize: 22 },
     logoName: {
-        color: 'white',
-        fontSize: 18,
-        fontWeight: '800',
-        letterSpacing: 0.5,
+        color: 'white', fontSize: 18, fontWeight: '800', letterSpacing: 0.5,
         textShadowColor: 'rgba(0,0,0,0.5)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 4,
     },
-    headerActions: {
-        flexDirection: 'row',
-        gap: 8,
-    },
+    headerActions: { flexDirection: 'row', gap: 8 },
     headerBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 40, height: 40, borderRadius: 20,
         backgroundColor: 'rgba(0,0,0,0.35)',
-        justifyContent: 'center',
-        alignItems: 'center',
+        justifyContent: 'center', alignItems: 'center',
         position: 'relative',
     },
     notifBadge: {
-        position: 'absolute',
-        top: 4,
-        right: 4,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
+        position: 'absolute', top: 4, right: 4,
+        width: 16, height: 16, borderRadius: 8,
         backgroundColor: '#EF4444',
-        justifyContent: 'center',
-        alignItems: 'center',
+        justifyContent: 'center', alignItems: 'center',
     },
-    notifBadgeText: {
-        color: 'white',
-        fontSize: 9,
-        fontWeight: '800',
+    notifBadgeText: { color: 'white', fontSize: 9, fontWeight: '800' },
+
+    // ── Category Bar ── NEW ──
+    categoryBar: {
+        position: 'absolute', left: 0, right: 0, zIndex: 99,
+        paddingVertical: 6,
+        backgroundColor: 'rgba(0,0,0,0.25)', // subtle separator
     },
+    catChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
+    },
+    catChipActive: {
+        backgroundColor: '#0066FF',
+        borderColor: '#0066FF',
+    },
+    catText: {
+        color: 'rgba(255,255,255,0.75)',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    catTextActive: {
+        color: '#fff',
+        fontWeight: '700',
+    },
+
+    // ── Projects strip ──
     projectsStrip: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 99,
+        position: 'absolute', left: 0, right: 0, zIndex: 98,
         paddingVertical: 4,
     },
     projectChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        backgroundColor: 'rgba(0,0,0,0.45)',
-        borderRadius: 20,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.18)',
+        flexDirection: 'row', alignItems: 'center', gap: 5,
+        backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 20,
+        paddingHorizontal: 10, paddingVertical: 5,
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
     },
-    projectChipText: {
-        color: 'white',
-        fontSize: 11,
-        fontWeight: '700',
+    projectChipText: { color: 'white', fontSize: 11, fontWeight: '700' },
+
+    // ── Footer loading ──
+    footerLoading: {
+        height: 60, justifyContent: 'center', alignItems: 'center',
+    },
+    footerLoadingText: {
+        color: 'rgba(255,255,255,0.5)', fontSize: 13,
     },
 });
-
-// Mock Data for Demo
-const MOCK_ROOMS: Room[] = [
-    {
-        id: 1,
-        title: 'Căn hộ cao cấp view sông Sài Gòn, nội thất sang trọng',
-        description: 'Căn hộ 2PN, 2WC, full nội thất, view trực diện sông.',
-        price: 15000000,
-        area: 85,
-        address: 'Vinhomes Central Park, Phường 22, Quận Bình Thạnh, Hồ Chí Minh',
-        latitude: 10.795,
-        longitude: 106.72,
-        images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop'],
-        videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-living-room-with-a-fireplace-and-christmas-decorations-2780-large.mp4',
-        transactionType: 'RENT',
-        propertyType: 'APARTMENT',
-        status: 'ACTIVE',
-        amenities: ['Pool', 'Gym', 'Parking', 'WiFi'],
-        ownerId: 101,
-        ownerFullName: 'Nguyễn Văn A',
-        ownerAvatarUrl: 'https://randomuser.me/api/portraits/men/32.jpg',
-        ownerPhone: '0901234567',
-        bedrooms: 2,
-        bathrooms: 2,
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-    },
-    {
-        id: 2,
-        title: 'Phòng trọ giá rẻ gần đại học Bách Khoa, giờ giấc tự do',
-        description: 'Phòng mới xây, giờ giấc tự do, có gác lửng.',
-        price: 3500000,
-        area: 25,
-        address: 'Lý Thường Kiệt, Phường 12, Quận 10, Hồ Chí Minh',
-        latitude: 10.772,
-        longitude: 106.658,
-        images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&auto=format&fit=crop'],
-        transactionType: 'RENT',
-        propertyType: 'ROOM',
-        status: 'ACTIVE',
-        ownerId: 102,
-        ownerFullName: 'Trần Thị B',
-        ownerAvatarUrl: 'https://randomuser.me/api/portraits/women/44.jpg',
-        ownerPhone: '0912345678',
-        bedrooms: 1,
-        bathrooms: 1,
-        createdAt: new Date().toISOString(),
-    },
-    {
-        id: 3,
-        title: 'Nhà nguyên căn mặt tiền kinh doanh, 1 trệt 2 lầu đẹp',
-        description: 'Nhà 1 trệt 2 lầu, thích hợp mở văn phòng hoặc kinh doanh.',
-        price: 25000000,
-        area: 120,
-        address: 'Nguyễn Văn Linh, Phường Tân Phong, Quận 7, Hồ Chí Minh',
-        latitude: 10.73,
-        longitude: 106.7,
-        images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop'],
-        videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-modern-apartment-with-a-view-of-the-city-at-night-3456-large.mp4',
-        transactionType: 'RENT',
-        propertyType: 'HOUSE',
-        status: 'ACTIVE',
-        ownerId: 103,
-        ownerFullName: 'Lê Văn C',
-        ownerAvatarUrl: 'https://randomuser.me/api/portraits/men/86.jpg',
-        ownerPhone: '0987654321',
-        bedrooms: 4,
-        bathrooms: 3,
-        createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    },
-    {
-        id: 4,
-        title: 'Studio hiện đại, full nội thất cao cấp, gần Metro Tân Cảng',
-        description: 'Studio sang trọng với đầy đủ tiện nghi.',
-        price: 8500000,
-        area: 35,
-        address: 'Điện Biên Phủ, Phường 22, Quận Bình Thạnh, Hồ Chí Minh',
-        latitude: 10.789,
-        longitude: 106.715,
-        images: ['https://images.unsplash.com/photo-1560448205-4d9b3e6bb6db?w=800&auto=format&fit=crop'],
-        transactionType: 'RENT',
-        propertyType: 'APARTMENT',
-        status: 'ACTIVE',
-        amenities: ['WiFi', 'Điều hoà', 'Bếp', 'Máy giặt'],
-        ownerId: 104,
-        ownerFullName: 'Phạm Thị D',
-        ownerAvatarUrl: 'https://randomuser.me/api/portraits/women/65.jpg',
-        ownerPhone: '0933445566',
-        bedrooms: 0,
-        bathrooms: 1,
-        createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-    },
-];

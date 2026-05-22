@@ -73,11 +73,11 @@ export default function WithdrawScreen() {
     // ── Khi rút thành công → show alert rồi back ──
     useEffect(() => {
         if (withdrawStatus === 'success') {
-            Alert.alert(
-                '✅ Yêu cầu đã gửi',
-                `Yêu cầu rút ${formatVND(amount)} đã được ghi nhận.\nThời gian xử lý: 1-3 ngày làm việc.\nMã giao dịch: ${withdrawTxId ?? 'N/A'}`,
-                [{ text: 'Về trang ví', onPress: () => router.back() }]
-            );
+          Alert.alert(
+  'Yêu cầu hoàn tiền',
+  `Yêu cầu hoàn ${formatVND(amount)} đã được ghi nhận.\nThời gian xử lý: 1-3 ngày làm việc.\nMã giao dịch: ${withdrawTxId ?? 'N/A'}`,
+  [{ text: 'Về trang ví', onPress: () => router.back() }]
+);
         }
     }, [withdrawStatus]);
 
@@ -297,7 +297,7 @@ export default function WithdrawScreen() {
             <View style={styles.warningBox}>
                 <Ionicons name="warning" size={20} color="#FF6B35" />
                 <Text style={styles.warningText}>
-                    Giao dịch rút tiền <Text style={{ fontWeight: '800' }}>không thể hoàn tác</Text> sau khi xác nhận.
+                    Giao dịch hoàn tiền <Text style={{ fontWeight: '800' }}>không thể hoàn tác</Text> sau khi xác nhận.
                     Vui lòng kiểm tra kỹ thông tin.
                 </Text>
             </View>
@@ -340,7 +340,7 @@ export default function WithdrawScreen() {
                 {withdrawStatus === 'loading' ? (
                     <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                    <Text style={styles.primaryBtnText}>Xác nhận rút tiền</Text>
+                    <Text style={styles.primaryBtnText}>Xác nhận hoàn tiền</Text>
                 )}
             </TouchableOpacity>
 
@@ -374,7 +374,7 @@ export default function WithdrawScreen() {
                 >
                     <Ionicons name="arrow-back" size={22} color="#1a1a2e" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Rút tiền</Text>
+                <Text style={styles.headerTitle}>Hoàn tiền đang giữ</Text>
                 {/* Step indicator */}
                 <View style={styles.stepIndicator}>
                     <View style={[styles.stepDot, step >= 1 && styles.stepDotActive]} />

@@ -20,9 +20,15 @@ function PackageCard({ pkg, onBuy }: { pkg: ServicePackage; onBuy: () => void })
                 </View>
             )}
             <Text style={styles.pkgName}>{pkg.name}</Text>
-            <Text style={styles.pkgPrice}>{pkg.price.toLocaleString('vi-VN')}đ<Text style={styles.pkgDuration}> / {pkg.durationDays} ngày</Text></Text>
-            {pkg.description && <Text style={styles.pkgDesc}>{pkg.description}</Text>}
-            {pkg.features && pkg.features.map((f, i) => (
+            <Text style={styles.pkgPrice}>
+                {pkg.price.toLocaleString('vi-VN')}đ
+                <Text style={styles.pkgDuration}> / {pkg.durationDays} ngày</Text>
+            </Text>
+            {!!pkg.description && (
+                <Text style={styles.pkgDesc}>{pkg.description}</Text>
+            )}
+            {/* Chỉ render features nếu có — backend hiện không trả về */}
+            {pkg.features && pkg.features.length > 0 && pkg.features.map((f, i) => (
                 <View key={i} style={styles.featureRow}>
                     <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
                     <Text style={styles.featureText}>{f}</Text>
@@ -33,7 +39,9 @@ function PackageCard({ pkg, onBuy }: { pkg: ServicePackage; onBuy: () => void })
                 onPress={onBuy}
                 activeOpacity={0.85}
             >
-                <Text style={[styles.buyBtnText, pkg.isPopular && styles.buyBtnTextPrimary]}>Mua ngay</Text>
+                <Text style={[styles.buyBtnText, pkg.isPopular && styles.buyBtnTextPrimary]}>
+                    Mua ngay
+                </Text>
             </TouchableOpacity>
         </View>
     );

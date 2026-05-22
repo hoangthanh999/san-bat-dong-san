@@ -13,11 +13,17 @@ export const chatService = {
      * GET /api/chat/conversations (JWT)
      * Backend: ChatController.getConversations()
      */
-    getConversations: async (): Promise<Conversation[]> => {
-        const response = await apiClient.get<Conversation[]>(API_ENDPOINTS.CHAT_CONVERSATIONS);
-        return response.data;
-    },
-
+ getConversations: async (): Promise<Conversation[]> => {
+    const response = await apiClient.get<any[]>(API_ENDPOINTS.CHAT_CONVERSATIONS);
+    
+    // Map lại để đảm bảo id luôn có giá trị
+    return response.data.map((item: any) => ({
+        ...item,
+        id: item.id ?? item.partnerId ?? item.userId,  // ✅ fallback
+        fullName: item.fullName ?? item.partnerName ?? item.name,
+        avatar: item.avatar ?? item.partnerAvatar ?? item.avatarUrl,
+    }));
+},
     /**
      * Lấy lịch sử chat với 1 người
      * GET /api/chat/history/{partnerId} (JWT)

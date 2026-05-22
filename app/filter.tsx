@@ -1,37 +1,62 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar,
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePropertyStore } from '../store/propertyStore';
-import { RoomFilters } from '../types';
+import { searchService } from '../services/api/search';
+import { amenityService } from '../services/api/amenities';
+import { RoomFilters, Amenity } from '../types';
 
-const PRICE_RANGES = [
+// ─── Constants ────────────────────────────────────────────────
+const PRICE_RANGES_RENT = [
     { label: 'Dưới 3 triệu', min: 0, max: 3000000 },
-    { label: '3 - 5 triệu', min: 3000000, max: 5000000 },
-    { label: '5 - 10 triệu', min: 5000000, max: 10000000 },
-    { label: '10 - 20 triệu', min: 10000000, max: 20000000 },
+    { label: '3 – 5 triệu', min: 3000000, max: 5000000 },
+    { label: '5 – 10 triệu', min: 5000000, max: 10000000 },
+    { label: '10 – 20 triệu', min: 10000000, max: 20000000 },
     { label: 'Trên 20 triệu', min: 20000000, max: undefined },
 ];
 
+const PRICE_RANGES_SALE = [
+    { label: 'Dưới 500 triệu', min: 0, max: 500000000 },
+    { label: '500tr – 1 tỷ', min: 500000000, max: 1000000000 },
+    { label: '1 – 3 tỷ', min: 1000000000, max: 3000000000 },
+    { label: '3 – 10 tỷ', min: 3000000000, max: 10000000000 },
+    { label: 'Trên 10 tỷ', min: 10000000000, max: undefined },
+];
+
 const AREA_RANGES = [
-    { label: 'Dưới 20 m²', min: 0, max: 20 },
-    { label: '20 - 40 m²', min: 20, max: 40 },
-    { label: '40 - 70 m²', min: 40, max: 70 },
-    { label: '70 - 100 m²', min: 70, max: 100 },
-    { label: 'Trên 100 m²', min: 100, max: undefined },
+    { label: 'Dưới 30 m²', min: 0, max: 30 },
+    { label: '30 – 60 m²', min: 30, max: 60 },
+    { label: '60 – 100 m²', min: 60, max: 100 },
+    { label: '100 – 200 m²', min: 100, max: 200 },
+    { label: 'Trên 200 m²', min: 200, max: undefined },
 ];
 
 const BEDROOM_OPTIONS = [0, 1, 2, 3, 4];
+
+const FURNISHING_OPTIONS = [
+    { val: 'UNFURNISHED', label: 'Không có' },
+    { val: 'PARTIALLY_FURNISHED', label: 'Cơ bản' },
+    { val: 'FULLY_FURNISHED', label: 'Đầy đủ' },
+];
+
+const AVAILABILITY_OPTIONS = [
+    { val: 'IMMEDIATELY', label: 'Vào ngay' },
+    { val: 'THIS_MONTH', label: 'Tháng này' },
+    { val: 'NEXT_MONTH', label: 'Tháng sau' },
+    { val: 'NEGOTIABLE', label: 'Thương lượng' },
+];
+
 const SORT_OPTIONS = [
     { val: 'newest', label: 'Mới nhất' },
     { val: 'price_asc', label: 'Giá thấp → cao' },
     { val: 'price_desc', label: 'Giá cao → thấp' },
-    { val: 'nearest', label: 'Gần nhất' },
 ];
 
+// ─── Sub-component: Chip ──────────────────────────────────────
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
     return (
         <TouchableOpacity style={[styles.chip, selected && styles.chipSelected]} onPress={onPress}>
@@ -40,40 +65,51 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
     );
 }
 
+function SectionHeader({ title }: { title: string }) {
+    return <Text style={styles.sectionLabel}>{title}</Text>;
+}
+
+// ─── Extended local filter type ───────────────────────────────
+interface LocalFilters extends RoomFilters {
+    priceIndex?: number;
+    areaIndex?: number;
+    transactionType?: string;      // 'FOR_RENT' | 'FOR_SALE'
+    propertyTypes?: string[];      // multi-select
+    furnishingStatuses?: string[];
+    availabilityStatuses?: string[];
+    amenities?: string[];
+    hasBalcony?: boolean;
+    minBedrooms?: number;
+}
+
 /**
- * FilterScreen — Full-page route screen (KHÔNG phải Modal).
+ * FilterScreen — Full-page route screen.
  * Điều hướng đến bằng router.push('/filter').
- * Đóng bằng router.back() thay vì onClose prop (prop đó gây crash khi không được truyền).
+ * Khi Apply: gọi searchService.searchProperties với full params backend.
  */
 export default function FilterScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { filters, setFilters, resetFilters } = usePropertyStore();
-    const [local, setLocal] = useState<RoomFilters & { priceIndex?: number; areaIndex?: number }>({
-        ...filters,
-    });
+    const { filters, setFilters, setSearchResults, resetFilters } = usePropertyStore();
 
-    const updateLocal = (key: keyof typeof local, value: any) =>
+    const [local, setLocal] = useState<LocalFilters>({ ...filters });
+    const [amenityList, setAmenityList] = useState<Amenity[]>([]);
+    const [isApplying, setIsApplying] = useState(false);
+
+    const isSale = local.transactionType === 'FOR_SALE';
+    const priceRanges = isSale ? PRICE_RANGES_SALE : PRICE_RANGES_RENT;
+
+    useEffect(() => {
+        amenityService.getAll()
+            .then(data => setAmenityList(data || []))
+            .catch(() => {});
+    }, []);
+
+    const updateLocal = (key: keyof LocalFilters, value: any) =>
         setLocal(p => ({ ...p, [key]: value }));
 
-    const handleApply = () => {
-        setFilters(local);
-        router.back();
-    };
-
-    const handleReset = () => {
-        setLocal({});
-        resetFilters();
-        router.back();
-    };
-
-    const setBedroom = (num: number) => {
-        const cur = local.bedroomList || [];
-        updateLocal('bedroomList', cur.includes(num) ? cur.filter(b => b !== num) : [...cur, num]);
-    };
-
-    const setPriceRange = (index: number) => {
-        const range = PRICE_RANGES[index];
+    const togglePriceRange = (index: number) => {
+        const range = priceRanges[index];
         setLocal(p => ({
             ...p,
             priceIndex: p.priceIndex === index ? undefined : index,
@@ -82,7 +118,7 @@ export default function FilterScreen() {
         }));
     };
 
-    const setAreaRange = (index: number) => {
+    const toggleAreaRange = (index: number) => {
         const range = AREA_RANGES[index];
         setLocal(p => ({
             ...p,
@@ -90,6 +126,79 @@ export default function FilterScreen() {
             minArea: p.areaIndex === index ? undefined : range.min,
             maxArea: p.areaIndex === index ? undefined : range.max,
         }));
+    };
+
+    const toggleMulti = (key: 'propertyTypes' | 'furnishingStatuses' | 'availabilityStatuses' | 'amenities', val: string) => {
+        const cur: string[] = (local[key] as string[]) || [];
+        updateLocal(key, cur.includes(val) ? cur.filter(x => x !== val) : [...cur, val]);
+    };
+
+    const handleApply = async () => {
+        // Persist basic filters to store (for backward compat with non-search screens)
+        setFilters({
+            transactionType: local.transactionType,
+            propertyType: local.propertyTypes?.[0], // simple compat
+            minPrice: local.minPrice,
+            maxPrice: local.maxPrice,
+            minArea: local.minArea,
+            maxArea: local.maxArea,
+            sortBy: local.sortBy,
+            bedroomList: local.minBedrooms != null ? [local.minBedrooms] : [],
+        });
+
+        // Build backend search request
+        const hasAdvancedFilters =
+            local.transactionType ||
+            (local.propertyTypes?.length ?? 0) > 0 ||
+            local.minPrice != null || local.maxPrice != null ||
+            local.minArea != null || local.maxArea != null ||
+            local.minBedrooms != null ||
+            (local.furnishingStatuses?.length ?? 0) > 0 ||
+            (local.availabilityStatuses?.length ?? 0) > 0 ||
+            (local.amenities?.length ?? 0) > 0 ||
+            local.hasBalcony;
+
+        if (hasAdvancedFilters) {
+            setIsApplying(true);
+            try {
+                // Map sortBy frontend → backend sortBy/sortDir
+                let sortBy = 'createdAt';
+                let sortDir = 'desc';
+                if (local.sortBy === 'price_asc') { sortBy = 'price'; sortDir = 'asc'; }
+                else if (local.sortBy === 'price_desc') { sortBy = 'price'; sortDir = 'desc'; }
+
+                const results = await searchService.searchProperties({
+                    transactionTypes: local.transactionType ? [local.transactionType] : undefined,
+                    propertyTypes: local.propertyTypes?.length ? local.propertyTypes : undefined,
+                    minPrice: local.minPrice,
+                    maxPrice: local.maxPrice,
+                    minArea: local.minArea,
+                    maxArea: local.maxArea,
+                    minBedrooms: local.minBedrooms,
+                    furnishingStatuses: local.furnishingStatuses?.length ? local.furnishingStatuses : undefined,
+                    availabilityStatuses: local.availabilityStatuses?.length ? local.availabilityStatuses : undefined,
+                    amenities: local.amenities?.length ? local.amenities : undefined,
+                    hasBalcony: local.hasBalcony || undefined,
+                    sortBy,
+                    sortDir,
+                    page: 0,
+                    size: 20,
+                });
+                setSearchResults(results);
+            } catch (err) {
+                console.warn('[Filter] Backend search failed:', err);
+            } finally {
+                setIsApplying(false);
+            }
+        }
+
+        router.back();
+    };
+
+    const handleReset = () => {
+        setLocal({});
+        resetFilters();
+        router.back();
     };
 
     return (
@@ -104,28 +213,48 @@ export default function FilterScreen() {
                 >
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Bộ lọc</Text>
+                <Text style={styles.headerTitle}>Bộ lọc nâng cao</Text>
                 <TouchableOpacity onPress={handleReset}>
                     <Text style={styles.resetBtn}>Đặt lại</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {/* Loại bất động sản */}
+
+                {/* Hình thức giao dịch */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Loại bất động sản</Text>
+                    <SectionHeader title="Hình thức giao dịch" />
                     <View style={styles.chipRow}>
                         {[
                             { val: undefined, label: 'Tất cả' },
-                            { val: 'ROOM', label: 'Phòng trọ' },
-                            { val: 'APARTMENT', label: 'Căn hộ' },
-                            { val: 'HOUSE', label: 'Nhà' },
+                            { val: 'FOR_RENT', label: '🏠 Cho thuê' },
+                            { val: 'FOR_SALE', label: '💰 Mua bán' },
                         ].map(opt => (
                             <Chip
                                 key={opt.label}
                                 label={opt.label}
-                                selected={local.propertyType === opt.val}
-                                onPress={() => updateLocal('propertyType', opt.val)}
+                                selected={local.transactionType === opt.val}
+                                onPress={() => setLocal(p => ({ ...p, transactionType: opt.val, priceIndex: undefined, minPrice: undefined, maxPrice: undefined }))}
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                {/* Loại BĐS (multi-select) */}
+                <View style={styles.section}>
+                    <SectionHeader title="Loại bất động sản" />
+                    <View style={styles.chipRow}>
+                        {[
+                            { val: 'ROOM', label: 'Phòng trọ' },
+                            { val: 'APARTMENT', label: 'Căn hộ' },
+                            { val: 'HOUSE', label: 'Nhà' },
+                            { val: 'LAND', label: 'Đất' },
+                        ].map(opt => (
+                            <Chip
+                                key={opt.val}
+                                label={opt.label}
+                                selected={(local.propertyTypes || []).includes(opt.val)}
+                                onPress={() => toggleMulti('propertyTypes', opt.val)}
                             />
                         ))}
                     </View>
@@ -133,14 +262,14 @@ export default function FilterScreen() {
 
                 {/* Khoảng giá */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Khoảng giá thuê</Text>
+                    <SectionHeader title={isSale ? 'Khoảng giá bán' : 'Khoảng giá thuê'} />
                     <View style={styles.chipRow}>
-                        {PRICE_RANGES.map((r, i) => (
+                        {priceRanges.map((r, i) => (
                             <Chip
                                 key={r.label}
                                 label={r.label}
                                 selected={local.priceIndex === i}
-                                onPress={() => setPriceRange(i)}
+                                onPress={() => togglePriceRange(i)}
                             />
                         ))}
                     </View>
@@ -148,42 +277,104 @@ export default function FilterScreen() {
 
                 {/* Diện tích */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Diện tích</Text>
+                    <SectionHeader title="Diện tích" />
                     <View style={styles.chipRow}>
                         {AREA_RANGES.map((r, i) => (
                             <Chip
                                 key={r.label}
                                 label={r.label}
                                 selected={local.areaIndex === i}
-                                onPress={() => setAreaRange(i)}
+                                onPress={() => toggleAreaRange(i)}
                             />
                         ))}
                     </View>
                 </View>
 
-                {/* Số phòng ngủ */}
+                {/* Số phòng ngủ tối thiểu */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Số phòng ngủ</Text>
+                    <SectionHeader title="Số phòng ngủ tối thiểu" />
                     <View style={styles.chipRow}>
                         <Chip
                             label="Tất cả"
-                            selected={!local.bedroomList || local.bedroomList.length === 0}
-                            onPress={() => updateLocal('bedroomList', [])}
+                            selected={local.minBedrooms == null}
+                            onPress={() => updateLocal('minBedrooms', undefined)}
                         />
                         {BEDROOM_OPTIONS.map(n => (
                             <Chip
                                 key={n}
-                                label={n === 0 ? 'Studio' : `${n} PN`}
-                                selected={(local.bedroomList || []).includes(n)}
-                                onPress={() => setBedroom(n)}
+                                label={n === 0 ? 'Studio' : `${n}+ PN`}
+                                selected={local.minBedrooms === n}
+                                onPress={() => updateLocal('minBedrooms', n)}
                             />
                         ))}
                     </View>
                 </View>
 
+                {/* Nội thất */}
+                <View style={styles.section}>
+                    <SectionHeader title="Nội thất" />
+                    <View style={styles.chipRow}>
+                        {FURNISHING_OPTIONS.map(opt => (
+                            <Chip
+                                key={opt.val}
+                                label={opt.label}
+                                selected={(local.furnishingStatuses || []).includes(opt.val)}
+                                onPress={() => toggleMulti('furnishingStatuses', opt.val)}
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                {/* Tình trạng phòng (chỉ cho thuê) */}
+                {!isSale && (
+                    <View style={styles.section}>
+                        <SectionHeader title="Có thể vào ở" />
+                        <View style={styles.chipRow}>
+                            {AVAILABILITY_OPTIONS.map(opt => (
+                                <Chip
+                                    key={opt.val}
+                                    label={opt.label}
+                                    selected={(local.availabilityStatuses || []).includes(opt.val)}
+                                    onPress={() => toggleMulti('availabilityStatuses', opt.val)}
+                                />
+                            ))}
+                        </View>
+                    </View>
+                )}
+
+                {/* Ban công */}
+                <View style={styles.section}>
+                    <View style={styles.switchRow}>
+                        <Text style={styles.sectionLabel}>Có ban công</Text>
+                        <Switch
+                            value={!!local.hasBalcony}
+                            onValueChange={v => updateLocal('hasBalcony', v || undefined)}
+                            trackColor={{ false: '#DDD', true: '#AAC8FF' }}
+                            thumbColor={local.hasBalcony ? '#0066FF' : '#F4F4F4'}
+                        />
+                    </View>
+                </View>
+
+                {/* Tiện ích */}
+                {amenityList.length > 0 && (
+                    <View style={styles.section}>
+                        <SectionHeader title="Tiện ích" />
+                        <View style={styles.chipRow}>
+                            {amenityList.map(a => (
+                                <Chip
+                                    key={a.id}
+                                    label={a.name}
+                                    selected={(local.amenities || []).includes(a.name)}
+                                    onPress={() => toggleMulti('amenities', a.name)}
+                                />
+                            ))}
+                        </View>
+                    </View>
+                )}
+
                 {/* Sắp xếp */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionLabel}>Sắp xếp theo</Text>
+                    <SectionHeader title="Sắp xếp theo" />
                     <View style={styles.chipRow}>
                         {SORT_OPTIONS.map(opt => (
                             <Chip
@@ -191,7 +382,7 @@ export default function FilterScreen() {
                                 label={opt.label}
                                 selected={local.sortBy === opt.val}
                                 onPress={() =>
-                                    updateLocal('sortBy', local.sortBy === opt.val ? undefined : opt.val)
+                                    updateLocal('sortBy', local.sortBy === opt.val ? undefined : opt.val as any)
                                 }
                             />
                         ))}
@@ -202,8 +393,15 @@ export default function FilterScreen() {
             </ScrollView>
 
             <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
-                    <Text style={styles.applyBtnText}>Áp dụng</Text>
+                <TouchableOpacity
+                    style={[styles.applyBtn, isApplying && styles.applyBtnDisabled]}
+                    onPress={handleApply}
+                    disabled={isApplying}
+                >
+                    {isApplying
+                        ? <ActivityIndicator color="white" size="small" />
+                        : <Text style={styles.applyBtnText}>Áp dụng bộ lọc</Text>
+                    }
                 </TouchableOpacity>
             </View>
         </View>
@@ -238,6 +436,12 @@ const styles = StyleSheet.create({
     chipSelected: { borderColor: '#0066FF', backgroundColor: '#E8F0FF' },
     chipText: { fontSize: 13, color: '#666' },
     chipTextSelected: { color: '#0066FF', fontWeight: '600' },
+    switchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
     bottomBar: {
         padding: 16,
         borderTopWidth: 1,
@@ -250,5 +454,6 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         alignItems: 'center',
     },
+    applyBtnDisabled: { backgroundColor: '#AAC8FF' },
     applyBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
 });

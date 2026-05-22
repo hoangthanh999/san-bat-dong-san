@@ -1,75 +1,69 @@
-/**
- * reels.ts
- * API service cho Reels Feed — gọi property-service qua propertyClient
- * Endpoint: GET /public/properties/reels
- */
 import propertyClient from './propertyClient';
 
-// ─── Khớp với PropertyReelResponseDTO.java + doc interface ───
 export interface PropertyReel {
     id: number;
     title: string;
-    price: number;                    // BigDecimal → number
-
-    // Media
-    thumbnailUrl: string | null;      // ảnh đại diện
-    videoUrl: string | null;          // null nếu chưa upload video
-
-    // Location
+    price: number;
     address: string;
     area: number;
 
-    // Listing type
-    listingType: 'RENT' | 'SALE' | 'FOR_RENT' | 'FOR_SALE';
+    // Media
+    videoUrl: string | null;
+    thumbnailUrl: string | null;
 
-    // Interaction
+    // Listing
+    listingType: 'FOR_RENT' | 'FOR_SALE' | 'RENT' | 'SALE';
+
+    // Interaction — ✅ đúng với backend (không có prefix "is")
     likeCount: number;
-    isLiked: boolean;
-    isSaved: boolean;
+    liked: boolean;    // ← đổi từ isLiked
+    saved: boolean;    // ← đổi từ isSaved
     isPromoted: boolean;
 
-    // Owner — backend dùng snapshot fields
+    // Owner
     ownerSlug: string;
-    ownerNameSnapshot: string | null;   // alias ownerName
-    ownerAvatarSnapshot: string | null; // alias ownerAvatar
+    ownerNameSnapshot: string | null;
+    ownerAvatarSnapshot: string | null;
 
-    // Timestamps
-    createdAt: string;                  // ISO string
+    // Meta
+    createdAt: string;
 }
 
-// ─── Cursor-based pagination response ────────────────────────
 export interface ReelsFeedResponse {
     items: PropertyReel[];
     nextCursor: string | null;
     hasNext: boolean;
 }
 
-// ─── API calls ───────────────────────────────────────────────
+function unwrap<T>(data: any): T {
+    if (data && data.result !== undefined) return data.result as T;
+    return data as T;
+}
+
 export const reelsApi = {
-    /**
-     * Fetch lần đầu — không có cursor
-     * GET /public/properties/reels?size=10
-     */
     getFeed: async (size = 10): Promise<ReelsFeedResponse> => {
-        const res = await propertyClient.get<ReelsFeedResponse>(
+        const res = await propertyClient.get<any>(
             '/public/properties/reels',
             { params: { size } }
         );
-        return res.data;
+        const payload = unwrap<ReelsFeedResponse>(res.data);
+        return {
+            items: payload.items ?? [],
+            nextCursor: payload.nextCursor ?? null,
+            hasNext: payload.hasNext ?? false,
+        };
     },
 
-    /**
-     * Load thêm bằng cursor
-     * GET /public/properties/reels?cursor=xxx&size=10
-     */
-    loadMore: async (
-        cursor: string,
-        size = 10
-    ): Promise<ReelsFeedResponse> => {
-        const res = await propertyClient.get<ReelsFeedResponse>(
+    loadMore: async (cursor: string, size = 10): Promise<ReelsFeedResponse> => {
+        const res = await propertyClient.get<any>(
             '/public/properties/reels',
             { params: { cursor, size } }
         );
-        return res.data;
+        const payload = unwrap<ReelsFeedResponse>(res.data);
+        return {
+            items: payload.items ?? [],
+            nextCursor: payload.nextCursor ?? null,
+            hasNext: payload.hasNext ?? false,
+        };
     },
 };

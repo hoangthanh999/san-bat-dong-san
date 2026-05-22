@@ -74,6 +74,16 @@ export const userService = {
     },
 
     /**
+     * Lấy banner công khai của chủ nhà theo slug
+     * GET /customers/{slug}/public-banner
+     * Response: { bannerUrl: string }
+     */
+    getPublicBanner: async (slug: string): Promise<{ bannerUrl: string }> => {
+        const response = await apiClient.get<{ bannerUrl: string }>(API_ENDPOINTS.CUSTOMER_PUBLIC_BANNER(slug));
+        return response.data;
+    },
+
+    /**
      * Lấy thông tin gọn của user theo id
      * GET /customers/{id}/summary
      */

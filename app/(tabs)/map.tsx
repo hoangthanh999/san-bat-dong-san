@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     View, StyleSheet, Dimensions, StatusBar,
-    TouchableOpacity, Text, ScrollView, Animated, Alert,
+    TouchableOpacity, Text, ScrollView, Animated, Alert, ActivityIndicator,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Image } from 'expo-image';
@@ -10,11 +10,13 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { usePropertyStore } from '../../store/propertyStore';
-import { Room } from '../../types';
+import { searchService } from '../../services/api/search';
+import { Room, PropertySearchItem } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const CARD_HEIGHT = 130;
+const NEAR_ME_RADIUS_KM = 5; // Tìm kiếm trong bán kính 5km
 
 const FILTER_CHIPS = [
     { id: 'all', label: 'Tất cả' },
@@ -27,39 +29,35 @@ const FILTER_CHIPS = [
     { id: 'whole', label: 'Nguyên căn' },
 ];
 
-const MOCK_MAP_ROOMS: Room[] = [
-    {
-        id: 1, title: 'Căn hộ cao cấp view sông', price: 15000000, area: 85,
-        address: 'Vinhomes Central Park, Bình Thạnh, TP.HCM',
-        images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400'],
-        latitude: 10.795, longitude: 106.72, transactionType: 'RENT', propertyType: 'APARTMENT', status: 'ACTIVE',
-        ownerId: 101, bedrooms: 2, bathrooms: 2, createdAt: new Date().toISOString(), amenities: ['Pool', 'Gym'],
-    },
-    {
-        id: 2, title: 'Phòng trọ gần ĐH Bách Khoa', price: 3500000, area: 25,
-        address: 'Lý Thường Kiệt, Quận 10, TP.HCM',
-        images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400'],
-        latitude: 10.772, longitude: 106.658, transactionType: 'RENT', propertyType: 'ROOM', status: 'ACTIVE',
-        ownerId: 102, bedrooms: 1, bathrooms: 1, createdAt: new Date().toISOString(),
-    },
-    {
-        id: 3, title: 'Nhà mặt tiền kinh doanh Q7', price: 25000000, area: 120,
-        address: 'Nguyễn Văn Linh, Quận 7, TP.HCM',
-        images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400'],
-        latitude: 10.73, longitude: 106.7, transactionType: 'RENT', propertyType: 'HOUSE', status: 'ACTIVE',
-        ownerId: 103, bedrooms: 4, bathrooms: 3, createdAt: new Date().toISOString(),
-    },
-    {
-        id: 4, title: 'Studio hiện đại gần Metro', price: 8500000, area: 35,
-        address: 'Điện Biên Phủ, Bình Thạnh, TP.HCM',
-        images: ['https://images.unsplash.com/photo-1560448205-4d9b3e6bb6db?w=400'],
-        latitude: 10.789, longitude: 106.715, transactionType: 'RENT', propertyType: 'APARTMENT', status: 'ACTIVE',
-        ownerId: 104, bedrooms: 0, bathrooms: 1, createdAt: new Date().toISOString(),
-    },
-];
+// ─── Convert PropertySearchItem → Room (lightweight map-only display) ─────────
+function searchItemToRoom(item: PropertySearchItem): Room {
+    return {
+        id: item.id,
+        title: item.title,
+        price: item.price,
+        area: item.area,
+        address: item.address,
+        province: item.province,
+        district: item.district,
+        ward: item.ward,
+        street: item.street,
+        propertyType: item.propertyType,
+        transactionType: item.transactionType,
+        images: item.thumbnail ? [item.thumbnail] : [],
+        latitude: item.latitude ?? 0,
+        longitude: item.longitude ?? 0,
+        bedrooms: item.bedrooms,
+        bathrooms: item.bathrooms,
+        hasBalcony: item.hasBalcony,
+        furnishingStatus: item.furnishingStatus,
+        status: 'ACTIVE' as any,
+        ownerId: 0,
+        createdAt: item.createdAt,
+    };
+}
 
-// ─── Tạo HTML Leaflet map ───────────────────────────────────────────────────
-const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number) => {
+// ─── Tạo HTML Leaflet map ──────────────────────────────────────────────────
+const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, radiusKm?: number) => {
     const markers = rooms.map(r => ({
         id: r.id,
         lat: r.latitude,
@@ -121,6 +119,7 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number) => 
     var rooms = ${JSON.stringify(markers)};
 
     rooms.forEach(function(r) {
+      if (!r.lat || !r.lng) return;
       var icon = L.divIcon({
         className: '',
         html: '<div class="price-marker" id="m' + r.id + '">' + r.label + '</div>',
@@ -148,7 +147,7 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number) => 
       });
       L.marker([${userLat}, ${userLng}], { icon: userIcon }).addTo(map);
       L.circle([${userLat}, ${userLng}], {
-        radius: 2000,
+        radius: ${(radiusKm || 5) * 1000},
         color: 'rgba(0,102,255,0.4)',
         fillColor: 'rgba(0,102,255,0.08)',
         fillOpacity: 1,
@@ -182,21 +181,28 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number) => 
 </html>`;
 };
 
-// ───────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function MapScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { rooms, fetchRooms } = usePropertyStore();
+    const { rooms, isLoading, fetchRooms } = usePropertyStore();
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
     const [activeFilter, setActiveFilter] = useState('all');
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+    const [nearbyRooms, setNearbyRooms] = useState<Room[] | null>(null); // null = chưa search Near Me
+    const [isSearchingNearby, setIsSearchingNearby] = useState(false);
     const nearMeAnim = useRef(new Animated.Value(1)).current;
     const webViewRef = useRef<WebView>(null);
 
-    const displayRooms = rooms.length > 0 ? rooms : MOCK_MAP_ROOMS;
+    useEffect(() => { fetchRooms(); }, []);
 
-    const filteredRooms = displayRooms.filter(room => {
+    // Chỉ dùng rooms thật từ backend (có tọa độ hợp lệ)
+    const roomsWithCoords = (nearbyRooms ?? rooms).filter(
+        r => r.latitude && r.longitude && r.latitude !== 0 && r.longitude !== 0
+    );
+
+    const filteredRooms = roomsWithCoords.filter(room => {
         switch (activeFilter) {
             case 'cheap': return room.price < 5000000;
             case 'mid': return room.price >= 5000000 && room.price <= 15000000;
@@ -208,8 +214,6 @@ export default function MapScreen() {
             default: return true;
         }
     });
-
-    useEffect(() => { fetchRooms(); }, []);
 
     const pulseNearMe = () => {
         Animated.loop(
@@ -232,6 +236,26 @@ export default function MapScreen() {
         setUserLocation({ lat, lng });
         webViewRef.current?.postMessage(JSON.stringify({ type: 'goToUser', lat, lng }));
         pulseNearMe();
+
+        // Gọi backend search theo tọa độ thực + bán kính
+        setIsSearchingNearby(true);
+        try {
+            const results = await searchService.searchProperties({
+                latitude: lat,
+                longitude: lng,
+                radiusKm: NEAR_ME_RADIUS_KM,
+                page: 0,
+                size: 50,
+            });
+            const mapped = (results.content || []).map(searchItemToRoom);
+            setNearbyRooms(mapped);
+            setSelectedRoom(null);
+        } catch (err) {
+            console.warn('[Map] Near me search failed:', err);
+            Alert.alert('Lỗi', 'Không thể tìm bất động sản gần bạn. Vui lòng thử lại.');
+        } finally {
+            setIsSearchingNearby(false);
+        }
     };
 
     const handleWebViewMessage = (event: any) => {
@@ -256,7 +280,10 @@ export default function MapScreen() {
         filteredRooms,
         userLocation?.lat,
         userLocation?.lng,
+        NEAR_ME_RADIUS_KM,
     );
+
+    const isNearMeMode = nearbyRooms !== null;
 
     return (
         <View style={styles.container}>
@@ -265,6 +292,7 @@ export default function MapScreen() {
             {/* Bản đồ Leaflet */}
             <WebView
                 ref={webViewRef}
+                key={`map-${activeFilter}-${filteredRooms.length}`}
                 style={styles.map}
                 source={{ html: leafletHTML }}
                 onMessage={handleWebViewMessage}
@@ -273,6 +301,18 @@ export default function MapScreen() {
                 originWhitelist={['*']}
                 mixedContentMode="always"
             />
+
+            {/* Loading overlay khi đang fetch dữ liệu */}
+            {(isLoading || isSearchingNearby) && (
+                <View style={styles.loadingOverlay}>
+                    <View style={styles.loadingCard}>
+                        <ActivityIndicator size="small" color="#0066FF" />
+                        <Text style={styles.loadingText}>
+                            {isSearchingNearby ? `Đang tìm BĐS trong ${NEAR_ME_RADIUS_KM}km...` : 'Đang tải bản đồ...'}
+                        </Text>
+                    </View>
+                </View>
+            )}
 
             {/* Search Bar */}
             <View style={[styles.searchContainer, { top: insets.top + 8 }]}>
@@ -295,6 +335,20 @@ export default function MapScreen() {
             {/* Filter Chips */}
             <View style={[styles.chipsContainer, { top: insets.top + 64 }]}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+                    {/* Chip xóa Near Me mode */}
+                    {isNearMeMode && (
+                        <TouchableOpacity
+                            style={[styles.chip, styles.chipClear]}
+                            onPress={() => {
+                                setNearbyRooms(null);
+                                setUserLocation(null);
+                                setSelectedRoom(null);
+                            }}
+                        >
+                            <Ionicons name="close" size={12} color="white" />
+                            <Text style={[styles.chipText, { color: 'white' }]}>Xóa Near Me</Text>
+                        </TouchableOpacity>
+                    )}
                     {FILTER_CHIPS.map(chip => (
                         <TouchableOpacity
                             key={chip.id}
@@ -317,16 +371,37 @@ export default function MapScreen() {
                 styles.nearMeBtn,
                 { bottom: Math.max(insets.bottom, 16) + 144, transform: [{ scale: nearMeAnim }] }
             ]}>
-                <TouchableOpacity style={styles.nearMeBtnInner} onPress={handleNearMe} activeOpacity={0.8}>
+                <TouchableOpacity
+                    style={[styles.nearMeBtnInner, isNearMeMode && styles.nearMeBtnActive]}
+                    onPress={handleNearMe}
+                    activeOpacity={0.8}
+                    disabled={isSearchingNearby}
+                >
                     <Ionicons name="navigate" size={20} color="white" />
-                    <Text style={styles.nearMeText}>Gần tôi</Text>
+                    <Text style={styles.nearMeText}>{isNearMeMode ? 'Cập nhật' : 'Gần tôi'}</Text>
                 </TouchableOpacity>
             </Animated.View>
 
             {/* Room count badge */}
             <View style={[styles.countBadge, { bottom: Math.max(insets.bottom, 16) + 144 }]}>
-                <Text style={styles.countText}>{filteredRooms.length} bất động sản</Text>
+                {isNearMeMode
+                    ? <Text style={styles.countText}>📍 {filteredRooms.length} BĐS trong {NEAR_ME_RADIUS_KM}km</Text>
+                    : <Text style={styles.countText}>{filteredRooms.length} bất động sản</Text>
+                }
             </View>
+
+            {/* Empty state khi không có dữ liệu thật (không dùng mock nữa) */}
+            {!isLoading && filteredRooms.length === 0 && (
+                <View style={[styles.emptyBadge, { bottom: Math.max(insets.bottom, 16) + 170 }]}>
+                    <Ionicons name="location-outline" size={16} color="#888" />
+                    <Text style={styles.emptyText}>
+                        {isNearMeMode
+                            ? 'Không có BĐS nào trong bán kính gần bạn'
+                            : 'Chưa có BĐS nào có tọa độ trên bản đồ'
+                        }
+                    </Text>
+                </View>
+            )}
 
             {/* Selected Room Bottom Card */}
             {selectedRoom && (
@@ -336,7 +411,7 @@ export default function MapScreen() {
                     activeOpacity={0.92}
                 >
                     <Image
-                        source={{ uri: selectedRoom.images[0] }}
+                        source={{ uri: selectedRoom.images[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400' }}
                         style={styles.cardImage}
                         contentFit="cover"
                     />
@@ -376,6 +451,34 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     map: { width: '100%', height: '100%' },
+
+    // ── Loading overlay ──
+    loadingOverlay: {
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        justifyContent: 'center', alignItems: 'center',
+        pointerEvents: 'none' as any,
+    },
+    loadingCard: {
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        backgroundColor: 'white', borderRadius: 12,
+        paddingHorizontal: 18, paddingVertical: 12,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12, shadowRadius: 8, elevation: 6,
+    },
+    loadingText: { fontSize: 13, color: '#555', fontWeight: '600' },
+
+    // ── Empty state ──
+    emptyBadge: {
+        position: 'absolute', left: 16, right: 16,
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 12,
+        paddingHorizontal: 14, paddingVertical: 10,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
+    },
+    emptyText: { fontSize: 13, color: '#666', flex: 1, textAlign: 'center' },
+
+    // ── Search Bar ──
     searchContainer: { position: 'absolute', left: 16, right: 16 },
     searchBar: {
         flexDirection: 'row', alignItems: 'center', backgroundColor: 'white',
@@ -388,6 +491,8 @@ const styles = StyleSheet.create({
         width: 32, height: 32, borderRadius: 8, backgroundColor: '#EFF4FF',
         justifyContent: 'center', alignItems: 'center',
     },
+
+    // ── Filter Chips ──
     chipsContainer: { position: 'absolute', left: 0, right: 0 },
     chipsScroll: { paddingHorizontal: 16, gap: 8 },
     chip: {
@@ -395,10 +500,14 @@ const styles = StyleSheet.create({
         shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
         borderWidth: 1.5, borderColor: '#E0E0E0',
+        flexDirection: 'row', alignItems: 'center', gap: 4,
     },
     chipActive: { backgroundColor: '#0066FF', borderColor: '#0066FF' },
+    chipClear: { backgroundColor: '#EF4444', borderColor: '#EF4444' },
     chipText: { fontSize: 13, fontWeight: '600', color: '#555' },
     chipTextActive: { color: 'white' },
+
+    // ── Near Me button ──
     nearMeBtn: { position: 'absolute', right: 16 },
     nearMeBtnInner: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -407,7 +516,10 @@ const styles = StyleSheet.create({
         shadowColor: '#0066FF', shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4, shadowRadius: 10, elevation: 8,
     },
+    nearMeBtnActive: { backgroundColor: '#0052CC' },
     nearMeText: { color: 'white', fontWeight: '700', fontSize: 13 },
+
+    // ── Count badge ──
     countBadge: {
         position: 'absolute', left: 16, backgroundColor: 'white',
         borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8,
@@ -415,6 +527,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
     },
     countText: { fontSize: 12, fontWeight: '600', color: '#333' },
+
+    // ── Bottom Card ──
     bottomCard: {
         position: 'absolute', left: 16, right: 16, backgroundColor: 'white',
         borderRadius: 16, flexDirection: 'row', alignItems: 'center',

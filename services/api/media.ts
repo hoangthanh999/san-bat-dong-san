@@ -1,5 +1,42 @@
 import { API_ENDPOINTS } from '../../constants';
 
+
+async function sha1(str: string): Promise<string> {
+    const rotl = (n: number, s: number) => (n << s) | (n >>> (32 - s));
+    const W = new Array(80);
+    let H0 = 0x67452301, H1 = 0xEFCDAB89, H2 = 0x98BADCFE, H3 = 0x10325476, H4 = 0xC3D2E1F0;
+    const bytes: number[] = [];
+    for (let i = 0; i < str.length; i++) {
+        const c = str.charCodeAt(i);
+        if (c < 128) bytes.push(c);
+        else if (c < 2048) { bytes.push((c >> 6) | 192); bytes.push((c & 63) | 128); }
+        else { bytes.push((c >> 12) | 224); bytes.push(((c >> 6) & 63) | 128); bytes.push((c & 63) | 128); }
+    }
+    const bitLen = bytes.length * 8;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    for (let i = 7; i >= 0; i--) bytes.push((bitLen / Math.pow(2, i * 8)) & 255);
+    for (let chunk = 0; chunk < bytes.length; chunk += 64) {
+        for (let i = 0; i < 16; i++)
+            W[i] = (bytes[chunk+i*4]<<24)|(bytes[chunk+i*4+1]<<16)|(bytes[chunk+i*4+2]<<8)|bytes[chunk+i*4+3];
+        for (let i = 16; i < 80; i++)
+            W[i] = rotl(W[i-3]^W[i-8]^W[i-14]^W[i-16], 1);
+        let [a, b, c, d, e] = [H0, H1, H2, H3, H4];
+        for (let i = 0; i < 80; i++) {
+            let f: number, k: number;
+            if (i < 20)      { f = (b & c) | (~b & d); k = 0x5A827999; }
+            else if (i < 40) { f = b ^ c ^ d;           k = 0x6ED9EBA1; }
+            else if (i < 60) { f = (b & c)|(b & d)|(c & d); k = 0x8F1BBCDC; }
+            else             { f = b ^ c ^ d;           k = 0xCA62C1D6; }
+            const temp = (rotl(a, 5) + f + e + k + W[i]) >>> 0;
+            [e, d, c, b, a] = [d, c, rotl(b, 30) >>> 0, a, temp];
+        }
+        H0=(H0+a)>>>0; H1=(H1+b)>>>0; H2=(H2+c)>>>0; H3=(H3+d)>>>0; H4=(H4+e)>>>0;
+    }
+    return [H0,H1,H2,H3,H4].map(h => h.toString(16).padStart(8,'0')).join('');
+}
+
+
 export const mediaService = {
     /**
      * Upload file lên media-service (Cloudinary proxy)
@@ -51,6 +88,7 @@ export const mediaService = {
         const { API_BASE_URL, STORAGE_KEYS } = await import('../../constants');
 
         const formData = new FormData();
+          console.log('[uploadMultiple] files count:', files.length);
         files.forEach((file) => {
             formData.append('files', {   // Key là "files" (số nhiều) — backend @RequestParam("files")
                 uri: file.uri,
@@ -67,8 +105,42 @@ export const mediaService = {
             body: formData,
         });
         const json = await response.json();
+            console.log('[uploadMultiple] response:', json);
+
         if (!response.ok) throw new Error(json.message || 'Upload nhiều file thất bại');
         // Unwrap ApiResponse.result → string[]
         return (json.result !== undefined ? json.result : json) as string[];
+    },
+uploadVideo: async (
+        fileUri: string,
+        fileName: string,
+        folder: string = 'properties'
+    ): Promise<string> => {
+        const CLOUD_NAME = 'dfyrnocnr';
+        const API_KEY = '448443126664466';
+        const API_SECRET = 'M8lZ0g_OPg4eLH0qh2BC-zMRaxQ';
+        const folderPath = `homeverse/${folder}`;
+        const eager = 'c_pad,h_1280,w_720,f_mp4';
+        const timestamp = Math.floor(Date.now() / 1000);
+
+        // ✅ Dùng SHA1 thuần JS, không cần native module
+        const stringToSign = `eager=${eager}&folder=${folderPath}&timestamp=${timestamp}${API_SECRET}`;
+        const signature = await sha1(stringToSign);
+
+        const formData = new FormData();
+        formData.append('file', { uri: fileUri, name: fileName, type: 'video/mp4' } as any);
+        formData.append('api_key', API_KEY);
+        formData.append('timestamp', String(timestamp));
+        formData.append('folder', folderPath);
+        formData.append('eager', eager);
+        formData.append('signature', signature);
+
+        const response = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`,
+            { method: 'POST', body: formData }
+        );
+        const data = await response.json();
+        if (data.error) throw new Error(data.error.message);
+        return data.eager?.[0]?.secure_url ?? data.secure_url;
     },
 };

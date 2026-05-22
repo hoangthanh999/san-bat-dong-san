@@ -46,6 +46,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     fetchHistory: async (partnerId: number) => {
+    // ✅ Guard: không gọi API nếu partnerId không hợp lệ
+    if (!partnerId || isNaN(partnerId)) {
+        console.warn('[Chat] fetchHistory: partnerId không hợp lệ', partnerId);
+        return;
+    }
         set({ isLoading: true });
         try {
             const history = await chatService.getHistory(partnerId);
@@ -134,6 +139,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     markAsRead: async (partnerId: number) => {
+          if (!partnerId || isNaN(partnerId)) return;
         try {
             await chatService.markAsRead(partnerId);
             set(state => {
@@ -156,7 +162,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const { token } = useAuthStore.getState();
         if (!token) return;
         const existingWs = get().ws;
-        if (existingWs) return;
+        if (existingWs &&
+            (existingWs.readyState === WebSocket.OPEN ||
+                existingWs.readyState === WebSocket.CONNECTING)) return;
 
         const ws = new WebSocket(`${WS_URL}/chat?token=${token}`);
 

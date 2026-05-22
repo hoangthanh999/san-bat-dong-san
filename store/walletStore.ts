@@ -112,7 +112,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             const msg =
                 err?.response?.data?.message ??
                 err?.response?.data?.result?.message ??
-                'Rút tiền thất bại. Vui lòng thử lại.';
+                'Hoàn tiền thất bại. Vui lòng thử lại.';
             set({ withdrawStatus: 'error', withdrawError: msg });
             return false;
         }

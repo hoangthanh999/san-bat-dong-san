@@ -17,13 +17,19 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
     const [loaded] = useFonts({});
-    const { checkAuth, isAuthenticated } = useAuthStore();
+
+    // ✅ Lấy thêm user để có user.id cho connectWS
+    const { checkAuth, isAuthenticated, user } = useAuthStore();
+
     const {
         fetchUnreadCount,
         initializePushNotifications: initPush,
         loadNotificationSettings,
         fetchNotifications,
+        connectWS,       // ✅ THÊM MỚI
+        disconnectWS,    // ✅ THÊM MỚI
     } = useNotificationStore();
+
     const { connectWebSocket } = useChatStore();
     const router = useRouter();
 
@@ -41,9 +47,9 @@ export default function RootLayout() {
         }
     }, [loaded]);
 
-    // Khởi tạo push notifications khi user đã đăng nhập
+    // Khởi tạo khi user đã đăng nhập
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticated || !user?.id) return;
 
         // 1. Load trạng thái notifications từ storage
         loadNotificationSettings();
@@ -55,13 +61,17 @@ export default function RootLayout() {
         // 3. Kết nối WebSocket chat
         connectWebSocket();
 
-        // 4. Khởi tạo push notifications (xin quyền + đăng ký token)
+        // 4. ✅ Kết nối WebSocket notification realtime
+        //    user.id đảm bảo subscribe đúng /user/queue/notifications
+        connectWS(user.id);
+
+        // 5. Khởi tạo push notifications (xin quyền + đăng ký token)
         initPush();
 
-        // 5. Xử lý notification khi app được mở từ killed state
+        // 6. Xử lý notification khi app được mở từ killed state
         handleInitialNotification(router);
 
-        // 6. Setup foreground + response handlers
+        // 7. Setup foreground + response handlers
         const cleanup = setupNotificationHandlers(
             router,
             () => {
@@ -71,10 +81,12 @@ export default function RootLayout() {
         );
         cleanupRef.current = cleanup;
 
+        // ✅ Cleanup: ngắt WS notification khi logout / unmount
         return () => {
             cleanupRef.current?.();
+            disconnectWS();
         };
-    }, [isAuthenticated]);
+    }, [isAuthenticated, user?.id]); // ✅ Depend on user.id để reconnect nếu user đổi
 
     if (!loaded) return null;
 
@@ -126,12 +138,22 @@ export default function RootLayout() {
                     {/* Package screens */}
                     <Stack.Screen name="packages/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="packages/boost/[roomId]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    <Stack.Screen name="packages/status" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     {/* Settings screens */}
                     <Stack.Screen name="settings/security" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     {/* Landlord profile */}
                     <Stack.Screen name="landlord-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    {/* Analytics */}
+                    <Stack.Screen name="analytics/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    {/* Profile */}
+                    <Stack.Screen name="profile/lifestyle" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    {/* Projects */}
+                    <Stack.Screen name="projects/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    <Stack.Screen name="projects/[id]" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    {/* Filter */}
+                    <Stack.Screen name="filter" options={{ headerShown: false, animation: 'slide_from_bottom' }} />
                     <Stack.Screen name="+not-found" options={{ headerShown: false }} />
-            </Stack>
+                </Stack>
                 <ToastProvider />
             </SafeAreaProvider>
         </GestureHandlerRootView>

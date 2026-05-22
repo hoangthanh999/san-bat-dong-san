@@ -17,9 +17,10 @@ export const packageService = {
      * Lấy danh sách gói dịch vụ
      * ⚠️ Backend KHÔNG có API list packages — phải hardcode hoặc bỏ qua
      */
-    getServicePackages: async (type?: PackageType): Promise<ServicePackage[]> => {
-        console.warn('[packageService] Backend KHÔNG có GET /api/packages — danh sách gói phải hardcode');
-        return [];
+    getServicePackages: async (): Promise<ServicePackage[]> => {
+        // Endpoint đúng: /api/admin/packages (LANDLORD được phép)
+        const res = await paymentClient.get('/api/admin/packages');
+        return res.data;
     },
 
     /**

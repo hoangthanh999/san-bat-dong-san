@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    TextInput, StatusBar, Alert, ActivityIndicator,
+    TextInput, StatusBar, Alert, ActivityIndicator, Switch,
 } from 'react-native';
 import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
@@ -13,26 +13,75 @@ import { useAuthStore } from '../../store/authStore';
 import { useKYCStore } from '../../store/kycStore';
 import { roomService } from '../../services/api/rooms';
 import { mediaService } from '../../services/api/media';
-import { amenityService } from '../../services/api/amenities'; // ✅ Dùng service có sẵn
-import { PropertyRequestDTO, Amenity } from '../../types';
+import { amenityService } from '../../services/api/amenities';
+import { projectService } from '../../services/api/projects';
+import { PropertyRequestDTO, Amenity, ProjectResponseDTO } from '../../types';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const STEPS = ['Cơ bản', 'Chi tiết', 'Ảnh & Video', 'Hoàn thành'];
-
 const FURNITURE_OPTIONS = ['Không có', 'Cơ bản', 'Đầy đủ', 'Cao cấp'];
-
 const FURNITURE_MAP: Record<string, string> = {
     'Không có': 'UNFURNISHED',
     'Cơ bản': 'PARTIALLY_FURNISHED',
     'Đầy đủ': 'FULLY_FURNISHED',
     'Cao cấp': 'FULLY_FURNISHED',
 };
-
 const FURNITURE_REVERSE_MAP: Record<string, string> = {
     'UNFURNISHED': 'Không có',
     'PARTIALLY_FURNISHED': 'Cơ bản',
     'FULLY_FURNISHED': 'Đầy đủ',
 };
+
+const LEGAL_DOCUMENT_OPTIONS = ['Sổ hồng / Sổ đỏ', 'Hợp đồng thuê', 'Giấy ủy quyền', 'Khác'];
+const LEGAL_DOCUMENT_MAP: Record<string, string> = {
+    'Sổ hồng / Sổ đỏ': 'CERTIFICATE_OF_OWNERSHIP',
+    'Hợp đồng thuê': 'LEASE_CONTRACT',
+    'Giấy ủy quyền': 'AUTHORIZATION_LETTER',
+    'Khác': 'NONE',
+};
+const LEGAL_DOCUMENT_REVERSE_MAP: Record<string, string> = {
+    'NONE': 'Khác',
+    'CERTIFICATE_OF_OWNERSHIP': 'Sổ hồng / Sổ đỏ',
+    'LEASE_CONTRACT': 'Hợp đồng thuê',
+    'AUTHORIZATION_LETTER': 'Giấy ủy quyền',
+};
+
+const AVAILABILITY_OPTIONS = ['Vào ở ngay', 'Trong tháng này', 'Trong tháng sau', 'Thương lượng'];
+const AVAILABILITY_MAP: Record<string, string> = {
+    'Vào ở ngay': 'IMMEDIATELY',
+    'Trong tháng này': 'THIS_MONTH',
+    'Trong tháng sau': 'NEXT_MONTH',
+    'Thương lượng': 'NEGOTIABLE',
+};
+const AVAILABILITY_REVERSE_MAP: Record<string, string> = {
+    'IMMEDIATELY': 'Vào ở ngay',
+    'THIS_MONTH': 'Trong tháng này',
+    'NEXT_MONTH': 'Trong tháng sau',
+    'NEGOTIABLE': 'Thương lượng',
+};
+
+const VALIDITY_OPTIONS = ['30 ngày', '60 ngày', '90 ngày'];
+const VALIDITY_MAP: Record<string, number> = {
+    '30 ngày': 30,
+    '60 ngày': 60,
+    '90 ngày': 90,
+};
+const VALIDITY_REVERSE_MAP: Record<number, string> = {
+    30: '30 ngày',
+    60: '60 ngày',
+    90: '90 ngày',
+};
+
+const PROPERTY_TYPE_OPTIONS = [
+    { val: 'ROOM', label: 'Phòng trọ' },
+    { val: 'APARTMENT', label: 'Căn hộ' },
+    { val: 'HOUSE', label: 'Nhà' },
+];
+
+const TRANSACTION_TYPE_OPTIONS = [
+    { val: 'FOR_RENT', label: 'Cho thuê' },
+    { val: 'FOR_SALE', label: 'Bán' },
+] as const;
 
 const PROVINCES: Record<string, Record<string, string[]>> = {
     'Hồ Chí Minh': {
@@ -59,6 +108,7 @@ const PROVINCES: Record<string, Record<string, string[]>> = {
         'Quận Sơn Trà': ['Phường An Hải Bắc', 'Phường An Hải Đông', 'Phường An Hải Tây', 'Phường Mân Thái', 'Phường Nại Hiên Đông', 'Phường Phước Mỹ', 'Phường Thọ Quang'],
     },
 };
+// ─── Sub-components ───────────────────────────────────────────
 
 function StepIndicator({ currentStep }: { currentStep: number }) {
     return (
@@ -67,11 +117,9 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
                 <React.Fragment key={step}>
                     <View style={styles.stepItem}>
                         <View style={[styles.stepCircle, index <= currentStep && styles.stepCircleActive]}>
-                            {index < currentStep ? (
-                                <Ionicons name="checkmark" size={14} color="white" />
-                            ) : (
-                                <Text style={[styles.stepNum, index === currentStep && styles.stepNumActive]}>{index + 1}</Text>
-                            )}
+                            {index < currentStep
+                                ? <Ionicons name="checkmark" size={14} color="white" />
+                                : <Text style={[styles.stepNum, index === currentStep && styles.stepNumActive]}>{index + 1}</Text>}
                         </View>
                         <Text style={[styles.stepLabel, index === currentStep && styles.stepLabelActive]}>{step}</Text>
                     </View>
@@ -103,13 +151,8 @@ function ChipSelector({ options, selected, onToggle }: {
 }
 
 function VideoPreviewPlayer({ uri, onRemove }: { uri: string; onRemove: () => void }) {
-    const player = useVideoPlayer(uri, (p: VideoPlayer) => {
-        p.loop = false;
-        p.muted = true;
-    });
-    useEffect(() => {
-        return () => { try { player.release(); } catch (_) { } };
-    }, []);
+    const player = useVideoPlayer(uri, (p: VideoPlayer) => { p.loop = false; p.muted = true; });
+    useEffect(() => { return () => { try { player.release(); } catch (_) { } }; }, []);
     return (
         <View style={styles.videoPreviewContainer}>
             <VideoView style={styles.videoPreview} player={player} allowsPictureInPicture={false} contentFit="cover" />
@@ -153,6 +196,76 @@ function DropdownPicker({ label, options, value, onChange, placeholder }: {
     );
 }
 
+function FormField({ label, children, required }: { label: string; children?: React.ReactNode; required?: boolean }) {
+    return (
+        <View style={styles.formField}>
+            <Text style={styles.fieldLabel}>{label}{required && <Text style={{ color: '#EF4444' }}> *</Text>}</Text>
+            {children}
+        </View>
+    );
+}
+
+function NumberStepper({ value, onChange, min = 0, max = 20 }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
+    return (
+        <View style={styles.stepper}>
+            <TouchableOpacity style={styles.stepperBtn} onPress={() => value > min && onChange(value - 1)}>
+                <Ionicons name="remove" size={20} color={value === min ? '#CCC' : '#0066FF'} />
+            </TouchableOpacity>
+            <Text style={styles.stepperValue}>{value}</Text>
+            <TouchableOpacity style={styles.stepperBtn} onPress={() => value < max && onChange(value + 1)}>
+                <Ionicons name="add" size={20} color={value === max ? '#CCC' : '#0066FF'} />
+            </TouchableOpacity>
+        </View>
+    );
+}
+
+function OptionButtonGroup<T extends string>({ options, value, onChange }: {
+    options: { val: T; label: string }[]; value: T; onChange: (v: T) => void;
+}) {
+    return (
+        <View style={styles.toggleRow}>
+            {options.map(opt => (
+                <TouchableOpacity
+                    key={opt.val}
+                    style={[styles.toggleBtn, value === opt.val && styles.toggleBtnActive]}
+                    onPress={() => onChange(opt.val)}
+                >
+                    <Text style={[styles.toggleText, value === opt.val && styles.toggleTextActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
+}
+
+function UtilityPriceField({ label, value, onChange, options, customPlaceholder }: {
+    label: string;
+    value: string;
+    onChange: (v: string) => void;
+    options: { val: string; label: string }[];
+    customPlaceholder: string;
+}) {
+    const isCustom = !options.some(opt => opt.val === value);
+    return (
+        <FormField label={label}>
+            <OptionButtonGroup
+                options={[...options, { val: 'CUSTOM', label: 'Tự nhập' }]}
+                value={(isCustom ? 'CUSTOM' : value) as string}
+                onChange={v => onChange(v === 'CUSTOM' ? '' : v)}
+            />
+            {isCustom && (
+                <TextInput
+                    style={[styles.input, { marginTop: 8 }]}
+                    placeholder={customPlaceholder}
+                    value={value}
+                    onChangeText={onChange}
+                />
+            )}
+        </FormField>
+    );
+}
+
+// ─── Main Export ──────────────────────────────────────────────
+
 export default function PostScreen() {
     return (
         <AuthGuardScreen message="Đăng nhập để đăng tin bất động sản" icon="create-outline">
@@ -161,54 +274,29 @@ export default function PostScreen() {
     );
 }
 
+// ─── PostScreenContent ────────────────────────────────────────
+
 function PostScreenContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { isAuthenticated } = useAuthStore();
     const { kycStatus, fetchKYCStatus } = useKYCStore();
+
     const [step, setStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
     const [images, setImages] = useState<string[]>([]);
     const [videoUri, setVideoUri] = useState<string | null>(null);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+    const [isGeocoding, setIsGeocoding] = useState(false);
 
-    // ✅ Amenities từ API
+    // ✅ useRef khai báo đúng chỗ - trong function component, KHÔNG trong JSX
+    const geocodeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const [amenityList, setAmenityList] = useState<Amenity[]>([]);
     const [amenityLoading, setAmenityLoading] = useState(false);
-
-    useEffect(() => {
-        if (isAuthenticated) fetchKYCStatus();
-    }, [isAuthenticated]);
-
-    // ✅ Fetch amenities khi mount — dùng amenityService.getAll()
-    useEffect(() => {
-        const fetchAmenities = async () => {
-            setAmenityLoading(true);
-            try {
-                const data = await amenityService.getAll();
-                setAmenityList(data || []);
-            } catch (err) {
-                console.warn('[Post] Failed to fetch amenities:', err);
-                // Fallback hardcode nếu API lỗi
-                setAmenityList([
-                    { id: 2, name: 'Wifi', icon: 'wifi' },
-                    { id: 3, name: 'Điều hòa', icon: 'air-conditioner' },
-                    { id: 4, name: 'Máy giặt', icon: 'washing-machine' },
-                    { id: 5, name: 'Bãi đỗ xe', icon: 'parking' },
-                    { id: 6, name: 'Hồ bơi', icon: 'pool' },
-                    { id: 7, name: 'Gym', icon: 'gym' },
-                    { id: 8, name: 'Thang máy', icon: 'elevator' },
-                    { id: 9, name: 'Bảo vệ 24/7', icon: 'security' },
-                    { id: 10, name: 'Camera an ninh', icon: 'camera' },
-                    { id: 11, name: 'Sân vườn', icon: 'garden' },
-                ] as Amenity[]);
-            } finally {
-                setAmenityLoading(false);
-            }
-        };
-        fetchAmenities();
-    }, []);
+    const [projectList, setProjectList] = useState<ProjectResponseDTO[]>([]);
+    const [projectLoading, setProjectLoading] = useState(false);
 
     const [form, setForm] = useState({
         title: '',
@@ -230,15 +318,110 @@ function PostScreenContent() {
         electricityPrice: 'STATE_PRICE',
         waterPrice: 'STATE_PRICE',
         internetPrice: 'FREE',
-        amenities: [] as string[], // ✅ Lưu name khớp DB
-        latitude: '10.762622',
-        longitude: '106.660172',
+        amenities: [] as string[],
+        latitude: '',   // ✅ Để trống, geocode sẽ fill
+        longitude: '',  // ✅ Để trống, geocode sẽ fill
+        projectId: '',  // Dự án liên kết (ID dạng string)
+        legalDocumentType: '', // Loại giấy tờ pháp lý
+        validityDays: '30', // Thời gian hiển thị tin đăng
     });
+
+    useEffect(() => {
+        if (isAuthenticated) fetchKYCStatus();
+    }, [isAuthenticated]);
+
+    useEffect(() => {
+        const fetchAmenities = async () => {
+            setAmenityLoading(true);
+            try {
+                const data = await amenityService.getAll();
+                setAmenityList(data || []);
+            } catch (err) {
+                console.warn('[Post] Failed to fetch amenities:', err);
+                setAmenityList([
+                    { id: 2, name: 'Wifi', icon: 'wifi' },
+                    { id: 3, name: 'Điều hòa', icon: 'air-conditioner' },
+                    { id: 4, name: 'Máy giặt', icon: 'washing-machine' },
+                    { id: 5, name: 'Bãi đỗ xe', icon: 'parking' },
+                    { id: 6, name: 'Hồ bơi', icon: 'pool' },
+                    { id: 7, name: 'Gym', icon: 'gym' },
+                    { id: 8, name: 'Thang máy', icon: 'elevator' },
+                    { id: 9, name: 'Bảo vệ 24/7', icon: 'security' },
+                    { id: 10, name: 'Camera an ninh', icon: 'camera' },
+                    { id: 11, name: 'Sân vườn', icon: 'garden' },
+                ] as Amenity[]);
+            } finally {
+                setAmenityLoading(false);
+            }
+        };
+        fetchAmenities();
+    }, []);
+
+    useEffect(() => {
+        const fetchProjects = async () => {
+            setProjectLoading(true);
+            try {
+                const data = await projectService.getPublicProjects(0, 100);
+                setProjectList(data?.content || []);
+            } catch (err) {
+                console.warn('[Post] Failed to fetch projects:', err);
+            } finally {
+                setProjectLoading(false);
+            }
+        };
+        fetchProjects();
+    }, []);
+
+    // ✅ Cleanup timer khi unmount
+    useEffect(() => {
+        return () => {
+            if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+        };
+    }, []);
 
     const updateForm = (key: keyof typeof form, value: any) =>
         setForm(prev => ({ ...prev, [key]: value }));
 
-    // ✅ Toggle theo name từ API
+    // ✅ Geocode địa chỉ → tọa độ thực tế qua Nominatim (OpenStreetMap, miễn phí)
+    const geocodeAddress = async (province: string, district: string, ward: string, detail: string) => {
+        if (!province || !district) return;
+        setIsGeocoding(true);
+
+        // Thử lần lượt từ chi tiết → tổng quát
+        const queries = [
+            // Lần 1: Đầy đủ nhất (số nhà + đường + phường + quận + tỉnh)
+            [detail, ward, district, province].filter(Boolean),
+            // Lần 2: Bỏ số nhà (đường + phường + quận + tỉnh)
+            [ward, district, province].filter(Boolean),
+            // Lần 3: Chỉ quận + tỉnh (fallback an toàn nhất)
+            [district, province].filter(Boolean),
+        ];
+
+        try {
+            for (const parts of queries) {
+                if (parts.length < 2) continue;
+                const query = encodeURIComponent(parts.join(', ') + ', Việt Nam');
+                const res = await fetch(
+                    `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=vn`,
+                    { headers: { 'Accept-Language': 'vi', 'User-Agent': 'SmartRental/1.0' } }
+                );
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    setForm(prev => ({ ...prev, latitude: data[0].lat, longitude: data[0].lon }));
+                    console.log(`[Geocode] ✅ Match: "${parts.join(', ')}" → ${data[0].lat}, ${data[0].lon}`);
+                    return; // Dừng ngay khi có kết quả
+                }
+                console.warn(`[Geocode] ❌ No result for: "${parts.join(', ')}"`);
+            }
+            console.warn('[Geocode] Không tìm được tọa độ nào.');
+        } catch (err) {
+            console.warn('[Geocode] Failed:', err);
+        } finally {
+            setIsGeocoding(false);
+        }
+    };
+
+
     const toggleAmenity = (name: string) => {
         updateForm(
             'amenities',
@@ -250,6 +433,35 @@ function PostScreenContent() {
 
     const districtOptions = form.province ? Object.keys(PROVINCES[form.province] || {}) : [];
     const wardOptions = form.province && form.district ? (PROVINCES[form.province]?.[form.district] || []) : [];
+    const isRent = form.transactionType === 'FOR_RENT';
+    const isSale = form.transactionType === 'FOR_SALE';
+    const isLand = form.propertyType === 'LAND';
+    const noProjectLabel = 'Không thuộc dự án';
+    const projectOptions = [noProjectLabel, ...projectList.map(p => p.name)];
+    const selectedProjectName = projectList.find(p => p.id.toString() === form.projectId)?.name || noProjectLabel;
+
+    const updateTransactionType = (transactionType: 'FOR_RENT' | 'FOR_SALE') => {
+        setForm(prev => ({
+            ...prev,
+            transactionType,
+            capacity: transactionType === 'FOR_RENT' && prev.propertyType !== 'LAND' ? prev.capacity : '',
+            electricityPrice: transactionType === 'FOR_RENT' ? prev.electricityPrice : 'STATE_PRICE',
+            waterPrice: transactionType === 'FOR_RENT' ? prev.waterPrice : 'STATE_PRICE',
+            internetPrice: transactionType === 'FOR_RENT' ? prev.internetPrice : 'FREE',
+        }));
+    };
+
+    const updatePropertyType = (propertyType: string) => {
+        setForm(prev => ({
+            ...prev,
+            propertyType,
+            bedrooms: propertyType === 'LAND' ? '0' : prev.bedrooms,
+            bathrooms: propertyType === 'LAND' ? '0' : prev.bathrooms,
+            capacity: propertyType === 'LAND' ? '' : prev.capacity,
+            furnishingStatus: propertyType === 'LAND' ? 'UNFURNISHED' : prev.furnishingStatus,
+            hasBalcony: propertyType === 'LAND' ? false : prev.hasBalcony,
+        }));
+    };
 
     const pickImages = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -268,7 +480,7 @@ function PostScreenContent() {
         if (!result.canceled && result.assets[0]) {
             const asset = result.assets[0];
             if (asset.fileSize && asset.fileSize > 50 * 1024 * 1024) {
-                Alert.alert('Video quá lớn', `Vui lòng chọn video dưới 50MB. Video bạn chọn có kích thước ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB.`);
+                Alert.alert('Video quá lớn', `Vui lòng chọn video dưới 50MB.`);
                 return;
             }
             setVideoUri(asset.uri);
@@ -283,7 +495,9 @@ function PostScreenContent() {
         setIsGeneratingAI(true);
         await new Promise(r => setTimeout(r, 1800));
         const addr = [form.addressDetail, form.ward, form.district, form.province].filter(Boolean).join(', ');
-        const aiText = `Phòng ${form.propertyType === 'ROOM' ? 'trọ' : 'căn hộ'} tại ${addr}, diện tích ${form.area || '...'}m², giá ${form.transactionType === 'FOR_RENT' ? 'thuê' : 'bán'} chỉ ${form.price ? Number(form.price).toLocaleString('vi-VN') : '...'}đ/tháng.\n\nNội thất ${form.furnishingStatus || 'cơ bản'}.${form.amenities.length > 0 ? '\n\nTiện ích: ' + form.amenities.join(', ') + '.' : ''}\n\nGiao thông thuận tiện, gần các tiện ích thiết yếu. Liên hệ ngay để được tư vấn!`;
+        const propertyLabel = PROPERTY_TYPE_OPTIONS.find(opt => opt.val === form.propertyType)?.label.toLowerCase() || 'bất động sản';
+        const priceSuffix = form.transactionType === 'FOR_RENT' ? 'đ/tháng' : 'đ';
+        const aiText = `${propertyLabel} tại ${addr}, diện tích ${form.area || '...'}m², giá ${form.transactionType === 'FOR_RENT' ? 'thuê' : 'bán'} chỉ ${form.price ? Number(form.price).toLocaleString('vi-VN') : '...'}${priceSuffix}.\n\n${form.propertyType !== 'LAND' ? `Nội thất ${FURNITURE_REVERSE_MAP[form.furnishingStatus] || form.furnishingStatus}.` : 'Pháp lý rõ ràng, vị trí thuận tiện.'}${form.amenities.length > 0 ? '\n\nTiện ích: ' + form.amenities.join(', ') + '.' : ''}\n\nGiao thông thuận tiện, gần các tiện ích thiết yếu. Liên hệ ngay để được tư vấn!`;
         updateForm('description', aiText);
         setIsGeneratingAI(false);
     };
@@ -292,11 +506,22 @@ function PostScreenContent() {
 
     const validateStep = () => {
         if (step === 0) {
+            if (!form.ward) { Alert.alert('Lỗi', 'Vui lòng chọn phường/xã'); return false; }
+            if (!form.addressDetail.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập địa chỉ chi tiết'); return false; }
             if (!form.title.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề'); return false; }
             if (!form.province) { Alert.alert('Lỗi', 'Vui lòng chọn tỉnh/thành phố'); return false; }
             if (!form.district) { Alert.alert('Lỗi', 'Vui lòng chọn quận/huyện'); return false; }
             if (!form.price || isNaN(Number(form.price))) { Alert.alert('Lỗi', 'Vui lòng nhập giá hợp lệ'); return false; }
             if (!form.area || isNaN(Number(form.area))) { Alert.alert('Lỗi', 'Vui lòng nhập diện tích hợp lệ'); return false; }
+            // Validate tọa độ sau khi chọn địa chỉ
+            if (!form.latitude || !form.longitude) {
+                Alert.alert('Thiếu vị trí', 'Vui lòng chọn Phường/Xã để hệ thống xác định tọa độ tự động.');
+                return false;
+            }
+        }
+        if (step === 1 && form.transactionType === 'FOR_SALE' && !form.legalDocumentType) {
+            Alert.alert('Lỗi', 'Vui lòng chọn giấy tờ pháp lý cho tin bán');
+            return false;
         }
         if (step === 2) {
             if (images.length === 0) { Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 1 ảnh'); return false; }
@@ -309,26 +534,32 @@ function PostScreenContent() {
         if (step < STEPS.length - 1) setStep(s => s + 1);
     };
 
+    // handleSubmit gọn, validate tọa độ đã ở validateStep
     const handleSubmit = async () => {
+        if (!validateStep()) return;
         setIsSubmitting(true);
         try {
             setUploadProgress('Đang tải ảnh lên...');
-            const imageFiles = images.map((uri, i) => ({
-                uri, name: `property_${Date.now()}_${i}.jpg`, type: 'image/jpeg',
-            }));
-            let imageUrls: string[] = [];
-            try {
-                imageUrls = await mediaService.uploadMultiple(imageFiles, 'properties');
-            } catch (uploadErr) {
-                console.warn('[Post] Media upload failed, using local URIs:', uploadErr);
-                imageUrls = images;
+            let imageUrls: string[] = images;
+            if (images.length > 0) {
+                try {
+                    const imageFiles = images.map((uri, i) => ({
+                        uri, name: `property_${Date.now()}_${i}.jpg`, type: 'image/jpeg',
+                    }));
+                    imageUrls = await mediaService.uploadMultiple(imageFiles, 'properties');
+                } catch (uploadErr) {
+                    console.warn('[Post] Media upload failed, using local URIs:', uploadErr);
+                    imageUrls = images;
+                }
             }
 
             let videoUrl: string | undefined;
             if (videoUri) {
                 setUploadProgress('Đang tải video...');
                 try {
-                    videoUrl = await mediaService.uploadFile(videoUri, `video_${Date.now()}.mp4`, 'video/mp4', 'properties');
+   videoUrl = await mediaService.uploadVideo(
+    videoUri, `video_${Date.now()}.mp4`, 'properties'
+);
                 } catch {
                     console.warn('[Post] Video upload failed');
                 }
@@ -336,6 +567,7 @@ function PostScreenContent() {
 
             setUploadProgress('Đang đăng tin...');
             const address = [form.addressDetail, form.ward, form.district, form.province].filter(Boolean).join(', ');
+            const validAmenityNames = new Set(amenityList.map(a => a.name));
             const body: PropertyRequestDTO = {
                 transactionType: form.transactionType,
                 title: form.title,
@@ -350,20 +582,24 @@ function PostScreenContent() {
                 latitude: Number(form.latitude),
                 longitude: Number(form.longitude),
                 propertyType: form.propertyType,
-                capacity: form.capacity ? Number(form.capacity) : undefined,
+                projectId: form.projectId ? Number(form.projectId) : undefined,
+                capacity: isRent && !isLand && form.capacity ? Number(form.capacity) : undefined,
+                validityDays: Number(form.validityDays),
                 images: imageUrls,
                 videoUrl,
-                amenities: form.amenities, // ✅ name khớp DB
-                bedrooms: Number(form.bedrooms),
-                bathrooms: Number(form.bathrooms),
-                hasBalcony: form.hasBalcony,
-                furnishingStatus: form.furnishingStatus,
+                amenities: form.amenities.filter(name => validAmenityNames.has(name)),
+                bedrooms: isLand ? undefined : Number(form.bedrooms),
+                bathrooms: isLand ? undefined : Number(form.bathrooms),
+                hasBalcony: isLand ? undefined : form.hasBalcony,
+                furnishingStatus: isLand ? undefined : form.furnishingStatus,
                 availabilityStatus: form.availabilityStatus,
-                electricityPrice: form.electricityPrice,
-                waterPrice: form.waterPrice,
-                internetPrice: form.internetPrice,
+                electricityPrice: isRent && !isLand ? form.electricityPrice : undefined,
+                waterPrice: isRent && !isLand ? form.waterPrice : undefined,
+                internetPrice: isRent && !isLand ? form.internetPrice : undefined,
+                legalDocumentType: form.legalDocumentType || undefined,
             };
 
+            console.log('[Post] create property payload:', body);
             await roomService.createRoom(body);
             setStep(3);
         } catch (error: any) {
@@ -382,9 +618,16 @@ function PostScreenContent() {
             bedrooms: '1', bathrooms: '1', capacity: '', furnishingStatus: 'PARTIALLY_FURNISHED',
             hasBalcony: false, availabilityStatus: 'IMMEDIATELY',
             electricityPrice: 'STATE_PRICE', waterPrice: 'STATE_PRICE', internetPrice: 'FREE',
-            amenities: [], latitude: '10.762622', longitude: '106.660172',
+            amenities: [],
+            projectId: '',
+            legalDocumentType: '',
+            validityDays: '30',
+            latitude: '',  // ✅ Để trống
+            longitude: '', // ✅ Để trống
         });
     };
+
+    // ─── Guards ───────────────────────────────────────────────
 
     if (!isAuthenticated) {
         return (
@@ -437,6 +680,8 @@ function PostScreenContent() {
         );
     }
 
+    // ─── Main Render ──────────────────────────────────────────
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" />
@@ -456,27 +701,98 @@ function PostScreenContent() {
                     {/* ===== STEP 0: Cơ bản ===== */}
                     {step === 0 && (
                         <>
+                            <FormField label="Hình thức giao dịch *" required>
+                                <OptionButtonGroup
+                                    options={TRANSACTION_TYPE_OPTIONS as unknown as { val: 'FOR_RENT' | 'FOR_SALE'; label: string }[]}
+                                    value={form.transactionType}
+                                    onChange={updateTransactionType}
+                                />
+                            </FormField>
                             <FormField label="Tiêu đề tin đăng *" required>
                                 <TextInput style={styles.input} placeholder="VD: Căn hộ 2PN view đẹp, full nội thất..." value={form.title} onChangeText={v => updateForm('title', v)} />
                             </FormField>
 
-                            <DropdownPicker label="Tỉnh/Thành phố *" options={Object.keys(PROVINCES)} value={form.province}
-                                onChange={v => { updateForm('province', v); updateForm('district', ''); updateForm('ward', ''); }}
-                                placeholder="Chọn tỉnh/thành phố" />
+                            <DropdownPicker
+                                label="Thuộc dự án (nếu có)"
+                                options={projectOptions}
+                                value={selectedProjectName}
+                                onChange={v => {
+                                    const project = projectList.find(p => p.name === v);
+                                    updateForm('projectId', project ? project.id.toString() : '');
+                                }}
+                                placeholder={projectLoading ? 'Đang tải dự án...' : 'Chọn dự án'}
+                            />
 
-                            <DropdownPicker label="Quận/Huyện *" options={districtOptions} value={form.district}
-                                onChange={v => { updateForm('district', v); updateForm('ward', ''); }}
-                                placeholder={form.province ? 'Chọn quận/huyện' : 'Chọn tỉnh trước'} />
+                            <DropdownPicker
+                                label="Tỉnh/Thành phố *"
+                                options={Object.keys(PROVINCES)}
+                                value={form.province}
+                                onChange={v => {
+                                    setForm(prev => ({ ...prev, province: v, district: '', ward: '', latitude: '', longitude: '' }));
+                                }}
+                                placeholder="Chọn tỉnh/thành phố"
+                            />
 
-                            <DropdownPicker label="Phường/Xã" options={wardOptions} value={form.ward}
-                                onChange={v => updateForm('ward', v)}
-                                placeholder={form.district ? 'Chọn phường/xã' : 'Chọn quận trước'} />
+                            <DropdownPicker
+                                label="Quận/Huyện *"
+                                options={districtOptions}
+                                value={form.district}
+                                onChange={v => {
+                                    setForm(prev => ({ ...prev, district: v, ward: '', latitude: '', longitude: '' }));
+                                    // Geocode ngay cấp quận (ward chưa có)
+                                    geocodeAddress(form.province, v, '', form.addressDetail);
+                                }}
+                                placeholder={form.province ? 'Chọn quận/huyện' : 'Chọn tỉnh trước'}
+                            />
+
+                            <DropdownPicker
+                                label="Phường/Xã"
+                                options={wardOptions}
+                                value={form.ward}
+                                onChange={v => {
+                                    updateForm('ward', v);
+                                    // ✅ Geocode chính xác nhất khi có đủ phường
+                                    geocodeAddress(form.province, form.district, v, form.addressDetail);
+                                }}
+                                placeholder={form.district ? 'Chọn phường/xã' : 'Chọn quận trước'}
+                            />
+
+                            {/* ✅ Hiển thị trạng thái geocode */}
+                            {isGeocoding && (
+                                <View style={styles.geocodingRow}>
+                                    <ActivityIndicator size="small" color="#0066FF" />
+                                    <Text style={styles.geocodingText}>Đang xác định tọa độ...</Text>
+                                </View>
+                            )}
+                            {!isGeocoding && form.latitude && form.longitude && (
+                                <View style={styles.geocodingRow}>
+                                    <Ionicons name="location" size={14} color="#22C55E" />
+                                    <Text style={styles.geocodingSuccess}>
+                                        Đã xác định: {Number(form.latitude).toFixed(5)}, {Number(form.longitude).toFixed(5)}
+                                    </Text>
+                                </View>
+                            )}
 
                             <FormField label="Địa chỉ chi tiết">
-                                <TextInput style={styles.input} placeholder="Số nhà, tên đường..." value={form.addressDetail} onChangeText={v => updateForm('addressDetail', v)} />
+                                {/* ✅ TextInput đúng cú pháp JSX, không có code lẫn vào */}
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Số nhà, tên đường..."
+                                    value={form.addressDetail}
+                                    onChangeText={v => {
+                                        updateForm('addressDetail', v);
+                                        // Debounce geocode sau khi người dùng nhập địa chỉ
+                                        if (geocodeTimer.current) clearTimeout(geocodeTimer.current);
+                                        geocodeTimer.current = setTimeout(() => {
+                                            if (form.province && form.district) {
+                                                geocodeAddress(form.province, form.district, form.ward, v);
+                                            }
+                                        }, 1500);
+                                    }}
+                                />
                             </FormField>
 
-                            <FormField label="Giá thuê (đồng/tháng) *">
+                            <FormField label={isRent ? "Giá thuê (đồng/tháng) *" : "Giá bán (đồng) *"}>
                                 <TextInput style={styles.input} placeholder="VD: 5000000" value={form.price} onChangeText={v => updateForm('price', v)} keyboardType="numeric" />
                             </FormField>
 
@@ -485,15 +801,11 @@ function PostScreenContent() {
                             </FormField>
 
                             <FormField label="Loại BĐS">
-                                <View style={styles.toggleRow}>
-                                    {[{ val: 'ROOM', label: 'Phòng trọ' }, { val: 'APARTMENT', label: 'Căn hộ' }, { val: 'HOUSE', label: 'Nhà' }].map(opt => (
-                                        <TouchableOpacity key={opt.val}
-                                            style={[styles.toggleBtn, form.propertyType === opt.val && styles.toggleBtnActive]}
-                                            onPress={() => updateForm('propertyType', opt.val)}>
-                                            <Text style={[styles.toggleText, form.propertyType === opt.val && styles.toggleTextActive]}>{opt.label}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                <OptionButtonGroup
+                                    options={PROPERTY_TYPE_OPTIONS}
+                                    value={form.propertyType}
+                                    onChange={updatePropertyType}
+                                />
                             </FormField>
 
                             <FormField label="Mô tả">
@@ -509,6 +821,7 @@ function PostScreenContent() {
                     {/* ===== STEP 1: Chi tiết ===== */}
                     {step === 1 && (
                         <>
+                            {!isLand && (
                             <View style={styles.row2}>
                                 <View style={{ flex: 1 }}>
                                     <FormField label="Phòng ngủ">
@@ -521,13 +834,15 @@ function PostScreenContent() {
                                     </FormField>
                                 </View>
                             </View>
+                            )}
 
-                            {form.propertyType === 'ROOM' && (
+                            {isRent && !isLand && form.propertyType === 'ROOM' && (
                                 <FormField label="Sức chứa (người)">
                                     <TextInput style={styles.input} placeholder="VD: 4" value={form.capacity} onChangeText={v => updateForm('capacity', v)} keyboardType="numeric" />
                                 </FormField>
                             )}
 
+                            {!isLand && (
                             <FormField label="Nội thất">
                                 <ChipSelector
                                     options={FURNITURE_OPTIONS}
@@ -535,8 +850,72 @@ function PostScreenContent() {
                                     onToggle={v => updateForm('furnishingStatus', FURNITURE_MAP[v] || v)}
                                 />
                             </FormField>
+                            )}
 
-                            {/* ✅ Tiện ích từ API */}
+                            {!isLand && (
+                                <FormField label="Ban công">
+                                    <View style={styles.switchRow}>
+                                        <Text style={styles.switchLabel}>Có ban công</Text>
+                                        <Switch
+                                            value={form.hasBalcony}
+                                            onValueChange={v => updateForm('hasBalcony', v)}
+                                            trackColor={{ false: '#DDD', true: '#AAC8FF' }}
+                                            thumbColor={form.hasBalcony ? '#0066FF' : '#F4F4F4'}
+                                        />
+                                    </View>
+                                </FormField>
+                            )}
+
+                            <DropdownPicker
+                                label="Tình trạng trống phòng"
+                                options={AVAILABILITY_OPTIONS}
+                                value={AVAILABILITY_REVERSE_MAP[form.availabilityStatus] || ''}
+                                onChange={v => updateForm('availabilityStatus', AVAILABILITY_MAP[v] || v)}
+                                placeholder="Chọn thời gian có thể vào ở"
+                            />
+
+                            <DropdownPicker
+                                label={isSale ? 'Pháp lý *' : 'Pháp lý'}
+                                options={LEGAL_DOCUMENT_OPTIONS}
+                                value={LEGAL_DOCUMENT_REVERSE_MAP[form.legalDocumentType] || ''}
+                                onChange={v => updateForm('legalDocumentType', LEGAL_DOCUMENT_MAP[v] || v)}
+                                placeholder="Chọn giấy tờ pháp lý"
+                            />
+
+                            <DropdownPicker
+                                label="Thời hạn hiển thị tin"
+                                options={VALIDITY_OPTIONS}
+                                value={VALIDITY_REVERSE_MAP[Number(form.validityDays)] || ''}
+                                onChange={v => updateForm('validityDays', String(VALIDITY_MAP[v] || 30))}
+                                placeholder="Chọn thời hạn"
+                            />
+
+                            {isRent && !isLand && (
+                                <>
+                                    <UtilityPriceField
+                                        label="Giá điện"
+                                        value={form.electricityPrice}
+                                        onChange={v => updateForm('electricityPrice', v)}
+                                        options={[{ val: 'STATE_PRICE', label: 'Giá nhà nước' }]}
+                                        customPlaceholder="VD: 3,500đ/kWh"
+                                    />
+                                    <UtilityPriceField
+                                        label="Giá nước"
+                                        value={form.waterPrice}
+                                        onChange={v => updateForm('waterPrice', v)}
+                                        options={[{ val: 'STATE_PRICE', label: 'Giá nhà nước' }, { val: 'FREE', label: 'Miễn phí' }]}
+                                        customPlaceholder="VD: 20,000đ/khối"
+                                    />
+                                    <UtilityPriceField
+                                        label="Internet"
+                                        value={form.internetPrice}
+                                        onChange={v => updateForm('internetPrice', v)}
+                                        options={[{ val: 'FREE', label: 'Miễn phí' }]}
+                                        customPlaceholder="VD: 100,000đ/tháng"
+                                    />
+                                </>
+                            )}
+
                             <FormField label="Tiện ích">
                                 {amenityLoading ? (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
@@ -639,29 +1018,6 @@ function PostScreenContent() {
     );
 }
 
-function FormField({ label, children, required }: { label: string; children?: React.ReactNode; required?: boolean }) {
-    return (
-        <View style={styles.formField}>
-            <Text style={styles.fieldLabel}>{label}{required && <Text style={{ color: '#EF4444' }}> *</Text>}</Text>
-            {children}
-        </View>
-    );
-}
-
-function NumberStepper({ value, onChange, min = 0, max = 20 }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
-    return (
-        <View style={styles.stepper}>
-            <TouchableOpacity style={styles.stepperBtn} onPress={() => value > min && onChange(value - 1)}>
-                <Ionicons name="remove" size={20} color={value === min ? '#CCC' : '#0066FF'} />
-            </TouchableOpacity>
-            <Text style={styles.stepperValue}>{value}</Text>
-            <TouchableOpacity style={styles.stepperBtn} onPress={() => value < max && onChange(value + 1)}>
-                <Ionicons name="add" size={20} color={value === max ? '#CCC' : '#0066FF'} />
-            </TouchableOpacity>
-        </View>
-    );
-}
-
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     authRequired: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16, paddingHorizontal: 40, backgroundColor: 'white' },
@@ -700,6 +1056,8 @@ const styles = StyleSheet.create({
     stepper: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: 'white', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12 },
     stepperBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
     stepperValue: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', minWidth: 30, textAlign: 'center' },
+    switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
+    switchLabel: { fontSize: 15, color: '#333', fontWeight: '500' },
     dropdownBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13 },
     dropdownValue: { fontSize: 15, color: '#1A1A1A' },
     dropdownPlaceholder: { fontSize: 15, color: '#BBB' },
@@ -708,6 +1066,9 @@ const styles = StyleSheet.create({
     dropdownItemSelected: { backgroundColor: '#E8F0FF' },
     dropdownItemText: { fontSize: 14, color: '#333' },
     dropdownItemTextSelected: { color: '#0066FF', fontWeight: '600' },
+    geocodingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, marginTop: -8 },
+    geocodingText: { fontSize: 12, color: '#0066FF' },
+    geocodingSuccess: { fontSize: 12, color: '#22C55E', fontWeight: '600' },
     imagePickerSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
     imageCount: { fontSize: 15, fontWeight: '600', color: '#333' },
     addImageBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },

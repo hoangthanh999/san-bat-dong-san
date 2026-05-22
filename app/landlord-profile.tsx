@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     StatusBar, Platform, ActivityIndicator,
@@ -16,6 +16,7 @@ export default function LandlordProfileScreen() {
     const insets = useSafeAreaInsets();
     const { slug, landlordId } = useLocalSearchParams<{ slug?: string; landlordId?: string }>();
     const [profile, setProfile] = useState<CustomerPublicResponseDTO | null>(null);
+    const [bannerUrl, setBannerUrl] = useState<string | null>(null);
     const [rooms, setRooms] = useState<Room[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,13 @@ export default function LandlordProfileScreen() {
             if (slug) {
                 const p = await userService.getPublicProfile(slug);
                 setProfile(p);
+                // Load banner image from dedicated endpoint
+                try {
+                    const bannerData = await userService.getPublicBanner(slug);
+                    if (bannerData?.bannerUrl) setBannerUrl(bannerData.bannerUrl);
+                } catch {
+                    // Banner is optional — fail silently
+                }
             } else if (landlordId) {
                 const summary = await userService.getUserSummary(Number(landlordId));
                 setProfile({
@@ -89,10 +97,20 @@ export default function LandlordProfileScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="light-content" />
 
-            {/* Header Banner */}
+            {/* Header Banner — dùng ảnh thật nếu có, fallback màu xanh */}
             <View style={[styles.banner, { paddingTop: insets.top + 8 }]}>
-                <View style={styles.bannerGradient} />
-                <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+                {bannerUrl ? (
+                    <Image
+                        source={{ uri: bannerUrl }}
+                        style={StyleSheet.absoluteFillObject}
+                        contentFit="cover"
+                    />
+                ) : (
+                    <View style={styles.bannerGradient} />
+                )}
+                {/* Overlay để chữ luôn đọc được dù có ảnh hay không */}
+                <View style={styles.bannerOverlay} />
+                <TouchableOpacity style={[styles.backBtn, { top: insets.top + 4 }]} onPress={() => router.back()}>
                     <Ionicons name="arrow-back" size={24} color="white" />
                 </TouchableOpacity>
                 <Text style={styles.bannerTitle}>Hồ sơ chủ nhà</Text>
@@ -208,16 +226,21 @@ const styles = StyleSheet.create({
     retryBtn: { backgroundColor: '#0066FF', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
     retryBtnText: { color: 'white', fontWeight: '700' },
     banner: {
-        height: 120, backgroundColor: '#0066FF',
+        height: 160, backgroundColor: '#0066FF',
         justifyContent: 'flex-end', padding: 16,
-        paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */,
+        paddingTop: 0,
+        overflow: 'hidden',
     },
     bannerGradient: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: '#0052CC',
     },
+    bannerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.25)',
+    },
     backBtn: {
-        position: 'absolute', top: 0 /* paddingTop set via inline style using useSafeAreaInsets */, left: 16,
+        position: 'absolute', left: 16,
         width: 40, height: 40, justifyContent: 'center',
     },
     bannerTitle: { fontSize: 20, fontWeight: '700', color: 'white', marginTop: 20 },

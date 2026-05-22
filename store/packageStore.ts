@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { ServicePackage, PackageType } from '../types';
 import { packageService } from '../services/api/packages';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS } from '../constants';
 
 interface PackageState {
     membershipPackages: ServicePackage[];
@@ -11,20 +9,23 @@ interface PackageState {
     isPurchasing: boolean;
     error: string | null;
 
-    fetchPackages: (type?: PackageType) => Promise<void>;
+    fetchPackages: (type?: 'MEMBERSHIP' | 'ROOM_PROMOTION') => Promise<void>; // ✅ Optional param
     purchaseMembership: (packageId: number) => Promise<void>;
     boostRoom: (roomId: number, packageId: number) => Promise<void>;
     clearError: () => void;
 }
 
-/**
- * Helper: Lấy userId đã lưu khi login từ AsyncStorage
- */
-async function getUserId(): Promise<number> {
-    const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
-    if (!userData) throw new Error('Chưa đăng nhập. Vui lòng đăng nhập lại.');
-    const user = JSON.parse(userData);
-    return user.id;
+function mapPackage(p: any): ServicePackage {
+    return {
+        id: p.id,
+        name: p.name ?? '',
+        type: p.type as PackageType,
+        price: Number(p.price) || 0,
+        durationDays: p.durationDays ?? 0,
+        description: p.description ?? '',
+        features: [],
+        isPopular: (p.priorityLevel ?? 0) > 0,
+    };
 }
 
 export const usePackageStore = create<PackageState>((set) => ({
@@ -34,57 +35,72 @@ export const usePackageStore = create<PackageState>((set) => ({
     isPurchasing: false,
     error: null,
 
-    fetchPackages: async (type?: PackageType) => {
+    // ✅ Nhận optional type để filter thông minh hơn
+    fetchPackages: async (type?: 'MEMBERSHIP' | 'ROOM_PROMOTION') => {
         set({ isLoading: true, error: null });
         try {
-            if (type === 'MEMBERSHIP') {
-                const data = await packageService.getServicePackages('MEMBERSHIP');
-                set({ membershipPackages: data, isLoading: false });
-            } else if (type === 'ROOM_PROMOTION') {
-                const data = await packageService.getServicePackages('ROOM_PROMOTION');
-                set({ boostPackages: data, isLoading: false });
-            } else {
-                // Fetch both
-                const [membership, boost] = await Promise.all([
-                    packageService.getServicePackages('MEMBERSHIP'),
-                    packageService.getServicePackages('ROOM_PROMOTION'),
-                ]);
-                set({ membershipPackages: membership, boostPackages: boost, isLoading: false });
+            const all: any[] = await packageService.getServicePackages();
+
+            // Nếu truyền type cụ thể → chỉ load loại đó (tiết kiệm xử lý)
+            if (type === 'ROOM_PROMOTION') {
+                const boost = all
+                    .filter((p) => p.type === 'ROOM_PROMOTION' && p.active !== false)
+                    .map(mapPackage);
+                set({ boostPackages: boost, isLoading: false });
+                return;
             }
+
+            if (type === 'MEMBERSHIP') {
+                const membership = all
+                    .filter((p) => p.type === 'MEMBERSHIP' && p.active !== false)
+                    .map(mapPackage);
+                set({ membershipPackages: membership, isLoading: false });
+                return;
+            }
+
+            // Không truyền type → load tất cả (behavior cũ)
+            const membership = all
+                .filter((p) => p.type === 'MEMBERSHIP' && p.active !== false)
+                .map(mapPackage);
+            const boost = all
+                .filter((p) => p.type === 'ROOM_PROMOTION' && p.active !== false)
+                .map(mapPackage);
+
+            set({ membershipPackages: membership, boostPackages: boost, isLoading: false });
         } catch (error: any) {
-            set({ error: error.message, isLoading: false });
+            console.error('[PackageStore] fetchPackages failed:', error?.message);
+            set({
+                isLoading: false,
+                error: error?.message ?? 'Không thể tải gói dịch vụ',
+            });
         }
     },
 
-    /**
-     * Mua gói hội viên
-     * Backend: POST /api/packages/buy-membership?packageId=Y
-     * JWT Token cung cấp userId tự động
-     */
     purchaseMembership: async (packageId: number) => {
         set({ isPurchasing: true, error: null });
         try {
             await packageService.purchaseMembership(packageId);
             set({ isPurchasing: false });
         } catch (error: any) {
-            set({ error: error.message || 'Mua gói thất bại', isPurchasing: false });
-            throw error;
+            const msg = error?.response?.data?.error
+                ?? error?.message
+                ?? 'Mua gói thất bại';
+            set({ error: msg, isPurchasing: false });
+            throw new Error(msg);
         }
     },
 
-    /**
-     * Boost tin đăng
-     * Backend: POST /api/packages/buy-promotion?packageId=X&propertyId=Y
-     * JWT Token cung cấp userId tự động
-     */
     boostRoom: async (roomId: number, packageId: number) => {
         set({ isPurchasing: true, error: null });
         try {
             await packageService.buyPromotion(packageId, roomId);
             set({ isPurchasing: false });
         } catch (error: any) {
-            set({ error: error.message || 'Boost tin thất bại', isPurchasing: false });
-            throw error;
+            const msg = error?.response?.data?.error
+                ?? error?.message
+                ?? 'Boost tin thất bại';
+            set({ error: msg, isPurchasing: false });
+            throw new Error(msg);
         }
     },
 

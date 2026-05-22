@@ -24,7 +24,7 @@ export default function RegisterScreen() {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [phone, setPhone] = useState('');
+   
     const [confirmPassword, setConfirmPassword] = useState('');
     const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
 
@@ -42,12 +42,7 @@ export default function RegisterScreen() {
         }
 
         // Validate số điện thoại Việt Nam
-        const phoneRegex = /^(0|\+84)(3|5|7|8|9)[0-9]{8}$/;
-        if (!phone.trim()) {
-            errors.phone = 'Vui lòng nhập số điện thoại';
-        } else if (!phoneRegex.test(phone.trim())) {
-            errors.phone = 'Số điện thoại không hợp lệ (VD: 0901234567)';
-        }
+    
 
         // Validate độ mạnh mật khẩu
         if (!password) {
@@ -74,7 +69,7 @@ export default function RegisterScreen() {
         if (!validate()) return;
 
         try {
-            await register({ email: email.trim(), password, fullName: fullName.trim(), phone: phone.trim() });
+            await register({ email: email.trim(), password, fullName: fullName.trim() });
             router.replace('/(auth)/login');
         } catch (err: any) {
             const status = err?.response?.status;
@@ -123,13 +118,7 @@ export default function RegisterScreen() {
                         autoCapitalize="none"
                         error={fieldErrors.email}
                     />
-                    <Input
-                        label="Số điện thoại"
-                        placeholder="0123456789"
-                        value={phone}
-                        onChangeText={setPhone}
-                        error={fieldErrors.phone}
-                    />
+                 
                     <Input
                         label="Mật khẩu"
                         placeholder="••••••••"

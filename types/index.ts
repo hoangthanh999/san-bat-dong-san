@@ -127,7 +127,7 @@ export interface RegisterRequest {
     email: string;
     password: string;
     fullName: string;
-    phone: string;   // backend @NotBlank — bắt buộc
+  
 }
 
 // Backend login trả về (trước khi unwrap result)

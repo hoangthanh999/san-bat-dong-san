@@ -104,4 +104,20 @@ export const searchService = {
         );
         return response.data;
     },
+
+    /**
+     * Lấy danh sách bài đăng theo list IDs
+     * POST /search/properties/by-ids — body: { ids: number[] }
+     * Backend: SearchController.getPropertiesByIds()
+     *
+     * Dùng khi cần hydrate danh sách ID từ AI/recommendation engine
+     * Response: ApiResponse<List<PropertySearchItemDTO>> (unwrapped bởi interceptor)
+     */
+    getPropertiesByIds: async (ids: number[]): Promise<PropertySearchItem[]> => {
+        const response = await apiClient.post<PropertySearchItem[]>(
+            API_ENDPOINTS.SEARCH_PROPERTIES_BY_IDS,
+            { ids }
+        );
+        return response.data;
+    },
 };

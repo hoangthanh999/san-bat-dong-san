@@ -11,6 +11,7 @@
  *   - Loading / refreshing state
  *   - Active index (để sau này auto-play video)
  */
+import { useInteractionStore } from './interactionStore';
 import { create } from 'zustand';
 import { reelsApi, PropertyReel } from '../services/api/reels';
 
@@ -45,12 +46,11 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
 
     // ── Fetch lần đầu ────────────────────────────────────────
     fetchReels: async () => {
-        // Guard: không fetch nếu đang loading
         if (get().loading) return;
-
         set({ loading: true });
         try {
             const data = await reelsApi.getFeed(10);
+            syncInteractions(data.items); // ✅ thêm dòng này
             set({
                 reels: data.items,
                 nextCursor: data.nextCursor,
@@ -63,19 +63,14 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
         }
     },
 
-    // ── Load thêm bằng cursor ─────────────────────────────────
     loadMore: async () => {
         const { hasNext, loading, nextCursor, reels } = get();
-
-        // Guard: không load nếu hết data hoặc đang loading
-        // hoặc không có cursor
         if (!hasNext || loading || !nextCursor) return;
-
         set({ loading: true });
         try {
             const data = await reelsApi.loadMore(nextCursor, 10);
+            syncInteractions(data.items); // ✅ thêm dòng này
             set({
-                // Append vào cuối list, không replace
                 reels: [...reels, ...data.items],
                 nextCursor: data.nextCursor,
                 hasNext: data.hasNext,
@@ -87,18 +82,16 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
         }
     },
 
-    // ── Pull-to-refresh ───────────────────────────────────────
     refresh: async () => {
-        // Không check loading vì user chủ động refresh
         set({ refreshing: true });
         try {
             const data = await reelsApi.getFeed(10);
+            syncInteractions(data.items); // ✅ thêm dòng này
             set({
-                // Reset hoàn toàn — không append
                 reels: data.items,
                 nextCursor: data.nextCursor,
                 hasNext: data.hasNext,
-                activeIndex: 0,  // scroll về đầu
+                activeIndex: 0,
             });
         } catch (e) {
             console.error('[ReelsStore] refresh error:', e);
@@ -107,6 +100,12 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
         }
     },
 
-    // ── Active index (dùng cho auto-play video sau này) ───────
     setActiveIndex: (index) => set({ activeIndex: index }),
 }));
+function syncInteractions(items: PropertyReel[]) {
+    const { setLiked, setSaved } = useInteractionStore.getState();
+    items.forEach(item => {
+        setLiked(item.id, item.liked);   // ✅ dùng item.liked
+        setSaved(item.id, item.saved);   // ✅ dùng item.saved
+    });
+}

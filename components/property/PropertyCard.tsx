@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, Pressable,
     TouchableOpacity, Linking, Share, Alert,
-    useWindowDimensions,
+    useWindowDimensions, FlatList,
 } from 'react-native';
 import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useInteractionStore } from '../../store/interactionStore';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -45,18 +46,37 @@ function getSmartTags(item: Room): { label: string; color: string; bg: string }[
 
 export default function PropertyCard({ item, isActive, cardHeight }: PropertyCardProps) {
     const router = useRouter();
-    const [isMuted, setIsMuted] = useState(true);
-    const [isLiked, setIsLiked] = useState(false);
-    const { toggleFavorite } = usePropertyStore();
+   const [isMuted, setIsMuted] = useState(false);
     const { isAuthenticated } = useAuthStore();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
 
+    const [currentImgIdx, setCurrentImgIdx] = useState(0);
+
+    const handleImageScroll = (event: any) => {
+        const slideSize = event.nativeEvent.layoutMeasurement.width;
+        if (!slideSize) return;
+        const offset = event.nativeEvent.contentOffset.x;
+        const activeIndex = Math.round(offset / slideSize);
+        if (activeIndex !== currentImgIdx) {
+            setCurrentImgIdx(activeIndex);
+        }
+    };
+    const {
+        isLiked: checkLiked,
+        isSaved: checkSaved,
+        toggleLike,
+        toggleSave,
+    } = useInteractionStore();
+
+    const isLiked = checkLiked(item.id);
+    const isSaved = checkSaved(item.id);
+
     // Chỉ tạo player khi có videoUrl thực sự
-    const player = useVideoPlayer(item.videoUrl || null, (p: VideoPlayer) => {
-        p.loop = true;
-        p.muted = isMuted;
-    });
+  const player = useVideoPlayer(item.videoUrl || null, (p: VideoPlayer) => {
+    p.loop = true;
+    p.muted = false;
+});
 
     const heartScale = useSharedValue(1);
     const likeOpacity = useSharedValue(0);
@@ -100,21 +120,26 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
         }
     }, [isMuted]);
 
+
+
+    // 3️⃣ Fix handleLike — dùng store
     const handleLike = async () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setIsLiked(prev => !prev);
-
         heartScale.value = withSequence(
             withSpring(1.4, { damping: 5 }),
             withSpring(1, { damping: 8 })
         );
-
         likeOpacity.value = withSequence(
             withTiming(1, { duration: 150 }),
             withTiming(0, { duration: 700 })
         );
+        await toggleLike(item.id);  // ✅ dùng store
+    };
 
-        await toggleFavorite(item.id);
+    // 4️⃣ Thêm handleSave
+    const handleSave = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        await toggleSave(item.id);
     };
 
     const handleCall = () => {
@@ -184,12 +209,12 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
     return (
         <View style={[styles.container, { height: cardHeight, width }]}>
             {/* Media Layer */}
-            <Pressable
-                onPress={() => setIsMuted(!isMuted)}
-                onLongPress={handleLike}
-                style={styles.mediaContainer}
-            >
-                {item.videoUrl && player ? (
+            {item.videoUrl && player ? (
+                <Pressable
+                    onPress={() => setIsMuted(!isMuted)}
+                    onLongPress={handleLike}
+                    style={styles.mediaContainer}
+                >
                     <VideoView
                         style={styles.video}
                         player={player}
@@ -197,21 +222,11 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
                         contentFit="cover"
                         nativeControls={false}
                     />
-                ) : (
-                    <Image
-                        source={{ uri: item.images[0] }}
-                        style={styles.image}
-                        contentFit="cover"
-                    />
-                )}
-
-                {/* Big Heart Animation Overlay */}
-                <Animated.View style={[styles.centerOverlay, overlayHeartStyle]} pointerEvents="none">
-                    <Ionicons name="heart" size={100} color="white" />
-                </Animated.View>
-
-                {/* Mute indicator */}
-                {item.videoUrl && (
+                    {/* Big Heart Animation Overlay */}
+                    <Animated.View style={[styles.centerOverlay, overlayHeartStyle]} pointerEvents="none">
+                        <Ionicons name="heart" size={100} color="white" />
+                    </Animated.View>
+                    {/* Mute indicator */}
                     <View style={[styles.muteIndicator, { top: muteTop }]}>
                         <Ionicons
                             name={isMuted ? 'volume-mute' : 'volume-high'}
@@ -219,8 +234,63 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
                             color="white"
                         />
                     </View>
-                )}
-            </Pressable>
+                </Pressable>
+            ) : item.images && item.images.length > 0 ? (
+                <View style={styles.mediaContainer}>
+                    <FlatList
+                        data={item.images}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        keyExtractor={(img, index) => `${item.id}-img-${index}`}
+                        onMomentumScrollEnd={handleImageScroll}
+                        renderItem={({ item: imgUri }) => (
+                            <Pressable
+                                onPress={handlePressDetails}
+                                onLongPress={handleLike}
+                                style={{ width, height: '100%' }}
+                            >
+                                <Image
+                                    source={{ uri: imgUri }}
+                                    style={styles.image}
+                                    contentFit="cover"
+                                />
+                            </Pressable>
+                        )}
+                        removeClippedSubviews={false}
+                    />
+                    {/* Big Heart Animation Overlay */}
+                    <Animated.View style={[styles.centerOverlay, overlayHeartStyle]} pointerEvents="none">
+                        <Ionicons name="heart" size={100} color="white" />
+                    </Animated.View>
+                    {/* Image Index Indicator */}
+                    {item.images.length > 1 && (
+                        <View style={[styles.imageIndexIndicator, { top: muteTop }]}>
+                            <Text style={styles.imageIndexText}>
+                                {currentImgIdx + 1}/{item.images.length}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            ) : (
+                <Pressable
+                    onPress={handlePressDetails}
+                    style={[styles.mediaContainer, {
+                        backgroundColor: '#0d1b2a',
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                    }]}
+                >
+                    <Ionicons name="home-outline" size={72} color="rgba(255,255,255,0.15)" />
+                    <Text style={{ color: 'rgba(255,255,255,0.3)', marginTop: 10, fontSize: 13 }}>
+                        Chưa có ảnh
+                    </Text>
+                    {/* Big Heart Animation Overlay */}
+                    <Animated.View style={[styles.centerOverlay, overlayHeartStyle]} pointerEvents="none">
+                        <Ionicons name="heart" size={100} color="white" />
+                    </Animated.View>
+                </Pressable>
+            )}
 
             {/* Gradient Overlay */}
             <LinearGradient
@@ -249,9 +319,21 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
 
             {/* Info Overlay */}
             <Pressable style={[styles.infoOverlay, { bottom: infoBottom }]} onPress={handlePressDetails}>
-                <View style={styles.priceTag}>
-                    <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
-                    <Text style={styles.unitText}>/ tháng</Text>
+                <View style={styles.priceRowContainer}>
+                    <View style={[
+                        styles.transactionBadge,
+                        { backgroundColor: item.transactionType === 'FOR_RENT' ? '#0066FF' : '#FF9500' }
+                    ]}>
+                        <Text style={styles.transactionBadgeText}>
+                            {item.transactionType === 'FOR_RENT' ? 'Cho thuê' : 'Bán'}
+                        </Text>
+                    </View>
+                    <View style={styles.priceTag}>
+                        <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
+                        {item.transactionType === 'FOR_RENT' && (
+                            <Text style={styles.unitText}>/ tháng</Text>
+                        )}
+                    </View>
                 </View>
 
                 <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
@@ -274,15 +356,16 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
                             <Text style={styles.featureText}>{item.bathrooms} PT</Text>
                         </View>
                     )}
-                    <View style={styles.featureBadge}>
-                        <Ionicons name="resize-outline" size={11} color="white" />
-                        <Text style={styles.featureText}>{item.area}m²</Text>
+                    <View style={[styles.featureBadge, styles.areaBadge]}>
+                        <Ionicons name="resize-outline" size={11} color="#FFD700" />
+                        <Text style={[styles.featureText, styles.areaText]}>{item.area}m²</Text>
                     </View>
                 </View>
             </Pressable>
 
             {/* Right Action Buttons */}
             <View style={[styles.rightActions, { bottom: actionsBottom }]}>
+
                 {/* Avatar */}
                 <TouchableOpacity onPress={handleChat} style={styles.landlordContainer}>
                     <Image
@@ -297,36 +380,58 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
                     </View>
                 </TouchableOpacity>
 
-                {/* Like */}
+                {/* ✅ Like — icon tim, label "Thích" */}
                 <TouchableOpacity onPress={handleLike} style={styles.actionButton}>
                     <Animated.View style={heartAnimatedStyle}>
-                        <Ionicons
-                            name={isLiked ? 'heart' : 'heart-outline'}
-                            size={32}
-                            color={isLiked ? '#FF4757' : 'white'}
-                        />
+                        <View style={[styles.iconCircle, { backgroundColor: isLiked ? 'rgba(255, 71, 87, 0.2)' : 'rgba(0,0,0,0.45)' }]}>
+                            <Ionicons
+                                name={isLiked ? 'heart' : 'heart-outline'}
+                                size={22}
+                                color={isLiked ? '#FF4757' : 'white'}
+                            />
+                        </View>
                     </Animated.View>
+                    <Text style={styles.actionText}>Thích</Text>
+                </TouchableOpacity>
+
+                {/* ✅ Save — icon bookmark, label "Lưu" */}
+                <TouchableOpacity onPress={handleSave} style={styles.actionButton}>
+                    <View style={[styles.iconCircle, { backgroundColor: isSaved ? 'rgba(255, 215, 0, 0.2)' : 'rgba(0,0,0,0.45)' }]}>
+                        <Ionicons
+                            name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                            size={22}
+                            color={isSaved ? '#FFD700' : 'white'}
+                        />
+                    </View>
                     <Text style={styles.actionText}>Lưu</Text>
                 </TouchableOpacity>
 
                 {/* Chat */}
                 <TouchableOpacity onPress={handleChat} style={styles.actionButton}>
-                    <Ionicons name="chatbubble-ellipses-outline" size={32} color="white" />
+                    <View style={[styles.iconCircle, { backgroundColor: '#0066FF' }]}>
+                        <Ionicons name="chatbubble-ellipses" size={20} color="white" />
+                    </View>
                     <Text style={styles.actionText}>Chat</Text>
                 </TouchableOpacity>
 
                 {/* Call */}
                 <TouchableOpacity onPress={handleCall} style={styles.actionButton}>
-                    <Ionicons name="call-outline" size={32} color="white" />
+                    <View style={[styles.iconCircle, { backgroundColor: '#2ECC71' }]}>
+                        <Ionicons name="call" size={20} color="white" />
+                    </View>
                     <Text style={styles.actionText}>Gọi</Text>
                 </TouchableOpacity>
 
                 {/* Share */}
                 <TouchableOpacity onPress={handleShare} style={styles.actionButton}>
-                    <Ionicons name="share-social-outline" size={32} color="white" />
+                    <View style={[styles.iconCircle, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
+                        <Ionicons name="share-social" size={20} color="white" />
+                    </View>
                     <Text style={styles.actionText}>Chia sẻ</Text>
                 </TouchableOpacity>
+
             </View>
+
         </View>
     );
 }
@@ -503,5 +608,59 @@ const styles = StyleSheet.create({
         textShadowColor: 'rgba(0,0,0,0.5)',
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 3,
+    },
+    imageIndexIndicator: {
+        position: 'absolute',
+        right: 12,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        borderRadius: 12,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        zIndex: 10,
+    },
+    imageIndexText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    priceRowContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 6,
+    },
+    transactionBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    transactionBadgeText: {
+        color: 'white',
+        fontSize: 11,
+        fontWeight: '800',
+        textTransform: 'uppercase',
+    },
+    areaBadge: {
+        backgroundColor: 'rgba(255, 215, 0, 0.15)',
+        borderColor: 'rgba(255, 215, 0, 0.3)',
+        borderWidth: 1,
+    },
+    areaText: {
+        color: '#FFD700',
+        fontWeight: '700',
+    },
+    iconCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 4,
     },
 });

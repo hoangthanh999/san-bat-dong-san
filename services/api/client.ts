@@ -65,6 +65,9 @@ apiClient.interceptors.response.use(
         const status = error.response?.status;
         const url = error.config?.url || '';
         console.error('[API Error]', status, error.message, url);
+        if (error.response?.data) {
+            console.error('[API Error Data]', JSON.stringify(error.response.data));
+        }
 
         // ============================================================
         // Import Toast để hiện thông báo thân thiện
@@ -136,7 +139,9 @@ apiClient.interceptors.response.use(
         }
 
         // Handle backend error response (400, 422, etc.)
-        const backendMessage = (error.response?.data as any)?.message;
+        const backendData = error.response?.data as any;
+        const backendCode = backendData?.code;
+        const backendMessage = backendData?.message;
         const errorMessage = backendMessage || error.message || 'Đã xảy ra lỗi';
 
         // Chỉ hiện toast cho lỗi không phải validation (validation đã hiện Alert riêng)
@@ -146,6 +151,8 @@ apiClient.interceptors.response.use(
 
         return Promise.reject({
             ...error,
+            backendCode,
+            backendMessage,
             message: errorMessage,
         });
     }

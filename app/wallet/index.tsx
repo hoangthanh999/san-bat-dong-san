@@ -183,8 +183,8 @@ function WalletContent() {
                         onPress={() => router.push('/wallet/withdraw' as any)}
                         activeOpacity={0.85}
                     >
-                        <Ionicons name="arrow-up-circle-outline" size={20} color="#E31837" />
-                        <Text style={styles.withdrawBtnText}>Rút tiền về tài khoản ngân hàng</Text>
+                        <Ionicons name="refresh-circle-outline" size={20} color="#FF9500" />
+                        <Text style={styles.withdrawBtnText}>Hoàn tiền đang giữ</Text>
                         <Ionicons name="chevron-forward" size={16} color="#E31837" />
                     </TouchableOpacity>
                 </View>
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12, paddingVertical: 8,
     },
     withdrawBtnText: {
-        flex: 1, color: '#E31837', fontSize: 14, fontWeight: '600',
+        flex: 1, color: '#FF9500 ', fontSize: 14, fontWeight: '600',
     },
 
     // ── Transactions ──

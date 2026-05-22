@@ -118,7 +118,7 @@ export default function ChatListScreen() {
             ) : (
                 <FlatList
                     data={conversations}
-                    keyExtractor={item => item.id.toString()}
+                 keyExtractor={(item, index) => item?.id?.toString() ?? index.toString()}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
                     ListHeaderComponent={
                         // AI Chat Banner — luôn hiển thị đầu danh sách
@@ -142,7 +142,10 @@ export default function ChatListScreen() {
                     renderItem={({ item }) => (
                         <ConversationItem
                             item={item}
-                            onPress={() => router.push(`/chat/${item.id}`)}
+                         onPress={() => {
+    if (!item?.id) return; // ✅ không navigate nếu id undefined
+    router.push(`/chat/${item.id}`);
+}}
                             onDelete={() => {
                                 Alert.alert('Xoá cuộc trò chuyện', 'Chức năng đang phát triển.');
                             }}
