@@ -27,6 +27,15 @@ interface ReleaseRequest {
     referenceId: string;
 }
 
+export interface WalletHoldRequest {
+    amount: number;
+    referenceId: string;
+}
+
+export interface WalletDebitRequest {
+    amount: number;
+}
+
 async function getStoredUserId(): Promise<number> {
     const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
     if (!userData) {
@@ -119,12 +128,31 @@ export const walletService = {
         return res.data.content ?? [];
     },
 
-    /**
-     * Lấy danh sách bills
-     * GET /api/bills/my
-     */
-    fetchBills: async (): Promise<any[]> => {
-        const res = await apiClient.get('/api/bills/my');
-        return (res.data as any).result ?? res.data ?? [];
+    fetchPaymentTransactions: async (userId?: number): Promise<Transaction[]> => {
+        const resolvedUserId = userId ?? await getStoredUserId();
+        const res = await paymentClient.get<Transaction[]>(
+            API_ENDPOINTS.TRANSACTION_HISTORY(resolvedUserId)
+        );
+        return res.data ?? [];
     },
+
+    holdMoney: async (payload: WalletHoldRequest): Promise<string> => {
+        const userId = await getStoredUserId();
+        const res = await apiClient.post<string>(
+            API_ENDPOINTS.WALLET_HOLD,
+            { userId, amount: payload.amount, referenceId: payload.referenceId }
+        );
+        return (res.data as any).result ?? res.data;
+    },
+
+    debitMoney: async (payload: WalletDebitRequest): Promise<string> => {
+        const userId = await getStoredUserId();
+        const res = await apiClient.post<string>(
+            API_ENDPOINTS.WALLET_DEBIT,
+            null,
+            { params: { userId, amount: payload.amount } }
+        );
+        return (res.data as any).result ?? res.data;
+    },
+
 };

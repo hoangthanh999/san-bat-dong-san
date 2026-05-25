@@ -487,7 +487,6 @@ function ProfileScreenContent() {
                         { icon: 'receipt-outline', label: 'Tạo hóa đơn tiền trọ', onPress: () => router.push('/bills/create' as any) },
                     ] : []),
                     { icon: 'star-outline', label: 'Gói dịch vụ & Boost tin', onPress: () => router.push('/packages' as any) },
-                    { icon: 'flame-outline', label: '📦 Trạng thái Boost', onPress: () => router.push('/packages/status' as any) },
                     { icon: 'bar-chart-outline', label: '📊 Thống kê thị trường', onPress: () => router.push('/analytics' as any) },
                 ].map(({ icon, label, onPress }) => (
                     <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>

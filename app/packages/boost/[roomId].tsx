@@ -59,7 +59,7 @@ export default function BoostRoomScreen() {
             setShowConfirm(false);
             await fetchTransactions();
             Alert.alert('Thành công! 🚀', `Tin đăng đã được đẩy lên top trong ${selectedPkg.durationDays} ngày!`, [
-                { text: 'Xem trạng thái boost', onPress: () => router.push('/packages/status' as any) },
+                { text: 'Xem giao dịch', onPress: () => router.push('/wallet/transactions' as any) },
                 { text: 'OK', onPress: () => router.back() },
             ]);
         } catch (e: any) {

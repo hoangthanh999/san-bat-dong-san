@@ -70,7 +70,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         // Optimistic update
         const tempMessage: ChatMessage = {
-            id: Date.now(),
+            id: `temp-${Date.now()}`,
             senderId: user.id,
             receiverId: partnerId,
             content,

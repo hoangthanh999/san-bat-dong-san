@@ -201,7 +201,9 @@ export const API_ENDPOINTS = {
     // ============================================================
     WALLET_ME: '/api/wallets/me',
     WALLET_TRANSACTIONS: '/api/wallets/transactions',
+    WALLET_HOLD: '/api/wallets/hold',
     WALLET_RELEASE: '/api/wallets/release',
+    WALLET_DEBIT: '/api/wallets/debit',
 
     // ============================================================
     // CHAT

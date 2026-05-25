@@ -59,6 +59,7 @@ export interface Room {
     ownerNameSnapshot?: string;
     ownerAvatarSnapshot?: string;
     ownerSlugSnapshot?: string;
+    ownerPhoneSnapshot?: string;
 
     // Legacy/enriched owner info
     ownerFullName?: string;
@@ -345,7 +346,7 @@ export type MessageType = 'TEXT' | 'IMAGE' | 'VOICE' | 'LOCATION' | 'PROPERTY' |
 
 // Khớp backend ChatMessageResponse
 export interface ChatMessage {
-    id: number;
+    id: string;
     senderId: number;
     receiverId: number;
     content?: string;

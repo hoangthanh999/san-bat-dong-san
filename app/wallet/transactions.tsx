@@ -11,13 +11,14 @@ import { Transaction } from '../../types';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 // ─── Filter tabs ──────────────────────────────────────────────
-type FilterKey = 'ALL' | 'DEPOSIT' | 'SERVICE' | 'REFUND';
+type FilterKey = 'ALL' | 'DEPOSIT' | 'SERVICE' | 'REFUND' | 'PAYMENT';
 
 const FILTER_TABS: { key: FilterKey; label: string; icon: string }[] = [
     { key: 'ALL', label: 'Tất cả', icon: 'list-outline' },
     { key: 'DEPOSIT', label: 'Nạp tiền', icon: 'arrow-down-circle-outline' },
     { key: 'SERVICE', label: 'Mua gói', icon: 'cube-outline' },
     { key: 'REFUND', label: 'Hoàn tiền', icon: 'return-down-back-outline' },
+    { key: 'PAYMENT', label: 'VNPay', icon: 'card-outline' },
 ];
 
 // Map type → filter key
@@ -155,25 +156,27 @@ export default function TransactionsScreen() {
 function TransactionsContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { transactions, isLoading, fetchTransactions } = useWalletStore();
+    const { transactions, paymentTransactions, isLoading, fetchTransactions, fetchPaymentTransactions } = useWalletStore();
     const [activeFilter, setActiveFilter] = useState<FilterKey>('ALL');
     const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
         fetchTransactions();
+        fetchPaymentTransactions();
     }, []);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await fetchTransactions();
+        await Promise.all([fetchTransactions(), fetchPaymentTransactions()]);
         setRefreshing(false);
-    }, [fetchTransactions]);
+    }, [fetchTransactions, fetchPaymentTransactions]);
 
     // ── Filter logic ──
     const filtered = useMemo(() => {
+        if (activeFilter === 'PAYMENT') return paymentTransactions;
         if (activeFilter === 'ALL') return transactions;
         return transactions.filter(tx => TYPE_TO_FILTER[tx.type] === activeFilter);
-    }, [transactions, activeFilter]);
+    }, [transactions, paymentTransactions, activeFilter]);
 
     // ── Tổng tiền theo filter ──
     const summary = useMemo(() => {
@@ -277,7 +280,7 @@ function TransactionsContent() {
             </View>
 
             {/* ── Content ── */}
-            {isLoading && transactions.length === 0 ? (
+            {isLoading && filtered.length === 0 ? (
                 <View style={styles.loadingWrap}>
                     <ActivityIndicator size="large" color="#0066FF" />
                     <Text style={styles.loadingText}>Đang tải giao dịch...</Text>
@@ -285,7 +288,7 @@ function TransactionsContent() {
             ) : (
                 <FlatList
                     data={filtered}
-                    keyExtractor={item => String(item.id)}
+                    keyExtractor={item => `${activeFilter}-${item.id}`}
                     renderItem={({ item }) => <TransactionCard item={item} />}
                     ListHeaderComponent={<ListHeader />}
                     ListEmptyComponent={renderEmpty}

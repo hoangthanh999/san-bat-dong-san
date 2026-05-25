@@ -115,6 +115,9 @@ const getOwnerAvatar = (room: Room): string => {
         || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0066FF&color=fff`;
 };
 
+const getOwnerPhone = (room: Room): string | undefined =>
+    room.ownerPhoneSnapshot || room.ownerPhone;
+
 const getStatusBadge = (status: string) => {
     switch (status) {
         case 'ACTIVE': return { label: '✅ Đang hiển thị', bg: '#E8F5E9', color: '#2E7D32' };
@@ -247,9 +250,10 @@ export default function PropertyDetailScreen() {
 
     const handleCall = () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
-        if (room?.ownerPhone) {
+        const ownerPhone = room ? getOwnerPhone(room) : undefined;
+        if (ownerPhone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Linking.openURL(`tel:${room.ownerPhone}`);
+            Linking.openURL(`tel:${ownerPhone}`);
         } else {
             Alert.alert('Thông báo', 'Số điện thoại chủ nhà chưa được cập nhật.');
         }

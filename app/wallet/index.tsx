@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12, paddingVertical: 8,
     },
     withdrawBtnText: {
-        flex: 1, color: '#FF9500 ', fontSize: 14, fontWeight: '600',
+        flex: 1, color: '#FF9500', fontSize: 14, fontWeight: '600',
     },
 
     // ── Transactions ──

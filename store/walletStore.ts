@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Transaction, WalletInfo } from '../types';
-import { walletService, WithdrawRequest } from '../services/api/wallet';
+import { walletService, WalletDebitRequest, WalletHoldRequest, WithdrawRequest } from '../services/api/wallet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
 
@@ -10,6 +10,7 @@ export type WithdrawStatus = 'idle' | 'loading' | 'success' | 'error';
 interface WalletState {
     wallet: WalletInfo | null;
     transactions: Transaction[];
+    paymentTransactions: Transaction[];
     paymentUrl: string | null;
     isLoading: boolean;
     isCreatingPayment: boolean;
@@ -22,6 +23,9 @@ interface WalletState {
     fetchWallet: () => Promise<void>;
     createPayment: (amount: number) => Promise<string>;
     fetchTransactions: () => Promise<void>;
+    fetchPaymentTransactions: () => Promise<void>;
+    holdMoney: (payload: WalletHoldRequest) => Promise<boolean>;
+    debitMoney: (payload: WalletDebitRequest) => Promise<boolean>;
     clearPaymentUrl: () => void;
     // ── Withdraw actions ──
     withdraw: (payload: WithdrawRequest) => Promise<boolean>;
@@ -41,6 +45,7 @@ async function getUserId(): Promise<number> {
 export const useWalletStore = create<WalletState>((set, get) => ({
     wallet: null,
     transactions: [],
+    paymentTransactions: [],
     paymentUrl: null,
     isLoading: false,
     isCreatingPayment: false,
@@ -94,7 +99,55 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         }
     },
 
+    fetchPaymentTransactions: async () => {
+        set({ isLoading: true });
+        try {
+            const userId = await getUserId();
+            const paymentTransactions = await walletService.fetchPaymentTransactions(userId);
+            set({ paymentTransactions, isLoading: false });
+        } catch (err: any) {
+            set({
+                isLoading: false,
+                error: err?.response?.data?.message ?? 'Không thể tải lịch sử thanh toán',
+            });
+        }
+    },
+
     clearPaymentUrl: () => set({ paymentUrl: null }),
+
+    holdMoney: async (payload: WalletHoldRequest): Promise<boolean> => {
+        set({ isLoading: true, error: null });
+        try {
+            await walletService.holdMoney(payload);
+            await get().fetchWallet();
+            await get().fetchTransactions();
+            set({ isLoading: false });
+            return true;
+        } catch (err: any) {
+            set({
+                isLoading: false,
+                error: err?.message ?? 'Không thể giữ tiền trong ví',
+            });
+            return false;
+        }
+    },
+
+    debitMoney: async (payload: WalletDebitRequest): Promise<boolean> => {
+        set({ isLoading: true, error: null });
+        try {
+            await walletService.debitMoney(payload);
+            await get().fetchWallet();
+            await get().fetchTransactions();
+            set({ isLoading: false });
+            return true;
+        } catch (err: any) {
+            set({
+                isLoading: false,
+                error: err?.message ?? 'Không thể trừ tiền trong ví',
+            });
+            return false;
+        }
+    },
 
     // ── RÚT TIỀN ─────────────────────────────────────────────
     withdraw: async (payload: WithdrawRequest): Promise<boolean> => {

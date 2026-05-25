@@ -3,6 +3,8 @@ import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useAuthStore } from './authStore';
 import { WS_CHAT_URL } from '../constants';
+import { searchService } from '../services/api/search';
+import { PropertySearchItem } from '../types';
 
 // ============================
 // Types khớp với backend
@@ -35,6 +37,42 @@ interface AiChatResponse {
     aiReply: string;
     status: string;
     items?: PropertyCardDTO[];
+}
+
+function mapSearchItemToPropertyCard(item: PropertySearchItem): PropertyCardDTO {
+    return {
+        propertyId: item.id,
+        title: item.title,
+        price: Number(item.price) || 0,
+        district: item.district || item.province,
+        imageUrl: item.thumbnail,
+    };
+}
+
+async function hydratePropertyCards(items: PropertyCardDTO[] = []): Promise<PropertyCardDTO[]> {
+    const ids = Array.from(
+        new Set(
+            items
+                .map(item => Number(item.propertyId))
+                .filter(id => Number.isFinite(id) && id > 0)
+        )
+    );
+
+    if (ids.length === 0) return items;
+
+    try {
+        const properties = await searchService.getPropertiesByIds(ids);
+        if (properties.length === 0) return items;
+
+        const fallbackById = new Map(items.map(item => [Number(item.propertyId), item]));
+        return properties.map(property => ({
+            ...fallbackById.get(property.id),
+            ...mapSearchItemToPropertyCard(property),
+        }));
+    } catch (error) {
+        console.warn('[AI-WS] Không hydrate được danh sách BĐS từ /search/properties/by-ids:', error);
+        return items;
+    }
 }
 
 interface AiChatState {
@@ -98,17 +136,18 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
                 set({ isConnected: true });
 
                 // ✅ Subscribe nhận phản hồi AI
-                client.subscribe(`/topic/user/${user.id}/ai`, (message: IMessage) => {
+                client.subscribe(`/topic/user/${user.id}/ai`, async (message: IMessage) => {
                     try {
                         const response: AiChatResponse = JSON.parse(message.body);
                         console.log('[AI-WS] Nhận phản hồi AI:', response);
 
                         if (response.aiReply) {
+                            const hydratedItems = await hydratePropertyCards(response.items);
                             const aiMessage: AiChatMessage = {
                                 id: `ai-${Date.now()}`,
                                 role: 'ai',
                                 content: response.aiReply,
-                                items: response.items || [],
+                                items: hydratedItems,
                                 status: response.status,
                                 createdAt: new Date().toISOString(),
                             };

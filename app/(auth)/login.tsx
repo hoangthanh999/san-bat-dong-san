@@ -15,6 +15,8 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
+import { API_BASE_URL } from '../../constants';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -123,13 +125,14 @@ function GoogleLoginButton() {
             const { Alert } = require('react-native');
 
             // URL backend Google OAuth2 (qua nginx gateway)
-            const BACKEND_OAUTH_URL = 'http://10.184.58.46:8080/oauth2/authorization/google';
+            const backendOAuthUrl = `${API_BASE_URL}/oauth2/authorization/google`;
+            const redirectUri = Linking.createURL('login-success');
 
             // Mở in-app browser để đăng nhập Google
             // Deep link: homeswipe://login-success?token=xxx (cần cấu hình trong app.json)
             const result = await WebBrowser.openAuthSessionAsync(
-                BACKEND_OAUTH_URL,
-                'homeswipe://login-success'
+                backendOAuthUrl,
+                redirectUri
             );
 
             if (result.type === 'success' && result.url) {

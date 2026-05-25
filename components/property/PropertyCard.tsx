@@ -147,9 +147,10 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
             router.push('/(auth)/login');
             return;
         }
-        if (item.ownerPhone) {
+        const ownerPhone = item.ownerPhoneSnapshot || item.ownerPhone;
+        if (ownerPhone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Linking.openURL(`tel:${item.ownerPhone}`);
+            Linking.openURL(`tel:${ownerPhone}`);
         } else {
             Alert.alert('Thông báo', 'Số điện thoại chưa được cập nhật.');
         }

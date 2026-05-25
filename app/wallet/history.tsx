@@ -13,6 +13,7 @@ const FILTER_TABS = [
     { key: '', label: 'Tất cả' },
     { key: 'DEPOSIT', label: 'Nạp tiền' },
     { key: 'POST_FEE,MEMBERSHIP,BOOST', label: 'Chi tiêu' },
+    { key: '__PAYMENT__', label: 'VNPay' },
 ];
 
 const TYPE_LABELS: Record<string, string> = {
@@ -74,24 +75,26 @@ function groupByMonth(txs: Transaction[]) {
 export default function TransactionHistoryScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { transactions, isLoading, fetchTransactions } = useWalletStore();
+    const { transactions, paymentTransactions, isLoading, fetchTransactions, fetchPaymentTransactions } = useWalletStore();
     const [activeFilter, setActiveFilter] = useState('');
 
     useEffect(() => {
         fetchTransactions();
+        fetchPaymentTransactions();
     }, []);
 
     // Client-side filtering theo type
-    const filteredTx = activeFilter
-        ? transactions.filter(tx => activeFilter.split(',').includes(tx.type))
-        : transactions;
+    const sourceTx = activeFilter === '__PAYMENT__' ? paymentTransactions : transactions;
+    const filteredTx = activeFilter && activeFilter !== '__PAYMENT__'
+        ? sourceTx.filter(tx => activeFilter.split(',').includes(tx.type))
+        : sourceTx;
 
     const groups = groupByMonth(filteredTx);
 
     const renderItem = ({ item }: { item: { title: string; data: Transaction[] } }) => (
         <View>
             <Text style={styles.monthHeader}>{item.title}</Text>
-            {item.data.map((tx) => <TransactionCard key={tx.id} item={tx} />)}
+            {item.data.map((tx) => <TransactionCard key={`${activeFilter || 'wallet'}-${tx.id}`} item={tx} />)}
         </View>
     );
 
@@ -123,7 +126,7 @@ export default function TransactionHistoryScreen() {
                 ))}
             </View>
 
-            {isLoading && transactions.length === 0 ? (
+            {isLoading && sourceTx.length === 0 ? (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" color="#0066FF" />
                 </View>

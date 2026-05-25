@@ -112,6 +112,7 @@ export default function RootLayout() {
                         name="notifications"
                         options={{ headerShown: false, animation: 'slide_from_right' }}
                     />
+                    <Stack.Screen name="login-success" options={{ headerShown: false }} />
                     {/* KYC screens */}
                     <Stack.Screen name="kyc/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="kyc/upload-front" options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -125,6 +126,7 @@ export default function RootLayout() {
                     <Stack.Screen name="wallet/success" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="wallet/failed" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="wallet/history" options={{ headerShown: false, animation: 'slide_from_right' }} />
+                    <Stack.Screen name="wallet/operations" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="wallet/withdraw" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="liked-properties" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="property/trash" options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -138,7 +140,6 @@ export default function RootLayout() {
                     {/* Package screens */}
                     <Stack.Screen name="packages/index" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     <Stack.Screen name="packages/boost/[roomId]" options={{ headerShown: false, animation: 'slide_from_right' }} />
-                    <Stack.Screen name="packages/status" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     {/* Settings screens */}
                     <Stack.Screen name="settings/security" options={{ headerShown: false, animation: 'slide_from_right' }} />
                     {/* Landlord profile */}
