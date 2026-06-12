@@ -2,6 +2,10 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, STORAGE_KEYS } from '../../constants';
 
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+    _retry?: boolean;
+}
+
 // Create Axios instance cho gateway (identity, customer, media, notification)
 // KHÔNG set default Content-Type ở đây — interceptor sẽ xử lý
 
@@ -9,6 +13,77 @@ const apiClient: AxiosInstance = axios.create({
     baseURL: API_BASE_URL,
     timeout: 30000,
 });
+
+const refreshClient: AxiosInstance = axios.create({
+    baseURL: API_BASE_URL,
+    timeout: 30000,
+});
+
+let refreshPromise: Promise<string> | null = null;
+
+const AUTH_REFRESH_EXCLUDED_PATHS = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/refresh',
+    '/auth/logout',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+];
+
+function isRefreshExcludedUrl(url?: string): boolean {
+    if (!url) return false;
+    return AUTH_REFRESH_EXCLUDED_PATHS.some(path => url.includes(path));
+}
+
+function extractToken(data: any): string | null {
+    const payload = data?.result !== undefined ? data.result : data;
+    return payload?.token ?? null;
+}
+
+async function clearAuthState() {
+    await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+
+    try {
+        const { useAuthStore } = require('../../store/authStore');
+        useAuthStore.getState().forceLogout();
+    } catch (e) { }
+}
+
+async function refreshAccessToken(): Promise<string> {
+    if (!refreshPromise) {
+        refreshPromise = (async () => {
+            const currentToken = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            if (!currentToken) {
+                throw new Error('Missing access token');
+            }
+
+            const response = await refreshClient.post('/auth/refresh', null, {
+                headers: {
+                    Authorization: `Bearer ${currentToken}`,
+                },
+            });
+
+            const newToken = extractToken(response.data);
+            if (!newToken) {
+                throw new Error('Refresh response missing token');
+            }
+
+            await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, newToken);
+
+            try {
+                const { useAuthStore } = require('../../store/authStore');
+                useAuthStore.setState({ token: newToken, isAuthenticated: true });
+            } catch (e) { }
+
+            return newToken;
+        })().finally(() => {
+            refreshPromise = null;
+        });
+    }
+
+    return refreshPromise;
+}
 apiClient.interceptors.request.use(config => {
     console.log('[Request Body]', JSON.stringify(config.data));
     return config;
@@ -63,7 +138,8 @@ apiClient.interceptors.response.use(
     },
     async (error: AxiosError) => {
         const status = error.response?.status;
-        const url = error.config?.url || '';
+        const originalRequest = error.config as RetryableRequestConfig | undefined;
+        const url = originalRequest?.url || '';
         console.error('[API Error]', status, error.message, url);
         if (error.response?.data) {
             console.error('[API Error Data]', JSON.stringify(error.response.data));
@@ -82,21 +158,31 @@ apiClient.interceptors.response.use(
 
         // Handle 401 Unauthorized - Token expired
         if (status === 401) {
-            await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-            await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+            const canRefresh = originalRequest && !originalRequest._retry && !isRefreshExcludedUrl(url);
 
-            // Reset zustand auth state
-            try {
-                const { useAuthStore } = require('../../store/authStore');
-                useAuthStore.getState().forceLogout();
-            } catch (e) { }
+            if (canRefresh) {
+                originalRequest._retry = true;
 
-            showToast?.('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
+                try {
+                    const newToken = await refreshAccessToken();
 
-            return Promise.reject({
-                ...error,
-                message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
-            });
+                    if (originalRequest.headers) {
+                        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                    }
+
+                    return apiClient(originalRequest);
+                } catch (refreshError) {
+                    await clearAuthState();
+                    showToast?.('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
+
+                    return Promise.reject({
+                        ...error,
+                        message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+                    });
+                }
+            }
+
+            return Promise.reject(error);
         }
 
         // Handle 403 Forbidden
