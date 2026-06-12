@@ -1,20 +1,19 @@
 import { create } from 'zustand';
+import { Client, IMessage } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 import { Conversation, ChatMessage } from '../types';
 import { chatService } from '../services/api/chat';
-import { WS_URL } from '../constants';
+import { WS_CHAT_URL } from '../constants';
 import { useAuthStore } from './authStore';
 
 interface ChatState {
     conversations: Conversation[];
-    messages: Record<number, ChatMessage[]>; // keyed by partnerId
+    messages: Record<number, ChatMessage[]>;
     isLoading: boolean;
     isConnected: boolean;
     totalUnread: number;
-    ws: WebSocket | null;
-    _reconnectAttempts: number;
-    _reconnectTimeout: ReturnType<typeof setTimeout> | null;
+    _stompClient: Client | null;
 
-    // Actions
     fetchConversations: () => Promise<void>;
     fetchHistory: (partnerId: number) => Promise<void>;
     sendMessage: (partnerId: number, content: string, type?: string, metadata?: any) => Promise<void>;
@@ -30,9 +29,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     isLoading: false,
     isConnected: false,
     totalUnread: 0,
-    ws: null,
-    _reconnectAttempts: 0,
-    _reconnectTimeout: null,
+    _stompClient: null,
 
     fetchConversations: async () => {
         set({ isLoading: true });
@@ -46,11 +43,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     fetchHistory: async (partnerId: number) => {
-    // ✅ Guard: không gọi API nếu partnerId không hợp lệ
-    if (!partnerId || isNaN(partnerId)) {
-        console.warn('[Chat] fetchHistory: partnerId không hợp lệ', partnerId);
-        return;
-    }
+        if (!partnerId || isNaN(partnerId)) {
+            console.warn('[Chat] fetchHistory: partnerId khong hop le', partnerId);
+            return;
+        }
+
         set({ isLoading: true });
         try {
             const history = await chatService.getHistory(partnerId);
@@ -64,11 +61,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     sendMessage: async (partnerId: number, content: string, type = 'TEXT', metadata?: any) => {
-        const { token } = useAuthStore.getState();
         const { user } = useAuthStore.getState();
         if (!user) return;
 
-        // Optimistic update
         const tempMessage: ChatMessage = {
             id: `temp-${Date.now()}`,
             senderId: user.id,
@@ -89,7 +84,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         try {
             const sent = await chatService.sendMessage(user.id, partnerId, content, type);
-            // Update with real message from server
             set(state => ({
                 messages: {
                     ...state.messages,
@@ -98,7 +92,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ),
                 },
             }));
-            // Update conversation last message
             set(state => ({
                 conversations: state.conversations.map(c =>
                     c.id === partnerId
@@ -107,7 +100,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 ),
             }));
         } catch (error) {
-            // Remove failed message
             set(state => ({
                 messages: {
                     ...state.messages,
@@ -119,27 +111,33 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     receiveMessage: (message: ChatMessage) => {
         const partnerId = message.senderId;
-        set(state => ({
-            messages: {
-                ...state.messages,
-                [partnerId]: [...(state.messages[partnerId] || []), message],
-            },
-            conversations: state.conversations.map(c =>
-                c.id === partnerId
-                    ? {
-                        ...c,
-                        lastMessage: message.content,
-                        lastTime: message.createdAt,
-                        unreadCount: c.unreadCount + 1,
-                    }
-                    : c
-            ),
-            totalUnread: state.totalUnread + 1,
-        }));
+
+        set(state => {
+            const currentMessages = state.messages[partnerId] || [];
+            const alreadyExists = Boolean(message.id) && currentMessages.some(m => m.id === message.id);
+
+            return {
+                messages: {
+                    ...state.messages,
+                    [partnerId]: alreadyExists ? currentMessages : [...currentMessages, message],
+                },
+                conversations: state.conversations.map(c =>
+                    c.id === partnerId
+                        ? {
+                            ...c,
+                            lastMessage: message.content,
+                            lastTime: message.createdAt,
+                            unreadCount: c.unreadCount + 1,
+                        }
+                        : c
+                ),
+                totalUnread: alreadyExists ? state.totalUnread : state.totalUnread + 1,
+            };
+        });
     },
 
     markAsRead: async (partnerId: number) => {
-          if (!partnerId || isNaN(partnerId)) return;
+        if (!partnerId || isNaN(partnerId)) return;
         try {
             await chatService.markAsRead(partnerId);
             set(state => {
@@ -157,83 +155,70 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
     },
 
-
     connectWebSocket: () => {
-        const { token } = useAuthStore.getState();
-        if (!token) return;
-        const existingWs = get().ws;
-        if (existingWs &&
-            (existingWs.readyState === WebSocket.OPEN ||
-                existingWs.readyState === WebSocket.CONNECTING)) return;
+        const { token, user } = useAuthStore.getState();
+        if (!token || !user?.id) return;
 
-        const ws = new WebSocket(`${WS_URL}/chat?token=${token}`);
+        const existingClient = get()._stompClient;
+        if (existingClient?.active) return;
 
-        ws.onopen = () => {
-            set({ isConnected: true, _reconnectAttempts: 0 });
-
-            // ✅ Gửi STOMP CONNECT với Authorization header
-            const { token } = useAuthStore.getState();
-            const connectFrame = [
-                'CONNECT',
-                'accept-version:1.2',
-                'heart-beat:0,0',
-                `Authorization:Bearer ${token}`,  // ← Thêm dòng này
-                '',
-                '\0',
-            ].join('\n');
-
-            ws.send(connectFrame);
-        };
-        ws.onmessage = (event) => {
+        const handleMessage = (message: IMessage) => {
             try {
-                const message: ChatMessage = JSON.parse(event.data);
-                get().receiveMessage(message);
-            } catch (e) {
-                console.error('WS parse error', e);
+                const chatMessage: ChatMessage = JSON.parse(message.body);
+
+                if (chatMessage.senderId === user.id) {
+                    return;
+                }
+
+                get().receiveMessage(chatMessage);
+            } catch (error) {
+                console.error('[ChatWS] Parse error', error);
             }
         };
 
-        ws.onclose = () => {
-            set({ isConnected: false, ws: null });
+        const client = new Client({
+            webSocketFactory: () => new (SockJS as any)(WS_CHAT_URL),
+            connectHeaders: {
+                Authorization: `Bearer ${token}`,
+            },
+            reconnectDelay: 5000,
+            heartbeatIncoming: 4000,
+            heartbeatOutgoing: 4000,
 
-            // Exponential backoff reconnect (tối đa 5 lần)
-            const attempts = get()._reconnectAttempts;
-            const MAX_RETRIES = 5;
-            const MAX_DELAY_MS = 30000;
+            onConnect: () => {
+                set({ isConnected: true });
+                client.subscribe('/user/queue/messages', handleMessage);
+                client.subscribe(`/topic/user/${user.id}`, handleMessage);
+            },
 
-            if (attempts < MAX_RETRIES && useAuthStore.getState().token) {
-                const delay = Math.min(2000 * Math.pow(2, attempts), MAX_DELAY_MS);
-                console.log(`[WS] Mất kết nối. Thử lại sau ${delay / 1000}s (lần ${attempts + 1}/${MAX_RETRIES})`);
+            onDisconnect: () => {
+                set({ isConnected: false });
+            },
 
-                const timeout = setTimeout(() => {
-                    set({ _reconnectTimeout: null });
-                    get().connectWebSocket();
-                }, delay);
+            onStompError: (frame) => {
+                console.error('[ChatWS] STOMP error:', frame.headers?.message);
+                set({ isConnected: false });
+            },
 
-                set({ _reconnectAttempts: attempts + 1, _reconnectTimeout: timeout });
-            } else if (attempts >= MAX_RETRIES) {
-                console.warn('[WS] Đã thử kết nối lại quá nhiều lần. Dừng reconnect.');
-                set({ _reconnectAttempts: 0 });
-            }
-        };
+            onWebSocketClose: () => {
+                set({ isConnected: false });
+            },
 
-        ws.onerror = () => {
-            set({ isConnected: false });
-        };
+            onWebSocketError: (event) => {
+                console.error('[ChatWS] WebSocket error:', event);
+                set({ isConnected: false });
+            },
+        });
 
-        set({ ws });
+        client.activate();
+        set({ _stompClient: client });
     },
 
     disconnectWebSocket: () => {
-        // Hủy bất kỳ reconnect timeout đang chờ
-        const timeout = get()._reconnectTimeout;
-        if (timeout) {
-            clearTimeout(timeout);
+        const client = get()._stompClient;
+        if (client) {
+            client.deactivate();
         }
-        const ws = get().ws;
-        if (ws) {
-            ws.close();
-        }
-        set({ ws: null, isConnected: false, _reconnectAttempts: 0, _reconnectTimeout: null });
+        set({ _stompClient: null, isConnected: false });
     },
 }));
