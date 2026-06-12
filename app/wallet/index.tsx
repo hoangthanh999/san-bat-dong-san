@@ -94,6 +94,8 @@ function WalletContent() {
         if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amount;
         return sum - amount;
     }, 0);
+    const hold = wallet?.holdBalance ?? wallet?.holdAmount ?? 0;
+
 
     const recentTx = transactions.slice(0, 5);
 
@@ -128,6 +130,11 @@ function WalletContent() {
                 <Text style={styles.balanceAmount}>
                     {balance.toLocaleString('vi-VN')} đ
                 </Text>
+                {hold > 0 && (
+                    <Text style={styles.holdAmount}>
+                        Đang giữ: {hold.toLocaleString('vi-VN')} đ
+                    </Text>
+                )}
                 <TouchableOpacity
                     style={styles.depositBtn}
                     onPress={() => router.push('/wallet/deposit' as any)}
@@ -183,8 +190,8 @@ function WalletContent() {
                         onPress={() => router.push('/wallet/withdraw' as any)}
                         activeOpacity={0.85}
                     >
-                        <Ionicons name="refresh-circle-outline" size={20} color="#FF9500" />
-                        <Text style={styles.withdrawBtnText}>Hoàn tiền đang giữ</Text>
+                        <Ionicons name="card-outline" size={20} color="#FF9500" />
+                        <Text style={styles.withdrawBtnText}>Rút tiền - đang phát triển</Text>
                         <Ionicons name="chevron-forward" size={16} color="#E31837" />
                     </TouchableOpacity>
                 </View>
@@ -239,6 +246,7 @@ const styles = StyleSheet.create({
     },
     balanceLabel: { fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
     balanceAmount: { fontSize: 34, fontWeight: '800', color: 'white', letterSpacing: 1 },
+    holdAmount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
     depositBtn: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 30,

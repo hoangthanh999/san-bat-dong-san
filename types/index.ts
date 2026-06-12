@@ -523,7 +523,8 @@ export interface WalletInfo {
     id: number;
     userId: number;
     balance: number;            // BigDecimal → number
-    holdAmount?: number;        // Tiền đang giữ (đặt cọc)
+    holdBalance?: number;       // Backend wallet-service field
+    holdAmount?: number;        // Legacy mobile alias
 }
 
 // ============================

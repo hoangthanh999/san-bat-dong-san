@@ -1,11 +1,8 @@
 import { create } from 'zustand';
 import { Transaction, WalletInfo } from '../types';
-import { walletService, WalletDebitRequest, WalletHoldRequest, WithdrawRequest } from '../services/api/wallet';
+import { walletService, WalletDebitRequest, WalletHoldRequest } from '../services/api/wallet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
-
-// ─── Withdraw state ───────────────────────────────────────────
-export type WithdrawStatus = 'idle' | 'loading' | 'success' | 'error';
 
 interface WalletState {
     wallet: WalletInfo | null;
@@ -14,10 +11,6 @@ interface WalletState {
     paymentUrl: string | null;
     isLoading: boolean;
     isCreatingPayment: boolean;
-    // ── Withdraw ──
-    withdrawStatus: WithdrawStatus;
-    withdrawError: string | null;
-    withdrawTxId: string | null;
     error: string | null;
 
     fetchWallet: () => Promise<void>;
@@ -27,14 +20,8 @@ interface WalletState {
     holdMoney: (payload: WalletHoldRequest) => Promise<boolean>;
     debitMoney: (payload: WalletDebitRequest) => Promise<boolean>;
     clearPaymentUrl: () => void;
-    // ── Withdraw actions ──
-    withdraw: (payload: WithdrawRequest) => Promise<boolean>;
-    resetWithdraw: () => void;
 }
 
-/**
- * Helper: Lấy userId đã lưu khi login từ AsyncStorage
- */
 async function getUserId(): Promise<number> {
     const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
     if (!userData) throw new Error('Chưa đăng nhập. Vui lòng đăng nhập lại.');
@@ -49,12 +36,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     paymentUrl: null,
     isLoading: false,
     isCreatingPayment: false,
-    withdrawStatus: 'idle',
-    withdrawError: null,
-    withdrawTxId: null,
     error: null,
 
-    // ── Lấy thông tin ví ──────────────────────────────────────
     fetchWallet: async () => {
         set({ isLoading: true, error: null });
         try {
@@ -68,7 +51,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         }
     },
 
-    // ── Tạo payment URL VNPay ─────────────────────────────────
     createPayment: async (amount: number) => {
         set({ isCreatingPayment: true, error: null });
         try {
@@ -84,7 +66,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         }
     },
 
-    // ── Lấy lịch sử giao dịch ────────────────────────────────
     fetchTransactions: async () => {
         set({ isLoading: true });
         try {
@@ -148,29 +129,4 @@ export const useWalletStore = create<WalletState>((set, get) => ({
             return false;
         }
     },
-
-    // ── RÚT TIỀN ─────────────────────────────────────────────
-    withdraw: async (payload: WithdrawRequest): Promise<boolean> => {
-        set({ withdrawStatus: 'loading', withdrawError: null, withdrawTxId: null });
-        try {
-            const res = await walletService.withdraw(payload);
-            set({
-                withdrawStatus: 'success',
-                withdrawTxId: res.transactionId ?? null,
-            });
-            // Refresh số dư sau khi rút thành công
-            await get().fetchWallet();
-            return true;
-        } catch (err: any) {
-            const msg =
-                err?.response?.data?.message ??
-                err?.response?.data?.result?.message ??
-                'Hoàn tiền thất bại. Vui lòng thử lại.';
-            set({ withdrawStatus: 'error', withdrawError: msg });
-            return false;
-        }
-    },
-
-    resetWithdraw: () =>
-        set({ withdrawStatus: 'idle', withdrawError: null, withdrawTxId: null }),
 }));

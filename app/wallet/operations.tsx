@@ -50,7 +50,7 @@ function WalletOperationsContent() {
 
     const amount = parseAmount(amountText);
     const balance = wallet?.balance ?? 0;
-    const holdAmount = wallet?.holdAmount ?? 0;
+    const holdAmount = wallet?.holdBalance ?? wallet?.holdAmount ?? 0;
 
     const handleSubmit = async () => {
         if (amount <= 0) {
