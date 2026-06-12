@@ -84,10 +84,6 @@ async function refreshAccessToken(): Promise<string> {
 
     return refreshPromise;
 }
-apiClient.interceptors.request.use(config => {
-    console.log('[Request Body]', JSON.stringify(config.data));
-    return config;
-});
 // Request Interceptor - Attach JWT token + tự động set Content-Type
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {

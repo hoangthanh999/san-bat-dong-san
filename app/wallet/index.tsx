@@ -103,7 +103,7 @@ function WalletContent() {
     // ✅ Định nghĩa TRƯỚC return, KHÔNG đặt JSX ngoài map
     const QUICK_ACTIONS = [
         { icon: 'add-circle', label: 'Nạp tiền', path: '/wallet/deposit', color: '#0066FF' },
-        { icon: 'history', label: 'Lịch sử', path: '/wallet/history', color: '#22C55E' },
+        { icon: 'time-outline', label: 'Lịch sử', path: '/wallet/history', color: '#22C55E' },
         { icon: 'star', label: 'Gói dịch vụ', path: '/packages', color: '#FF9500' },
         { icon: 'rocket', label: 'Boost tin', path: '/packages', color: '#8B5CF6' },
     ];

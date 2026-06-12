@@ -25,7 +25,6 @@ export const authService = {
             // Lưu token
 
             await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, authData.token);
-            console.log("LOGIN RESPONSE:", authData);
             // Xây dựng User object từ auth response
             const user: User = {
                 id: authData.id,
@@ -34,9 +33,6 @@ export const authService = {
                 role: authData.role as User['role'],
             };
             await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
-            // 👇 LOG SAU KHI LƯU
-            const savedToken = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-            console.log("TOKEN:", savedToken);
         }
 
         return authData;
@@ -136,10 +132,6 @@ export const authService = {
         const response = await apiClient.post(API_ENDPOINTS.CHANGE_PASSWORD, {
             oldPassword,
             newPassword,
-        });
-        console.log("CALL CHANGE PASSWORD:", {
-            url: API_ENDPOINTS.CHANGE_PASSWORD,
-            body: { oldPassword, newPassword }
         });
         return response.data;
     },
