@@ -1,23 +1,23 @@
 // API Base URL - Gateway (nginx)
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.13.235.46:8080';
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://217.217.253.67';
 
 // Property Service - nginx đã route /properties, /public/properties, /admin/properties → 8086
-export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'http://10.13.235.46:8086';
+export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'http://217.217.253.67';
 
 // Payment Service - nginx chỉ route /api/payment/, các endpoint khác cần gọi trực tiếp
-export const PAYMENT_API_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_API_BASE_URL || 'http://10.13.235.46:8087';
+export const PAYMENT_API_BASE_URL = process.env.EXPO_PUBLIC_PAYMENT_API_BASE_URL || 'http://217.217.253.67';
 
 // WebSocket Notification (STOMP/SockJS — notification-service)
 export const WS_URL = process.env.EXPO_PUBLIC_WS_URL
-    || 'http://10.13.235.46:8080/ws-notifier';
+    || 'http://217.217.253.67/ws-notifier';
 
 // WebSocket Chat (STOMP/SockJS — chat-service)
 export const WS_CHAT_URL = process.env.EXPO_PUBLIC_WS_CHAT_URL
-    || 'http://10.13.235.46:8080/ws-chat';
+    || 'http://217.217.253.67/ws-chat';
 
 // ✅ WebSocket AI Chat (STOMP/SockJS — ai-worker-service) - THÊM MỚI
 export const WS_AI_URL = process.env.EXPO_PUBLIC_WS_AI_URL
-    || 'http://10.13.235.46:8080/ws-ai';
+    || 'http://217.217.253.67/ws-ai';
 
 // Google Maps
 export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
