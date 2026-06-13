@@ -561,10 +561,25 @@ export interface Favorite {
 }
 
 // ============================
-// Appointment Types (chưa có backend)
+// Appointment Types (backend /appointments + legacy UI aliases)
 // ============================
+export type AppointmentStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED' | 'SUGGESTED';
+
 export interface Appointment {
     id: number;
+    propertyId: number;
+    propertyTitle?: string;
+    propertyImage?: string;
+    userId?: number;
+    ownerId: number;
+    partnerId?: number;
+    appointmentTime: string;
+    suggestedTime?: string;
+    suggestedNote?: string;
+    myRequest?: boolean;
+    updatedAt?: string;
+
+    // Legacy aliases used by existing appointment UI.
     roomId: number;
     roomTitle?: string;
     roomImage?: string;
@@ -577,7 +592,7 @@ export interface Appointment {
     suggestedMeetTime?: string;
     note?: string;
     message?: string;
-    status: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'RESCHEDULED';
+    status: AppointmentStatus;
     createdAt: string;
 }
 

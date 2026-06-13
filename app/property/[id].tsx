@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
     Linking, Dimensions, Alert, TextInput, Modal, Share,
-    StatusBar, Platform, ActivityIndicator,
+    StatusBar, Platform, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -312,11 +312,93 @@ export default function PropertyDetailScreen() {
             setReviewImages(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));
     };
 
+    const padDatePart = (value: number) => value.toString().padStart(2, '0');
+
+    const getDefaultBookingDate = () => {
+        const next = new Date();
+        next.setHours(next.getHours() + 1);
+        const minutes = next.getMinutes();
+
+        if (minutes === 0 || minutes === 30) {
+            next.setSeconds(0, 0);
+        } else if (minutes < 30) {
+            next.setMinutes(30, 0, 0);
+        } else {
+            next.setHours(next.getHours() + 1, 0, 0, 0);
+        }
+
+        return next;
+    };
+
+    const formatBookingInput = (date: Date) => {
+        return `${padDatePart(date.getDate())}/${padDatePart(date.getMonth() + 1)}/${date.getFullYear()} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+    };
+
+    const toLocalAppointmentTime = (date: Date) => {
+        return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}T${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}:00`;
+    };
+
+    const parseBookingDateToDate = (value: string) => {
+        const trimmed = value.trim();
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+            const parsed = new Date(trimmed.length === 16 ? `${trimmed}:00` : trimmed);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        }
+
+        const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+
+        const [, day, month, year, hour, minute] = match;
+        const parsed = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), 0, 0);
+        const isSameDate =
+            parsed.getFullYear() === Number(year) &&
+            parsed.getMonth() === Number(month) - 1 &&
+            parsed.getDate() === Number(day) &&
+            parsed.getHours() === Number(hour) &&
+            parsed.getMinutes() === Number(minute);
+
+        return isSameDate ? parsed : null;
+    };
+
+    const openBookingModal = () => {
+        setBookingDate(formatBookingInput(getDefaultBookingDate()));
+        setShowBookingModal(true);
+    };
+
+    const adjustBookingDay = (days: number) => {
+        const current = parseBookingDateToDate(bookingDate) || getDefaultBookingDate();
+        const next = new Date(current);
+        next.setDate(next.getDate() + days);
+
+        if (next <= new Date()) {
+            setBookingDate(formatBookingInput(getDefaultBookingDate()));
+            return;
+        }
+
+        setBookingDate(formatBookingInput(next));
+    };
+
+    const setTomorrowBooking = () => {
+        const next = getDefaultBookingDate();
+        next.setDate(next.getDate() + 1);
+        setBookingDate(formatBookingInput(next));
+    };
+
     const handleBooking = async () => {
         if (!isAuthenticated) { router.push('/(auth)/login'); return; }
         if (!bookingDate.trim()) { Alert.alert('Lỗi', 'Vui lòng chọn ngày xem phòng'); return; }
+        const appointmentDate = parseBookingDateToDate(bookingDate);
+        if (!appointmentDate) {
+            Alert.alert('Lỗi', 'Vui lòng nhập thời gian theo định dạng DD/MM/YYYY HH:MM hoặc YYYY-MM-DDTHH:MM:SS');
+            return;
+        }
+        if (appointmentDate <= new Date()) {
+            Alert.alert('Lỗi', 'Vui lòng chọn thời gian trong tương lai');
+            return;
+        }
         try {
-            await createAppointment({ roomId, scheduledAt: bookingDate, note: bookingNote });
+            const appointmentTime = toLocalAppointmentTime(appointmentDate);
+            await createAppointment({ roomId, scheduledAt: appointmentTime, note: bookingNote });
             setShowBookingModal(false);
             setBookingDate(''); setBookingNote('');
             Alert.alert('Thành công', '🎉 Đặt lịch xem phòng thành công! Chủ nhà sẽ liên hệ xác nhận.');
@@ -720,7 +802,7 @@ export default function PropertyDetailScreen() {
                     <View style={styles.bottomBtns}>
                         <TouchableOpacity style={styles.scheduleBtn} onPress={() => {
                             if (!isAuthenticated) { router.push('/(auth)/login'); return; }
-                            setShowBookingModal(true);
+                            openBookingModal();
                         }}>
                             <Ionicons name="calendar-outline" size={18} color="#0066FF" />
                             <Text style={styles.scheduleBtnText}>Đặt lịch</Text>
@@ -830,8 +912,16 @@ export default function PropertyDetailScreen() {
 
             {/* ===== BOOKING MODAL ===== */}
             <Modal visible={showBookingModal} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContainer}>
+                <KeyboardAvoidingView
+                    style={styles.modalOverlay}
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                >
+                    <View style={[styles.modalContainer, styles.bookingModalContainer, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+                        <ScrollView
+                            keyboardShouldPersistTaps="handled"
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={styles.bookingModalContent}
+                        >
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>📅 Đặt lịch xem phòng</Text>
                             <TouchableOpacity onPress={() => setShowBookingModal(false)}>
@@ -843,7 +933,24 @@ export default function PropertyDetailScreen() {
                             style={styles.bookingInput}
                             placeholder="VD: 15/03/2026 10:00"
                             value={bookingDate} onChangeText={setBookingDate}
+                            keyboardType="numbers-and-punctuation"
+                            returnKeyType="done"
                         />
+                        <View style={styles.bookingQuickRow}>
+                            <TouchableOpacity style={styles.bookingQuickBtn} onPress={() => adjustBookingDay(-1)}>
+                                <Text style={styles.bookingQuickText}>-1 ngay</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.bookingQuickBtn} onPress={() => setBookingDate(formatBookingInput(getDefaultBookingDate()))}>
+                                <Text style={styles.bookingQuickText}>Hom nay</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.bookingQuickBtn} onPress={setTomorrowBooking}>
+                                <Text style={styles.bookingQuickText}>Ngay mai</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.bookingQuickBtn} onPress={() => adjustBookingDay(1)}>
+                                <Text style={styles.bookingQuickText}>+1 ngay</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.bookingHint}>Mac dinh la khung gio gan nhat trong tuong lai. Khong the dat lich qua khu.</Text>
                         <Text style={styles.modalLabel}>Ghi chú (tuỳ chọn)</Text>
                         <TextInput
                             style={styles.reviewTextInput}
@@ -857,8 +964,9 @@ export default function PropertyDetailScreen() {
                         >
                             {bookingSubmitting ? <ActivityIndicator color="white" /> : <Text style={styles.submitBtnText}>Xác nhận đặt lịch</Text>}
                         </TouchableOpacity>
+                        </ScrollView>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
         </View>
     );
@@ -971,12 +1079,18 @@ const styles = StyleSheet.create({
     // Modals
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContainer: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
+    bookingModalContainer: { maxHeight: '88%' },
+    bookingModalContent: { paddingBottom: 8 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A' },
     modalLabel: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 },
     starPicker: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 20 },
     reviewTextInput: { borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 12, padding: 12, fontSize: 14, minHeight: 100, textAlignVertical: 'top', marginBottom: 20 },
-    bookingInput: { borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 12, padding: 12, fontSize: 14, marginBottom: 16 },
+    bookingInput: { borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 12, padding: 12, fontSize: 14, marginBottom: 10 },
+    bookingQuickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+    bookingQuickBtn: { borderWidth: 1, borderColor: '#D8E6FF', backgroundColor: '#F4F8FF', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+    bookingQuickText: { color: '#0066FF', fontSize: 13, fontWeight: '700' },
+    bookingHint: { color: '#777', fontSize: 12, lineHeight: 17, marginBottom: 14 },
     submitBtn: { backgroundColor: '#0066FF', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
     submitBtnDisabled: { backgroundColor: '#AAC8FF' },
     submitBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },

@@ -1,42 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar,
-    Platform, ActivityIndicator, RefreshControl, Alert,
+    ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
-import { Image } from 'expo-image';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, Stack } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { Appointment } from '../../types';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-    PENDING: { label: 'Chờ xác nhận', color: '#FF9500', bg: '#FFF3E0' },
-    CONFIRMED: { label: 'Đã xác nhận', color: '#22C55E', bg: '#F0FDF4' },
-    CANCELLED: { label: 'Đã hủy', color: '#EF4444', bg: '#FFF0F0' },
-    COMPLETED: { label: 'Hoàn thành', color: '#0066FF', bg: '#E8F0FF' },
-    RESCHEDULED: { label: 'Đề xuất giờ mới', color: '#8B5CF6', bg: '#F3EEFF' },
+    PENDING: { label: 'Cho xac nhan', color: '#FF9500', bg: '#FFF3E0' },
+    ACCEPTED: { label: 'Da chap nhan', color: '#22C55E', bg: '#F0FDF4' },
+    REJECTED: { label: 'Da tu choi', color: '#EF4444', bg: '#FFF0F0' },
+    CANCELLED: { label: 'Da huy', color: '#EF4444', bg: '#FFF0F0' },
+    COMPLETED: { label: 'Hoan thanh', color: '#0066FF', bg: '#E8F0FF' },
+    SUGGESTED: { label: 'De xuat gio moi', color: '#8B5CF6', bg: '#F3EEFF' },
 };
 
 const TABS = [
-    { key: 'upcoming', label: 'Sắp tới', statuses: ['PENDING', 'CONFIRMED', 'RESCHEDULED'] },
-    { key: 'past', label: 'Đã qua', statuses: ['COMPLETED'] },
-    { key: 'cancelled', label: 'Đã hủy', statuses: ['CANCELLED'] },
+    { key: 'upcoming', label: 'Sap toi', statuses: ['PENDING', 'ACCEPTED', 'SUGGESTED'] },
+    { key: 'past', label: 'Da qua', statuses: ['COMPLETED'] },
+    { key: 'cancelled', label: 'Da huy', statuses: ['REJECTED', 'CANCELLED'] },
 ];
+
+function formatDT(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value || 'Chua co thoi gian';
+
+    return date.toLocaleDateString('vi-VN', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }) + ' - ' + date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
 
 function AppointmentCard({ appt, onPress, onCancel }: {
     appt: Appointment;
     onPress: () => void;
-    onCancel?: () => void;
+    onCancel: () => void;
 }) {
     const config = STATUS_CONFIG[appt.status] || STATUS_CONFIG.PENDING;
-    const date = new Date(appt.scheduledAt);
-    const suggestedDate = appt.suggestedMeetTime ? new Date(appt.suggestedMeetTime) : null;
-
-    const formatDT = (d: Date) => d.toLocaleDateString('vi-VN', {
-        weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
-    }) + ' - ' + d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const canCancel = appt.status === 'PENDING' || appt.status === 'ACCEPTED' || appt.status === 'SUGGESTED';
 
     return (
         <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
@@ -52,73 +59,33 @@ function AppointmentCard({ appt, onPress, onCancel }: {
                 <View style={styles.roomInfo}>
                     <Ionicons name="home-outline" size={16} color="#666" />
                     <Text style={styles.roomTitle} numberOfLines={1}>
-                        {appt.roomTitle || `Phòng #${appt.roomId}`}
+                        {appt.roomTitle || appt.propertyTitle || `BDS #${appt.propertyId || appt.roomId}`}
                     </Text>
                 </View>
 
-                {appt.status === 'RESCHEDULED' && suggestedDate ? (
-                    <View style={styles.rescheduleBlock}>
-                        <View style={styles.timeRow}>
-                            <Ionicons name="close-circle" size={14} color="#EF4444" />
-                            <Text style={styles.oldTime}>Giờ cũ: {formatDT(date)}</Text>
-                        </View>
-                        <View style={styles.timeRow}>
-                            <Ionicons name="checkmark-circle" size={14} color="#22C55E" />
-                            <Text style={styles.newTime}>Giờ mới: {formatDT(suggestedDate)}</Text>
-                        </View>
-                    </View>
-                ) : (
-                    <View style={styles.timeRow}>
-                        <Ionicons name="calendar-outline" size={15} color="#555" />
-                        <Text style={styles.timeText}>{formatDT(date)}</Text>
-                    </View>
-                )}
+                <View style={styles.timeRow}>
+                    <Ionicons name="calendar-outline" size={15} color="#555" />
+                    <Text style={styles.timeText}>{formatDT(appt.scheduledAt || appt.appointmentTime)}</Text>
+                </View>
 
-                {appt.landlordName && (
-                    <View style={styles.personRow}>
-                        <Ionicons name="person-outline" size={14} color="#888" />
-                        <Text style={styles.personText}>Chủ: {appt.landlordName}</Text>
+                {appt.status === 'SUGGESTED' && appt.suggestedMeetTime && (
+                    <View style={styles.timeRow}>
+                        <Ionicons name="time-outline" size={15} color="#8B5CF6" />
+                        <Text style={styles.suggestText}>Gio moi: {formatDT(appt.suggestedMeetTime)}</Text>
                     </View>
                 )}
             </View>
 
-            <View style={styles.cardActions}>
-                {appt.status === 'RESCHEDULED' && (
-                    <>
-                        <TouchableOpacity
-                            style={[styles.actionBtn, { backgroundColor: '#E8F5E9', borderColor: '#22C55E' }]}
-                            onPress={(e) => { e.stopPropagation(); onPress(); }}
-                        >
-                            <Ionicons name="checkmark" size={16} color="#22C55E" />
-                            <Text style={[styles.actionBtnText, { color: '#22C55E' }]}>Đồng ý</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.actionBtn, { backgroundColor: '#FFF0F0', borderColor: '#EF4444' }]}
-                            onPress={(e) => { e.stopPropagation(); onCancel?.(); }}
-                        >
-                            <Ionicons name="close" size={16} color="#EF4444" />
-                            <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>Từ chối</Text>
-                        </TouchableOpacity>
-                    </>
-                )}
-                {(appt.status === 'PENDING' || appt.status === 'CONFIRMED') && (
+            {canCancel && (
+                <View style={styles.cardActions}>
                     <TouchableOpacity
                         style={[styles.actionBtn, { backgroundColor: '#FFF0F0', borderColor: '#EF4444' }]}
-                        onPress={(e) => { e.stopPropagation(); onCancel?.(); }}
+                        onPress={(e) => { e.stopPropagation(); onCancel(); }}
                     >
-                        <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>Hủy lịch</Text>
+                        <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>Huy lich</Text>
                     </TouchableOpacity>
-                )}
-                {appt.status === 'CONFIRMED' && (
-                    <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: '#E8F0FF', borderColor: '#0066FF' }]}
-                        onPress={(e) => { e.stopPropagation(); onPress(); }}
-                    >
-                        <Ionicons name="navigate-outline" size={16} color="#0066FF" />
-                        <Text style={[styles.actionBtnText, { color: '#0066FF' }]}>Chỉ đường</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
+                </View>
+            )}
         </TouchableOpacity>
     );
 }
@@ -126,7 +93,7 @@ function AppointmentCard({ appt, onPress, onCancel }: {
 export default function AppointmentsScreen() {
     return (
         <AuthGuardScreen
-            message="Đăng nhập để xem lịch hẹn xem phòng"
+            message="Dang nhap de xem lich hen xem phong"
             icon="calendar-outline"
         >
             <AppointmentsContent />
@@ -142,25 +109,29 @@ function AppointmentsContent() {
     const [refreshing, setRefreshing] = useState(false);
 
     useEffect(() => {
-        fetchAppointments(true);
-    }, []);
+        fetchAppointments(true).catch(() => undefined);
+    }, [fetchAppointments]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await fetchAppointments(true);
-        setRefreshing(false);
+        try {
+            await fetchAppointments(true);
+        } finally {
+            setRefreshing(false);
+        }
     };
 
     const handleCancel = (id: number) => {
-        Alert.alert('Hủy lịch hẹn', 'Bạn có chắc muốn hủy lịch hẹn này?', [
-            { text: 'Không', style: 'cancel' },
+        Alert.alert('Huy lich hen', 'Ban co chac muon huy lich hen nay?', [
+            { text: 'Khong', style: 'cancel' },
             {
-                text: 'Hủy lịch', style: 'destructive',
+                text: 'Huy lich',
+                style: 'destructive',
                 onPress: async () => {
                     try {
                         await cancelAppointment(id);
                     } catch (e: any) {
-                        Alert.alert('Lỗi', e.message || 'Hủy lịch hẹn thất bại. Vui lòng thử lại.');
+                        Alert.alert('Loi', e.message || 'Huy lich hen that bai. Vui long thu lai.');
                     }
                 },
             },
@@ -179,19 +150,10 @@ function AppointmentsContent() {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Lịch hẹn của tôi</Text>
+                <Text style={styles.headerTitle}>Lich hen cua toi</Text>
                 <View style={{ width: 40 }} />
             </View>
 
-            {/* Development Banner */}
-            <View style={styles.devBanner}>
-                <Ionicons name="construct-outline" size={18} color="#E65100" />
-                <Text style={styles.devBannerText}>
-                    🚧 Tính năng đang phát triển — Dữ liệu sẽ được cập nhật khi backend hoàn thiện
-                </Text>
-            </View>
-
-            {/* Tabs */}
             <View style={styles.tabBar}>
                 {TABS.map((tab) => (
                     <TouchableOpacity
@@ -213,11 +175,9 @@ function AppointmentsContent() {
             ) : filtered.length === 0 ? (
                 <View style={styles.center}>
                     <Ionicons name="calendar-outline" size={56} color="#CCC" />
-                    <Text style={styles.emptyTitle}>Không có lịch hẹn</Text>
+                    <Text style={styles.emptyTitle}>Khong co lich hen</Text>
                     <Text style={styles.emptySub}>
-                        {activeTab === 'upcoming'
-                            ? 'Đặt lịch xem phòng từ màn hình chi tiết BĐS'
-                            : 'Chưa có lịch hẹn trong mục này'}
+                        Dat lich xem phong tu man hinh chi tiet bat dong san
                     </Text>
                 </View>
             ) : (
@@ -241,15 +201,9 @@ function AppointmentsContent() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
-    devBanner: {
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 10,
-        borderBottomWidth: 1, borderBottomColor: '#FFE0B2',
-    },
-    devBannerText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 17 },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,
+        paddingHorizontal: 16, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },
@@ -284,13 +238,9 @@ const styles = StyleSheet.create({
     cardBody: { paddingHorizontal: 14, paddingBottom: 12, gap: 7 },
     roomInfo: { flexDirection: 'row', alignItems: 'center', gap: 7 },
     roomTitle: { fontSize: 15, fontWeight: '700', color: '#1A1A1A', flex: 1 },
-    rescheduleBlock: { gap: 4 },
     timeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     timeText: { fontSize: 13, color: '#555' },
-    oldTime: { fontSize: 13, color: '#EF4444', textDecorationLine: 'line-through' },
-    newTime: { fontSize: 13, color: '#22C55E', fontWeight: '600' },
-    personRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-    personText: { fontSize: 13, color: '#888' },
+    suggestText: { fontSize: 13, color: '#8B5CF6', fontWeight: '600' },
     cardActions: {
         flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingBottom: 12,
     },

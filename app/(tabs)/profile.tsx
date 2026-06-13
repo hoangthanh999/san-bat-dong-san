@@ -105,9 +105,24 @@ function SavedPropertyCard({
 }
 
 function AppointmentChip({ appt }: { appt: Appointment }) {
-    const date = new Date(appt.scheduledAt);
-    const statusColor: Record<string, string> = { PENDING: '#FF9500', CONFIRMED: '#22C55E', CANCELLED: '#EF4444', COMPLETED: '#0066FF', RESCHEDULED: '#8B5CF6' };
-    const statusLabel: Record<string, string> = { PENDING: 'Chờ xác nhận', CONFIRMED: 'Đã xác nhận', CANCELLED: 'Đã huỷ', COMPLETED: 'Hoàn thành', RESCHEDULED: 'Đề xuất giờ mới' };
+    const date = new Date(appt.scheduledAt || appt.appointmentTime);
+    const statusColor: Record<string, string> = {
+        PENDING: '#FF9500',
+        ACCEPTED: '#22C55E',
+        REJECTED: '#EF4444',
+        CANCELLED: '#EF4444',
+        COMPLETED: '#0066FF',
+        SUGGESTED: '#8B5CF6',
+    };
+    const statusLabel: Record<string, string> = {
+        PENDING: 'Chờ xác nhận',
+        ACCEPTED: 'Đã chấp nhận',
+        REJECTED: 'Đã từ chối',
+        CANCELLED: 'Đã huỷ',
+        COMPLETED: 'Hoàn thành',
+        SUGGESTED: 'Đề xuất giờ mới',
+    };
+    const color = statusColor[appt.status] || '#888';
     return (
         <View style={styles.apptCard}>
             <View style={styles.apptDateBox}>
@@ -115,10 +130,10 @@ function AppointmentChip({ appt }: { appt: Appointment }) {
                 <Text style={styles.apptMonth}>Tháng {date.getMonth() + 1}</Text>
             </View>
             <View style={styles.apptInfo}>
-                <Text style={styles.apptRoom} numberOfLines={1}>Phòng #{appt.roomId}</Text>
+                <Text style={styles.apptRoom} numberOfLines={1}>{appt.roomTitle || appt.propertyTitle || `BDS #${appt.roomId}`}</Text>
                 <Text style={styles.apptTime}>{date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</Text>
-                <View style={[styles.apptStatus, { backgroundColor: `${statusColor[appt.status]}20` }]}>
-                    <Text style={[styles.apptStatusText, { color: statusColor[appt.status] }]}>{statusLabel[appt.status]}</Text>
+                <View style={[styles.apptStatus, { backgroundColor: `${color}20` }]}>
+                    <Text style={[styles.apptStatusText, { color }]}>{statusLabel[appt.status] || appt.status}</Text>
                 </View>
             </View>
         </View>
@@ -160,20 +175,23 @@ function ProfileScreenContent() {
         if (isAuthenticated) {
             fetchProfile();
             fetchMyRooms(true);
-            fetchAppointments(true);
+            fetchAppointments(true).catch(() => undefined);
             fetchSavedProperties(true);
         }
     }, [isAuthenticated]);
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await Promise.all([
-            fetchProfile(),
-            fetchMyRooms(true),
-            fetchAppointments(true),
-            fetchSavedProperties(true),
-        ]);
-        setRefreshing(false);
+        try {
+            await Promise.all([
+                fetchProfile(),
+                fetchMyRooms(true),
+                fetchAppointments(true).catch(() => undefined),
+                fetchSavedProperties(true),
+            ]);
+        } finally {
+            setRefreshing(false);
+        }
     };
 
     const handleLogout = () => {
@@ -415,13 +433,6 @@ function ProfileScreenContent() {
                 {/* Tab: Lịch hẹn */}
                 {activeTab === 'appointments' && (
                     <View>
-                        {/* Development Banner */}
-                        <View style={styles.devBanner}>
-                            <Ionicons name="construct-outline" size={16} color="#E65100" />
-                            <Text style={styles.devBannerText}>
-                                🚧 Tính năng đang phát triển
-                            </Text>
-                        </View>
                         {appointments.length === 0 ? (
                             <View style={styles.emptyState}>
                                 <Ionicons name="calendar-outline" size={48} color="#CCC" />

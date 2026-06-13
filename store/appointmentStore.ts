@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Appointment, PaginatedResponse } from '../types';
+import { Appointment, AppointmentStatus } from '../types';
 import { appointmentService } from '../services/api/appointments';
 import { scheduleAppointmentReminder } from '../services/pushNotificationService';
 
@@ -11,7 +11,7 @@ interface AppointmentState {
     hasMore: boolean;
     page: number;
 
-    fetchAppointments: (reset?: boolean, status?: string) => Promise<void>;
+    fetchAppointments: (reset?: boolean, status?: AppointmentStatus) => Promise<void>;
     createAppointment: (data: { roomId: number; scheduledAt: string; note?: string; message?: string }) => Promise<void>;
     cancelAppointment: (id: number) => Promise<void>;
     confirmAppointment: (id: number) => Promise<void>;
@@ -27,10 +27,12 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     hasMore: true,
     page: 0,
 
-    fetchAppointments: async (reset = false, status?: string) => {
+    fetchAppointments: async (reset = false, status?: AppointmentStatus) => {
         if (!reset && !get().hasMore) return;
+
         const page = reset ? 0 : get().page;
-        set({ isLoading: true });
+        set({ isLoading: true, error: null });
+
         try {
             const data = await appointmentService.getMyAppointments(page, 10, status);
             set(state => ({
@@ -40,46 +42,42 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
                 isLoading: false,
             }));
         } catch (error: any) {
-            set({ error: error.message, isLoading: false });
+            set({ error: error.message || 'Khong the tai danh sach lich hen', isLoading: false });
+            throw error;
         }
     },
 
     createAppointment: async (data) => {
         set({ isSubmitting: true, error: null });
+
         try {
             const appointment = await appointmentService.createAppointment(data);
-            if (appointment) {
-                set(state => ({
-                    appointments: [appointment, ...state.appointments],
-                    isSubmitting: false,
-                }));
+            set(state => ({
+                appointments: [appointment, ...state.appointments.filter((a) => a.id !== appointment.id)],
+                isSubmitting: false,
+            }));
 
-                scheduleAppointmentReminder({
-                    appointmentId: appointment.id,
-                    roomId: appointment.roomId,
-                    roomTitle: appointment.roomTitle || `Phòng #${appointment.roomId}`,
-                    scheduledAt: appointment.scheduledAt,
-                    landlordName: appointment.landlordName || 'Chủ nhà',
-                }).catch(console.warn);
-            } else {
-                set({ isSubmitting: false });
-            }
+            scheduleAppointmentReminder({
+                appointmentId: appointment.id,
+                roomId: appointment.roomId,
+                roomTitle: appointment.roomTitle || `Phong #${appointment.roomId}`,
+                scheduledAt: appointment.scheduledAt,
+                landlordName: appointment.landlordName || 'Chu nha',
+            }).catch(console.warn);
         } catch (error: any) {
-            set({ error: error.message || 'Đặt lịch thất bại', isSubmitting: false });
+            set({ error: error.message || 'Dat lich that bai', isSubmitting: false });
             throw error;
         }
     },
 
     cancelAppointment: async (id: number) => {
         try {
-            await appointmentService.cancelAppointment(id);
+            const updated = await appointmentService.cancelAppointment(id);
             set(state => ({
-                appointments: state.appointments.map(a =>
-                    a.id === id ? { ...a, status: 'CANCELLED' as const } : a
-                ),
+                appointments: state.appointments.map(a => a.id === id ? updated : a),
             }));
         } catch (error: any) {
-            set({ error: error.message || 'Hủy lịch hẹn thất bại' });
+            set({ error: error.message || 'Huy lich hen that bai' });
             throw error;
         }
     },
@@ -87,13 +85,11 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     confirmAppointment: async (id: number) => {
         try {
             const updated = await appointmentService.confirmAppointment(id);
-            if (updated) {
-                set(state => ({
-                    appointments: state.appointments.map(a => a.id === id ? updated : a),
-                }));
-            }
-        } catch (error) {
-            console.error('Confirm appointment error', error);
+            set(state => ({
+                appointments: state.appointments.map(a => a.id === id ? updated : a),
+            }));
+        } catch (error: any) {
+            set({ error: error.message || 'Xac nhan lich hen that bai' });
             throw error;
         }
     },
@@ -101,13 +97,11 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     rescheduleAppointment: async (id: number, suggestedMeetTime: string) => {
         try {
             const updated = await appointmentService.rescheduleAppointment(id, suggestedMeetTime);
-            if (updated) {
-                set(state => ({
-                    appointments: state.appointments.map(a => a.id === id ? updated : a),
-                }));
-            }
-        } catch (error) {
-            console.error('Reschedule appointment error', error);
+            set(state => ({
+                appointments: state.appointments.map(a => a.id === id ? updated : a),
+            }));
+        } catch (error: any) {
+            set({ error: error.message || 'De xuat gio moi that bai' });
             throw error;
         }
     },
@@ -115,13 +109,11 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     acceptReschedule: async (id: number) => {
         try {
             const updated = await appointmentService.acceptReschedule(id);
-            if (updated) {
-                set(state => ({
-                    appointments: state.appointments.map(a => a.id === id ? updated : a),
-                }));
-            }
-        } catch (error) {
-            console.error('Accept reschedule error', error);
+            set(state => ({
+                appointments: state.appointments.map(a => a.id === id ? updated : a),
+            }));
+        } catch (error: any) {
+            set({ error: error.message || 'Chap nhan gio moi that bai' });
             throw error;
         }
     },
