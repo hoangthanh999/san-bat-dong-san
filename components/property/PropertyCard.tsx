@@ -371,8 +371,8 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
                 <TouchableOpacity onPress={handleChat} style={styles.landlordContainer}>
                     <Image
                         source={{
-                            uri: item.ownerAvatarUrl ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(item.ownerFullName || 'User')}&background=0066FF&color=fff&size=100`,
+                            uri: item.ownerAvatarSnapshot || item.ownerAvatarUrl ||
+                                `https://ui-avatars.com/api/?name=${encodeURIComponent(item.ownerNameSnapshot || item.ownerFullName || 'User')}&background=0066FF&color=fff&size=100`,
                         }}
                         style={styles.avatar}
                     />

@@ -48,7 +48,7 @@ function ChatDetailContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { user } = useAuthStore();
-    const { messages, conversations, fetchHistory, sendMessage, markAsRead, isLoading, connectWebSocket } = useChatStore();
+    const { messages, conversations, fetchConversations, fetchHistory, sendMessage, markAsRead, isLoading, connectWebSocket } = useChatStore();
 
     const [inputText, setInputText] = useState('');
     const [isSending, setIsSending] = useState(false);
@@ -65,6 +65,11 @@ function ChatDetailContent() {
     const partnerAvatar = conversation?.avatar;
 
     useEffect(() => {
+        // Guard: nếu conversations chưa load (vào thẳng detail qua deep link / reload)
+        // thì fetch để có avatar cho header và bubble
+        if (conversations.length === 0) {
+            fetchConversations();
+        }
         fetchHistory(partnerId);
         markAsRead(partnerId);
         connectWebSocket();

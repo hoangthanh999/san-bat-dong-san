@@ -3,6 +3,7 @@ import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { Conversation, ChatMessage } from '../types';
 import { chatService } from '../services/api/chat';
+import { userService } from '../services/api/user';
 import { WS_CHAT_URL } from '../constants';
 import { useAuthStore } from './authStore';
 
@@ -12,6 +13,8 @@ interface ChatState {
     isLoading: boolean;
     isConnected: boolean;
     totalUnread: number;
+    /** Cache avatar URL theo partnerId để tránh gọi summary lặp lại */
+    avatarCache: Record<number, string>;
     _stompClient: Client | null;
 
     fetchConversations: () => Promise<void>;
@@ -29,14 +32,47 @@ export const useChatStore = create<ChatState>((set, get) => ({
     isLoading: false,
     isConnected: false,
     totalUnread: 0,
+    avatarCache: {},
     _stompClient: null,
 
     fetchConversations: async () => {
         set({ isLoading: true });
         try {
             const conversations = await chatService.getConversations();
-            const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
-            set({ conversations, totalUnread, isLoading: false });
+
+            // Enrich avatar cho conversation thiếu avatar (giống web ChatPage.jsx)
+            // Chỉ gọi summary cho conv thiếu avatar, Promise.all song song, cache kết quả
+            const enriched = await Promise.all(
+                conversations.map(async (conv) => {
+                    // Đã có avatar → giữ nguyên, không gọi thêm
+                    if (conv.avatar) return conv;
+
+                    const partnerId = conv.id;
+                    if (!partnerId || isNaN(partnerId)) return conv;
+
+                    // Tra cache trước để tránh gọi lặp khi refresh
+                    const cached = get().avatarCache[partnerId];
+                    if (cached) return { ...conv, avatar: cached };
+
+                    // Gọi /customers/{partnerId}/summary (public, không cần JWT)
+                    try {
+                        const summary = await userService.getUserSummary(partnerId);
+                        if (summary.avatarUrl) {
+                            // Lưu cache theo partnerId
+                            set(state => ({
+                                avatarCache: { ...state.avatarCache, [partnerId]: summary.avatarUrl! },
+                            }));
+                            return { ...conv, avatar: summary.avatarUrl };
+                        }
+                    } catch {
+                        // Fail silent — nếu summary fail thì giữ nguyên conv, không crash chat
+                    }
+                    return conv;
+                })
+            );
+
+            const totalUnread = enriched.reduce((sum, c) => sum + c.unreadCount, 0);
+            set({ conversations: enriched, totalUnread, isLoading: false });
         } catch (error) {
             set({ isLoading: false });
         }
