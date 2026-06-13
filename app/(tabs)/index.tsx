@@ -167,6 +167,7 @@ useEffect(() => {
     const HEADER_BOTTOM = insets.top + 64;
     const CATEGORY_TOP = HEADER_BOTTOM;          // ngay dưới header
     const PROJECTS_TOP = CATEGORY_TOP + 44;      // ngay dưới category bar
+    const CARD_TAGS_TOP = projects.length > 0 ? PROJECTS_TOP + 42 : CATEGORY_TOP + 48;
    
 
     return (
@@ -185,6 +186,7 @@ useEffect(() => {
     item={item}
   isActive={isFocused && appActive && item.id === activeId}
     cardHeight={CARD_HEIGHT}
+    tagsTop={CARD_TAGS_TOP}
 />
                         )}
                         pagingEnabled

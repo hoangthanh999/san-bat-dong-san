@@ -28,6 +28,7 @@ interface PropertyCardProps {
     item: Room;
     isActive: boolean;
     cardHeight: number; // chiều cao do parent truyền vào (đã tính chính xác)
+    tagsTop?: number;
 }
 
 function getSmartTags(item: Room): { label: string; color: string; bg: string }[] {
@@ -44,7 +45,7 @@ function getSmartTags(item: Room): { label: string; color: string; bg: string }[
     return tags.slice(0, 3);
 }
 
-export default function PropertyCard({ item, isActive, cardHeight }: PropertyCardProps) {
+export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tagsTopProp }: PropertyCardProps) {
     const router = useRouter();
    const [isMuted, setIsMuted] = useState(false);
     const { isAuthenticated } = useAuthStore();
@@ -199,7 +200,7 @@ export default function PropertyCard({ item, isActive, cardHeight }: PropertyCar
 
     // ---------- Responsive layout calculations ----------
     // Smart Tags: đặt dưới header floating (~insets.top + 56px header content)
-    const tagsTop = insets.top + 64;
+    const tagsTop = tagsTopProp ?? insets.top + 64;
     // Mute indicator: dưới status bar 1 chút
     const muteTop = insets.top + 12;
     // Info overlay & right actions: cách bottom 16px
