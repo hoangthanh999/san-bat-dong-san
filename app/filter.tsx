@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch, ActivityIndicator,
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch, ActivityIndicator, TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePropertyStore } from '../store/propertyStore';
+import { useProjectStore } from '../store/projectStore';
 import { searchService } from '../services/api/search';
 import { amenityService } from '../services/api/amenities';
 import { RoomFilters, Amenity } from '../types';
@@ -36,6 +37,7 @@ const AREA_RANGES = [
 ];
 
 const BEDROOM_OPTIONS = [0, 1, 2, 3, 4];
+const BATHROOM_OPTIONS = [1, 2, 3, 4];
 
 const FURNISHING_OPTIONS = [
     { val: 'UNFURNISHED', label: 'Không có' },
@@ -80,6 +82,8 @@ interface LocalFilters extends RoomFilters {
     amenities?: string[];
     hasBalcony?: boolean;
     minBedrooms?: number;
+    minBathrooms?: number;
+    projectId?: number;
 }
 
 /**
@@ -90,7 +94,8 @@ interface LocalFilters extends RoomFilters {
 export default function FilterScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { filters, setFilters, setSearchResults, resetFilters } = usePropertyStore();
+    const { filters, setFilters, setSearchResults, resetFilters, clearSearchResults } = usePropertyStore();
+    const { projects, fetchProjects } = useProjectStore();
 
     const [local, setLocal] = useState<LocalFilters>({ ...filters });
     const [amenityList, setAmenityList] = useState<Amenity[]>([]);
@@ -103,6 +108,7 @@ export default function FilterScreen() {
         amenityService.getAll()
             .then(data => setAmenityList(data || []))
             .catch(() => {});
+        fetchProjects(true);
     }, []);
 
     const updateLocal = (key: keyof LocalFilters, value: any) =>
@@ -134,31 +140,47 @@ export default function FilterScreen() {
     };
 
     const handleApply = async () => {
+        const keyword = local.keyword?.trim() || undefined;
+        const province = local.province?.trim() || undefined;
+        const ward = local.ward?.trim() || undefined;
+
         // Persist basic filters to store (for backward compat with non-search screens)
         setFilters({
+            keyword,
             transactionType: local.transactionType,
             propertyType: local.propertyTypes?.[0], // simple compat
+            province,
+            ward,
             minPrice: local.minPrice,
             maxPrice: local.maxPrice,
             minArea: local.minArea,
             maxArea: local.maxArea,
             sortBy: local.sortBy,
             bedroomList: local.minBedrooms != null ? [local.minBedrooms] : [],
+            minBathrooms: local.minBathrooms,
+            projectId: local.projectId,
         });
 
         // Build backend search request
         const hasAdvancedFilters =
+            keyword ||
+            province ||
+            ward ||
             local.transactionType ||
             (local.propertyTypes?.length ?? 0) > 0 ||
             local.minPrice != null || local.maxPrice != null ||
             local.minArea != null || local.maxArea != null ||
             local.minBedrooms != null ||
+            local.minBathrooms != null ||
+            local.projectId != null ||
             (local.furnishingStatuses?.length ?? 0) > 0 ||
             (local.availabilityStatuses?.length ?? 0) > 0 ||
             (local.amenities?.length ?? 0) > 0 ||
             local.hasBalcony;
 
-        if (hasAdvancedFilters) {
+        if (!hasAdvancedFilters) {
+            clearSearchResults();
+        } else {
             setIsApplying(true);
             try {
                 // Map sortBy frontend → backend sortBy/sortDir
@@ -168,6 +190,9 @@ export default function FilterScreen() {
                 else if (local.sortBy === 'price_desc') { sortBy = 'price'; sortDir = 'desc'; }
 
                 const results = await searchService.searchProperties({
+                    keyword,
+                    province,
+                    ward,
                     transactionTypes: local.transactionType ? [local.transactionType] : undefined,
                     propertyTypes: local.propertyTypes?.length ? local.propertyTypes : undefined,
                     minPrice: local.minPrice,
@@ -175,6 +200,8 @@ export default function FilterScreen() {
                     minArea: local.minArea,
                     maxArea: local.maxArea,
                     minBedrooms: local.minBedrooms,
+                    minBathrooms: local.minBathrooms,
+                    projectId: local.projectId,
                     furnishingStatuses: local.furnishingStatuses?.length ? local.furnishingStatuses : undefined,
                     availabilityStatuses: local.availabilityStatuses?.length ? local.availabilityStatuses : undefined,
                     amenities: local.amenities?.length ? local.amenities : undefined,
@@ -198,6 +225,7 @@ export default function FilterScreen() {
     const handleReset = () => {
         setLocal({});
         resetFilters();
+        clearSearchResults();
         router.back();
     };
 
@@ -220,6 +248,35 @@ export default function FilterScreen() {
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+                <View style={styles.section}>
+                    <SectionHeader title="Từ khóa" />
+                    <TextInput
+                        style={styles.input}
+                        value={local.keyword || ''}
+                        onChangeText={text => updateLocal('keyword', text)}
+                        placeholder="Nhập tên, địa chỉ, mô tả..."
+                        placeholderTextColor="#999"
+                        returnKeyType="search"
+                    />
+                </View>
+
+                <View style={styles.section}>
+                    <SectionHeader title="Khu vực" />
+                    <TextInput
+                        style={styles.input}
+                        value={local.province || ''}
+                        onChangeText={text => updateLocal('province', text)}
+                        placeholder="Tỉnh/Thành phố, ví dụ: Thành phố Hồ Chí Minh"
+                        placeholderTextColor="#999"
+                    />
+                    <TextInput
+                        style={[styles.input, styles.inputSpacing]}
+                        value={local.ward || ''}
+                        onChangeText={text => updateLocal('ward', text)}
+                        placeholder="Phường/Xã, ví dụ: Phường Bến Nghé"
+                        placeholderTextColor="#999"
+                    />
+                </View>
 
                 {/* Hình thức giao dịch */}
                 <View style={styles.section}>
@@ -259,6 +316,27 @@ export default function FilterScreen() {
                         ))}
                     </View>
                 </View>
+
+                {projects.length > 0 && (
+                    <View style={styles.section}>
+                        <SectionHeader title="Dự án" />
+                        <View style={styles.chipRow}>
+                            <Chip
+                                label="Tất cả"
+                                selected={local.projectId == null}
+                                onPress={() => updateLocal('projectId', undefined)}
+                            />
+                            {projects.slice(0, 10).map(project => (
+                                <Chip
+                                    key={project.id}
+                                    label={project.name}
+                                    selected={local.projectId === project.id}
+                                    onPress={() => updateLocal('projectId', local.projectId === project.id ? undefined : project.id)}
+                                />
+                            ))}
+                        </View>
+                    </View>
+                )}
 
                 {/* Khoảng giá */}
                 <View style={styles.section}>
@@ -305,6 +383,25 @@ export default function FilterScreen() {
                                 label={n === 0 ? 'Studio' : `${n}+ PN`}
                                 selected={local.minBedrooms === n}
                                 onPress={() => updateLocal('minBedrooms', n)}
+                            />
+                        ))}
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <SectionHeader title="Số phòng tắm tối thiểu" />
+                    <View style={styles.chipRow}>
+                        <Chip
+                            label="Tất cả"
+                            selected={local.minBathrooms == null}
+                            onPress={() => updateLocal('minBathrooms', undefined)}
+                        />
+                        {BATHROOM_OPTIONS.map(n => (
+                            <Chip
+                                key={n}
+                                label={`${n}+ WC`}
+                                selected={local.minBathrooms === n}
+                                onPress={() => updateLocal('minBathrooms', n)}
                             />
                         ))}
                     </View>
@@ -426,6 +523,17 @@ const styles = StyleSheet.create({
     section: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4 },
     sectionLabel: { fontSize: 15, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    input: {
+        borderWidth: 1.5,
+        borderColor: '#E0E0E0',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 14,
+        color: '#1A1A1A',
+        backgroundColor: '#FAFAFA',
+    },
+    inputSpacing: { marginTop: 10 },
     chip: {
         paddingHorizontal: 14,
         paddingVertical: 8,

@@ -31,6 +31,7 @@ export default function FeedScreen() {
     const {
         rooms, fetchRooms, isLoading, isLoadingMore,
         loadMoreRooms, filters, error,
+        searchResults,
     } = usePropertyStore();
     const { unreadCount } = useNotificationStore();
     const { projects, fetchProjects } = useProjectStore();
@@ -78,11 +79,15 @@ useEffect(() => {
         setRefreshing(false);
     }, []);
 
-    const { searchResults } = usePropertyStore();
     const sourceRooms = searchResults ?? rooms;
+    const isSearchMode = searchResults !== null;
 
     const displayRooms = useMemo(() => {
         let result = [...sourceRooms];
+
+        if (isSearchMode) {
+            return result;
+        }
 
         // ── Category filter ──────────────────────────────
         if (activeCategory !== 'all') {
@@ -113,7 +118,7 @@ useEffect(() => {
             result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
         return result;
-    }, [sourceRooms, filters, activeCategory]); // ← thêm activeCategory
+    }, [sourceRooms, filters, activeCategory, isSearchMode]); // ← thêm activeCategory
 
     // ── Loading / Error / Empty states ───────────────────
     if (isLoading && rooms.length === 0 && !error) {
@@ -189,7 +194,9 @@ useEffect(() => {
                         showsVerticalScrollIndicator={false}
                         onViewableItemsChanged={onViewableItemsChanged}
                         viewabilityConfig={viewabilityConfig}
-                        onEndReached={() => loadMoreRooms()}
+                        onEndReached={() => {
+                            if (!isSearchMode) loadMoreRooms();
+                        }}
                         onEndReachedThreshold={0.5}
                         refreshControl={
                             <RefreshControl

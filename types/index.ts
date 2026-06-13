@@ -384,13 +384,18 @@ export interface Conversation {
 // Filter / Search (khớp backend PropertySearchRequestDTO)
 // ============================
 export interface RoomFilters {
+    keyword?: string;
     transactionType?: string;   // "FOR_SALE" | "FOR_RENT"
     propertyType?: string;      // "APARTMENT" | "HOUSE" | "LAND" | "ROOM"
+    province?: string;
+    ward?: string;
     minPrice?: number;
     maxPrice?: number;
     minArea?: number;
     maxArea?: number;
     bedroomList?: number[];
+    minBathrooms?: number;
+    projectId?: number;
     sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'nearest';
 }
 
