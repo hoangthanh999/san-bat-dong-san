@@ -184,7 +184,7 @@ function AiChatContent() {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
@@ -255,6 +255,7 @@ function AiChatContent() {
                     keyExtractor={item => item.id}
                     renderItem={renderMessage}
                     contentContainerStyle={styles.msgList}
+                    keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
                     ListFooterComponent={isThinking ? <TypingIndicator /> : null}

@@ -280,7 +280,7 @@ function ChatDetailContent() {
     return (
         <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <Stack.Screen options={{ headerShown: false }} />
             <StatusBar barStyle="dark-content" />
@@ -325,6 +325,7 @@ function ChatDetailContent() {
                     keyExtractor={item => item.id.toString()}
                     renderItem={renderMessage}
                     contentContainerStyle={styles.msgList}
+                    keyboardShouldPersistTaps="handled"
                     onContentSizeChange={scrollToBottom}
                     showsVerticalScrollIndicator={false}
                     onScrollBeginDrag={() => {
