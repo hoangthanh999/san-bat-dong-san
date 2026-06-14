@@ -9,7 +9,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import { usePropertyStore } from '../../store/propertyStore';
 import { searchService } from '../../services/api/search';
 import { Room, PropertySearchItem } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -55,6 +54,12 @@ function searchItemToRoom(item: PropertySearchItem): Room {
         createdAt: item.createdAt,
     };
 }
+
+const hasValidCoords = (room: Room) =>
+    Number.isFinite(room.latitude) &&
+    Number.isFinite(room.longitude) &&
+    room.latitude !== 0 &&
+    room.longitude !== 0;
 
 // ─── Tạo HTML Leaflet map ──────────────────────────────────────────────────
 const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, radiusKm?: number) => {
@@ -117,9 +122,11 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, rad
     var markers = {};
     var selectedId = null;
     var rooms = ${JSON.stringify(markers)};
+    var boundsPoints = [];
 
     rooms.forEach(function(r) {
       if (!r.lat || !r.lng) return;
+      boundsPoints.push([r.lat, r.lng]);
       var icon = L.divIcon({
         className: '',
         html: '<div class="price-marker" id="m' + r.id + '">' + r.label + '</div>',
@@ -154,7 +161,13 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, rad
         weight: 2,
       }).addTo(map);
       map.setView([${userLat}, ${userLng}], 14);
-    ` : ''}
+    ` : `
+      if (boundsPoints.length === 1) {
+        map.setView(boundsPoints[0], 15);
+      } else if (boundsPoints.length > 1) {
+        map.fitBounds(boundsPoints, { padding: [48, 48], maxZoom: 15 });
+      }
+    `}
 
     map.on('click', function() {
       if (selectedId !== null) {
@@ -186,21 +199,41 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, rad
 export default function MapScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { rooms, isLoading, fetchRooms } = usePropertyStore();
+    const [mapRooms, setMapRooms] = useState<Room[]>([]);
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
     const [activeFilter, setActiveFilter] = useState('all');
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [nearbyRooms, setNearbyRooms] = useState<Room[] | null>(null); // null = chưa search Near Me
+    const [isLoadingMap, setIsLoadingMap] = useState(false);
     const [isSearchingNearby, setIsSearchingNearby] = useState(false);
+    const [mapError, setMapError] = useState<string | null>(null);
     const nearMeAnim = useRef(new Animated.Value(1)).current;
     const webViewRef = useRef<WebView>(null);
 
-    useEffect(() => { fetchRooms(); }, []);
+    const loadMapProperties = useCallback(async () => {
+        setIsLoadingMap(true);
+        setMapError(null);
+        try {
+            const results = await searchService.searchProperties({
+                page: 0,
+                size: 100,
+            });
+            setMapRooms((results.content || []).map(searchItemToRoom));
+        } catch (err) {
+            console.warn('[Map] Load map properties failed:', err);
+            setMapError('Không thể tải dữ liệu bản đồ. Vui lòng thử lại.');
+            setMapRooms([]);
+        } finally {
+            setIsLoadingMap(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadMapProperties();
+    }, [loadMapProperties]);
 
     // Chỉ dùng rooms thật từ backend (có tọa độ hợp lệ)
-    const roomsWithCoords = (nearbyRooms ?? rooms).filter(
-        r => r.latitude && r.longitude && r.latitude !== 0 && r.longitude !== 0
-    );
+    const roomsWithCoords = (nearbyRooms ?? mapRooms).filter(hasValidCoords);
 
     const filteredRooms = roomsWithCoords.filter(room => {
         switch (activeFilter) {
@@ -292,7 +325,7 @@ export default function MapScreen() {
             {/* Bản đồ Leaflet */}
             <WebView
                 ref={webViewRef}
-                key={`map-${activeFilter}-${filteredRooms.length}`}
+                key={`map-${activeFilter}-${isNearMeMode ? 'near' : 'all'}-${filteredRooms.length}-${userLocation?.lat ?? 'x'}-${userLocation?.lng ?? 'x'}`}
                 style={styles.map}
                 source={{ html: leafletHTML }}
                 onMessage={handleWebViewMessage}
@@ -303,7 +336,7 @@ export default function MapScreen() {
             />
 
             {/* Loading overlay khi đang fetch dữ liệu */}
-            {(isLoading || isSearchingNearby) && (
+            {(isLoadingMap || isSearchingNearby) && (
                 <View style={styles.loadingOverlay}>
                     <View style={styles.loadingCard}>
                         <ActivityIndicator size="small" color="#0066FF" />
@@ -343,6 +376,7 @@ export default function MapScreen() {
                                 setNearbyRooms(null);
                                 setUserLocation(null);
                                 setSelectedRoom(null);
+                                setMapError(null);
                             }}
                         >
                             <Ionicons name="close" size={12} color="white" />
@@ -391,13 +425,15 @@ export default function MapScreen() {
             </View>
 
             {/* Empty state khi không có dữ liệu thật (không dùng mock nữa) */}
-            {!isLoading && filteredRooms.length === 0 && (
+            {!isLoadingMap && !isSearchingNearby && filteredRooms.length === 0 && (
                 <View style={[styles.emptyBadge, { bottom: Math.max(insets.bottom, 16) + 170 }]}>
                     <Ionicons name="location-outline" size={16} color="#888" />
                     <Text style={styles.emptyText}>
-                        {isNearMeMode
+                        {mapError
+                            ? mapError
+                            : isNearMeMode
                             ? 'Không có BĐS nào trong bán kính gần bạn'
-                            : 'Chưa có BĐS nào có tọa độ trên bản đồ'
+                            : 'Chưa có bất động sản có tọa độ để hiển thị trên bản đồ'
                         }
                     </Text>
                 </View>

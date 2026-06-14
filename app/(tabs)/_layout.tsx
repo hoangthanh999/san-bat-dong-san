@@ -141,11 +141,18 @@ export default function TabLayout() {
                 }}
             />
 
-            {/* ── Map (ẩn khỏi tab bar, vẫn accessible) ── */}
+            {/* ── Map ── */}
             <Tabs.Screen
                 name="map"
                 options={{
-                    href: null, // ẩn khỏi tab bar
+                    title: 'Bản đồ',
+                    tabBarIcon: ({ color, focused }) => (
+                        <Ionicons
+                            name={focused ? 'map' : 'map-outline'}
+                            size={24}
+                            color={color}
+                        />
+                    ),
                 }}
             />
         </Tabs>
