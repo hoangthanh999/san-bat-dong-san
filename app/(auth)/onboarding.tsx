@@ -1,7 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, Dimensions,
-    StatusBar, ScrollView, Animated,
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    Dimensions,
+    StatusBar,
+    ScrollView,
+    Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -9,43 +15,63 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-const STEPS = [
+type OnboardingStep = {
+    id: string;
+    title: string;
+    subtitle: string;
+    icon: string;
+    answerKey?: 'purpose' | 'discovery';
+    required?: boolean;
+    options?: {
+        value: string;
+        label: string;
+        icon: keyof typeof Ionicons.glyphMap;
+        desc: string;
+    }[];
+};
+
+const STEPS: OnboardingStep[] = [
+    {
+        id: 'welcome',
+        title: 'Chào mừng đến với HomeSwipe',
+        subtitle: 'Tìm bất động sản, xem bản đồ, chat với chủ nhà và đặt lịch xem nhà ngay trên điện thoại.',
+        icon: '🏠',
+    },
     {
         id: 'purpose',
-        question: 'Bạn đang tìm kiếm gì?',
-        subtitle: 'Chúng tôi sẽ gợi ý bất động sản phù hợp nhất',
-        icon: '🏠',
+        answerKey: 'purpose',
+        required: true,
+        title: 'Bạn đang quan tâm đến gì?',
+        subtitle: 'Lưu lựa chọn ban đầu để app hiểu nhu cầu của bạn hơn. Bạn vẫn có thể thay đổi bằng Search/filter.',
+        icon: '🔎',
         options: [
-            { value: 'BUY', label: 'Mua nhà', icon: 'home', desc: 'Tìm nhà để mua' },
-            { value: 'RENT', label: 'Thuê nhà', icon: 'key', desc: 'Tìm phòng trọ / căn hộ' },
-            { value: 'INVEST', label: 'Đầu tư', icon: 'trending-up', desc: 'BĐS sinh lời cao' },
+            { value: 'RENT', label: 'Thuê nhà/phòng', icon: 'key-outline', desc: 'Tìm phòng trọ, căn hộ hoặc nhà cho thuê' },
+            { value: 'BUY', label: 'Mua nhà', icon: 'home-outline', desc: 'Tìm bất động sản để mua' },
+            { value: 'INVEST', label: 'Đầu tư', icon: 'trending-up-outline', desc: 'Quan tâm tài sản có tiềm năng sinh lời' },
+            { value: 'UNSURE', label: 'Chưa xác định', icon: 'help-circle-outline', desc: 'Xem trước rồi lọc sau trong app' },
         ],
     },
     {
-        id: 'budget',
-        question: 'Ngân sách của bạn?',
-        subtitle: 'Giúp chúng tôi lọc đúng tầm giá',
-        icon: '💰',
+        id: 'discovery',
+        answerKey: 'discovery',
+        required: true,
+        title: 'Bạn muốn tìm nhà bằng cách nào?',
+        subtitle: 'Chọn cách khám phá phù hợp nhất lúc bắt đầu. Các công cụ này đều có sẵn trong app.',
+        icon: '🧭',
         options: [
-            { value: '<1ty', label: 'Dưới 1 tỷ', icon: 'wallet', desc: '< 1.000.000.000 đ' },
-            { value: '1-3ty', label: '1 - 3 tỷ', icon: 'cash', desc: '1 – 3 tỷ đồng' },
-            { value: '3-5ty', label: '3 - 5 tỷ', icon: 'card', desc: '3 – 5 tỷ đồng' },
-            { value: '>5ty', label: 'Trên 5 tỷ', icon: 'diamond', desc: '> 5.000.000.000 đ' },
+            { value: 'FEED', label: 'Xem Feed đề xuất', icon: 'albums-outline', desc: 'Lướt danh sách tin mới và nổi bật' },
+            { value: 'FILTER', label: 'Lọc khu vực/giá', icon: 'options-outline', desc: 'Tìm theo nhu cầu cụ thể hơn' },
+            { value: 'MAP', label: 'Xem trên bản đồ', icon: 'map-outline', desc: 'Xem bất động sản theo vị trí' },
+            { value: 'AI_CHAT', label: 'Hỏi AI / chat tư vấn', icon: 'chatbubble-ellipses-outline', desc: 'Nhận gợi ý và trao đổi khi cần' },
         ],
     },
     {
-        id: 'location',
-        question: 'Khu vực ưa thích?',
-        subtitle: 'Chọn một hoặc nhiều khu vực',
-        icon: '📍',
-        options: [
-            { value: 'Q1', label: 'Quận 1', icon: 'business', desc: 'Trung tâm, sầm uất' },
-            { value: 'Q7', label: 'Quận 7', icon: 'leaf', desc: 'Phú Mỹ Hưng, yên tĩnh' },
-            { value: 'thu_duc', label: 'Thủ Đức', icon: 'school', desc: 'Gần ĐH, sôi động' },
-            { value: 'binh_thanh', label: 'Bình Thạnh', icon: 'water', desc: 'Ven sông, hiện đại' },
-        ],
+        id: 'ready',
+        title: 'Sẵn sàng khám phá bất động sản',
+        subtitle: 'Bạn có thể xem tin và tìm kiếm ngay. Khi muốn chat, đặt lịch, đăng tin hoặc dùng ví, app sẽ yêu cầu đăng nhập.',
+        icon: '✨',
     },
 ];
 
@@ -53,12 +79,22 @@ export default function OnboardingScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [currentStep, setCurrentStep] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, string[]>>({});
+    const [answers, setAnswers] = useState<Record<string, string>>({});
     const progressAnim = useRef(new Animated.Value(0)).current;
 
     const step = STEPS[currentStep];
     const isLastStep = currentStep === STEPS.length - 1;
-    const selectedForStep = answers[step.id] || [];
+    const selectedForStep = step.answerKey ? answers[step.answerKey] : undefined;
+    const canProceed = !step.required || Boolean(selectedForStep);
+
+    const progressWidth = useMemo(
+        () =>
+            progressAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+            }),
+        [progressAnim]
+    );
 
     const animateProgress = (toValue: number) => {
         Animated.spring(progressAnim, {
@@ -71,107 +107,102 @@ export default function OnboardingScreen() {
 
     const handleSelect = (value: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const current = answers[step.id] || [];
-        const isMulti = step.id === 'location';
-        if (isMulti) {
-            const updated = current.includes(value)
-                ? current.filter(v => v !== value)
-                : [...current, value];
-            setAnswers(prev => ({ ...prev, [step.id]: updated }));
-        } else {
-            setAnswers(prev => ({ ...prev, [step.id]: [value] }));
+        if (!step.answerKey) return;
+        setAnswers(prev => ({ ...prev, [step.answerKey!]: value }));
+    };
+
+    const finishOnboarding = async () => {
+        try {
+            await AsyncStorage.setItem('onboarding_done', 'true');
+            if (Object.keys(answers).length > 0) {
+                await AsyncStorage.setItem('onboarding_answers', JSON.stringify(answers));
+            }
+        } catch {
+            // Even if storage fails, let the user enter the app; next launch can show onboarding again.
         }
+        router.replace('/(tabs)');
     };
 
     const handleNext = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         if (isLastStep) {
             await finishOnboarding();
-        } else {
-            const next = currentStep + 1;
-            setCurrentStep(next);
-            animateProgress(next / (STEPS.length - 1));
+            return;
         }
+
+        const next = currentStep + 1;
+        setCurrentStep(next);
+        animateProgress(next / (STEPS.length - 1));
     };
-
-    const finishOnboarding = async () => {
-        try {
-            await AsyncStorage.setItem('onboarding_done', 'true');
-            await AsyncStorage.setItem('onboarding_answers', JSON.stringify(answers));
-        } catch (e) { }
-        router.replace('/(tabs)');
-    };
-
-    const canProceed = selectedForStep.length > 0;
-
-    const progressWidth = progressAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0%', '100%'],
-    });
 
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" />
 
-            {/* Header */}
             <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                <View style={styles.progressBar}>
-                    {STEPS.map((_, idx) => (
-                        <View
-                            key={idx}
-                            style={[
-                                styles.progressDot,
-                                idx <= currentStep && styles.progressDotActive,
-                            ]}
-                        />
-                    ))}
+                <View style={styles.progressTrack}>
+                    <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
                 </View>
                 <TouchableOpacity onPress={finishOnboarding} style={styles.skipBtn}>
                     <Text style={styles.skipText}>Bỏ qua</Text>
                 </TouchableOpacity>
             </View>
 
-            {/* Content */}
-            <View style={styles.content}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
                 <Text style={styles.emoji}>{step.icon}</Text>
-                <Text style={styles.question}>{step.question}</Text>
+                <Text style={styles.title}>{step.title}</Text>
                 <Text style={styles.subtitle}>{step.subtitle}</Text>
 
-                <View style={styles.optionsGrid}>
-                    {step.options.map(option => {
-                        const isSelected = selectedForStep.includes(option.value);
-                        return (
-                            <TouchableOpacity
-                                key={option.value}
-                                style={[styles.optionCard, isSelected && styles.optionCardSelected]}
-                                onPress={() => handleSelect(option.value)}
-                                activeOpacity={0.7}
-                            >
-                                <View style={[styles.optionIcon, isSelected && styles.optionIconSelected]}>
-                                    <Ionicons
-                                        name={option.icon as any}
-                                        size={24}
-                                        color={isSelected ? 'white' : '#0066FF'}
-                                    />
-                                </View>
-                                <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
-                                    {option.label}
-                                </Text>
-                                <Text style={[styles.optionDesc, isSelected && styles.optionDescSelected]}>
-                                    {option.desc}
-                                </Text>
-                                {isSelected && (
-                                    <View style={styles.checkmark}>
-                                        <Ionicons name="checkmark" size={12} color="white" />
+                {step.options ? (
+                    <View style={styles.optionsGrid}>
+                        {step.options.map(option => {
+                            const isSelected = selectedForStep === option.value;
+                            return (
+                                <TouchableOpacity
+                                    key={option.value}
+                                    style={[styles.optionCard, isSelected && styles.optionCardSelected]}
+                                    onPress={() => handleSelect(option.value)}
+                                    activeOpacity={0.75}
+                                >
+                                    <View style={[styles.optionIcon, isSelected && styles.optionIconSelected]}>
+                                        <Ionicons
+                                            name={option.icon}
+                                            size={24}
+                                            color={isSelected ? 'white' : '#0066FF'}
+                                        />
                                     </View>
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-            </View>
+                                    <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
+                                        {option.label}
+                                    </Text>
+                                    <Text style={[styles.optionDesc, isSelected && styles.optionDescSelected]}>
+                                        {option.desc}
+                                    </Text>
+                                    {isSelected && (
+                                        <View style={styles.checkmark}>
+                                            <Ionicons name="checkmark" size={12} color="white" />
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                ) : (
+                    <View style={styles.infoCard}>
+                        <Ionicons name="phone-portrait-outline" size={26} color="#0066FF" />
+                        <Text style={styles.infoTitle}>Vào app trước, đăng nhập khi cần</Text>
+                        <Text style={styles.infoText}>
+                            Bạn có thể xem Feed, Search và Map ngay. Một số chức năng như chat, đặt lịch,
+                            đăng tin và ví sẽ yêu cầu đăng nhập.
+                        </Text>
+                    </View>
+                )}
+            </ScrollView>
 
-            {/* Bottom */}
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
                 <Text style={styles.stepIndicator}>
                     {currentStep + 1} / {STEPS.length}
@@ -179,10 +210,10 @@ export default function OnboardingScreen() {
                 <TouchableOpacity
                     style={[styles.nextBtn, !canProceed && styles.nextBtnDisabled]}
                     onPress={canProceed ? handleNext : undefined}
-                    activeOpacity={canProceed ? 0.8 : 1}
+                    activeOpacity={canProceed ? 0.85 : 1}
                 >
                     <Text style={styles.nextBtnText}>
-                        {isLastStep ? 'Bắt đầu khám phá! 🚀' : 'Tiếp theo'}
+                        {isLastStep ? 'Bắt đầu khám phá' : 'Tiếp theo'}
                     </Text>
                     {!isLastStep && <Ionicons name="arrow-forward" size={18} color="white" />}
                 </TouchableOpacity>
@@ -198,20 +229,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 0, // overridden by inline style using useSafeAreaInsets
         paddingBottom: 16,
     },
-    progressBar: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    progressDot: {
-        width: 32,
+    progressTrack: {
+        flex: 1,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#E0E0E0',
+        backgroundColor: '#E0E8FF',
+        overflow: 'hidden',
+        marginRight: 16,
     },
-    progressDotActive: {
+    progressFill: {
+        height: '100%',
+        borderRadius: 3,
         backgroundColor: '#0066FF',
     },
     skipBtn: {
@@ -219,30 +249,31 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
     },
     skipText: {
-        color: '#888',
+        color: '#667085',
         fontSize: 14,
-        fontWeight: '500',
+        fontWeight: '600',
     },
-    content: {
-        flex: 1,
+    scroll: { flex: 1 },
+    scrollContent: {
         paddingHorizontal: 20,
-        paddingTop: 20,
+        paddingTop: 18,
+        paddingBottom: 28,
     },
     emoji: {
-        fontSize: 52,
+        fontSize: 54,
         marginBottom: 16,
     },
-    question: {
+    title: {
         fontSize: 28,
         fontWeight: '800',
-        color: '#1A1A1A',
-        marginBottom: 8,
+        color: '#101828',
+        marginBottom: 10,
         lineHeight: 36,
     },
     subtitle: {
         fontSize: 15,
-        color: '#888',
-        marginBottom: 28,
+        color: '#667085',
+        marginBottom: 24,
         lineHeight: 22,
     },
     optionsGrid: {
@@ -252,9 +283,10 @@ const styles = StyleSheet.create({
     },
     optionCard: {
         width: (width - 52) / 2,
+        minHeight: 150,
         backgroundColor: 'white',
         borderRadius: 16,
-        padding: 16,
+        padding: 15,
         borderWidth: 2,
         borderColor: '#E0E8FF',
         position: 'relative',
@@ -284,16 +316,16 @@ const styles = StyleSheet.create({
     optionLabel: {
         fontSize: 15,
         fontWeight: '700',
-        color: '#1A1A1A',
-        marginBottom: 4,
+        color: '#101828',
+        marginBottom: 5,
     },
     optionLabelSelected: {
         color: '#0066FF',
     },
     optionDesc: {
         fontSize: 12,
-        color: '#999',
-        lineHeight: 16,
+        color: '#667085',
+        lineHeight: 17,
     },
     optionDescSelected: {
         color: '#4D94FF',
@@ -309,12 +341,35 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    infoCard: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 18,
+        borderWidth: 1,
+        borderColor: '#E0E8FF',
+        shadowColor: '#0066FF',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    infoTitle: {
+        marginTop: 10,
+        fontSize: 17,
+        fontWeight: '800',
+        color: '#101828',
+    },
+    infoText: {
+        marginTop: 8,
+        fontSize: 14,
+        color: '#667085',
+        lineHeight: 21,
+    },
     footer: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingBottom: 24, // thêm insets.bottom inline nếu cần
         paddingTop: 16,
         backgroundColor: 'white',
         borderTopWidth: 1,
@@ -322,8 +377,8 @@ const styles = StyleSheet.create({
     },
     stepIndicator: {
         fontSize: 14,
-        color: '#999',
-        fontWeight: '600',
+        color: '#667085',
+        fontWeight: '700',
     },
     nextBtn: {
         flexDirection: 'row',
@@ -331,7 +386,7 @@ const styles = StyleSheet.create({
         gap: 8,
         backgroundColor: '#0066FF',
         borderRadius: 14,
-        paddingHorizontal: 24,
+        paddingHorizontal: 22,
         paddingVertical: 14,
         shadowColor: '#0066FF',
         shadowOffset: { width: 0, height: 4 },
@@ -346,7 +401,7 @@ const styles = StyleSheet.create({
     },
     nextBtnText: {
         color: 'white',
-        fontWeight: '700',
+        fontWeight: '800',
         fontSize: 15,
     },
 });
