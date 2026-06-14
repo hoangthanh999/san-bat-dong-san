@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { searchService } from '../../services/api/search';
 import { Room, PropertySearchItem } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { formatCompactVND } from '../../utils/formatPrice';
 
 const { width } = Dimensions.get('window');
 const CARD_HEIGHT = 130;
@@ -67,9 +68,7 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, rad
         id: r.id,
         lat: r.latitude,
         lng: r.longitude,
-        label: r.price >= 1000000000
-            ? `${(r.price / 1000000000).toFixed(1)}tỷ`
-            : `${(r.price / 1000000).toFixed(0)}tr`,
+        label: formatCompactVND(r.price),
     }));
 
     return `<!DOCTYPE html>
@@ -304,11 +303,6 @@ export default function MapScreen() {
         } catch (e) { }
     };
 
-    const formatPrice = (price: number) =>
-        price >= 1000000000
-            ? `${(price / 1000000000).toFixed(1)}tỷ`
-            : `${(price / 1000000).toFixed(0)}tr`;
-
     const leafletHTML = buildLeafletHTML(
         filteredRooms,
         userLocation?.lat,
@@ -452,7 +446,7 @@ export default function MapScreen() {
                         contentFit="cover"
                     />
                     <View style={styles.cardInfo}>
-                        <Text style={styles.cardPrice}>{formatPrice(selectedRoom.price)}/tháng</Text>
+                        <Text style={styles.cardPrice}>{formatCompactVND(selectedRoom.price)}/tháng</Text>
                         <Text style={styles.cardTitle} numberOfLines={1}>{selectedRoom.title}</Text>
                         <Text style={styles.cardAddress} numberOfLines={1}>📍 {selectedRoom.address}</Text>
                         <View style={styles.cardMeta}>

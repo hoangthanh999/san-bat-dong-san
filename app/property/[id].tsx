@@ -22,6 +22,7 @@ import { roomService } from '../../services/api/rooms';
 import { ImageGallery } from '../../components/property/ImageGallery';
 import { ReviewCard } from '../../components/property/ReviewCard';
 import { Room } from '../../types';
+import { formatCompactVND } from '../../utils/formatPrice';
 
 const { width } = Dimensions.get('window');
 
@@ -242,7 +243,7 @@ export default function PropertyDetailScreen() {
     const handleShare = async () => {
         try {
             await Share.share({
-                message: `${room?.title}\n${room ? getFullAddress(room) : ''}\nGiá: ${formatPrice(room?.price || 0)}/tháng\n\nXem thêm trên HomeSwipe`,
+                message: `${room?.title}\n${room ? getFullAddress(room) : ''}\nGiá: ${formatCompactVND(room?.price)}/tháng\n\nXem thêm trên HomeSwipe`,
                 title: room?.title,
             });
         } catch { }
@@ -407,12 +408,6 @@ export default function PropertyDetailScreen() {
         }
     };
 
-    const formatPrice = (price: number) => {
-        if (price >= 1_000_000_000) return `${(price / 1_000_000_000).toFixed(1)} tỷ`;
-        if (price >= 1_000_000) return `${(price / 1_000_000).toFixed(0)} triệu`;
-        return `${price.toLocaleString('vi-VN')}đ`;
-    };
-
     const handleDeleteProperty = () => {
         if (!room) return;
         Alert.alert(
@@ -489,7 +484,7 @@ export default function PropertyDetailScreen() {
                     {/* Price & Status */}
                     <View style={styles.priceRow}>
                         <View>
-                            <Text style={styles.price}>{formatPrice(room.price)}</Text>
+                            <Text style={styles.price}>{formatCompactVND(room.price)}</Text>
                             <Text style={styles.priceUnit}>đồng / {room.transactionType === 'FOR_SALE' ? 'căn' : 'tháng'}</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: statusBadge.bg }]}>
@@ -784,7 +779,7 @@ export default function PropertyDetailScreen() {
             {/* Bottom Action Bar */}
             <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
                 <View style={styles.bottomPriceInfo}>
-                    <Text style={styles.bottomPrice}>{formatPrice(room.price)}</Text>
+                    <Text style={styles.bottomPrice}>{formatCompactVND(room.price)}</Text>
                     <Text style={styles.bottomUnit}>/{room.transactionType === 'FOR_SALE' ? 'căn' : 'tháng'}</Text>
                 </View>
                 {user?.id === room.ownerId ? (

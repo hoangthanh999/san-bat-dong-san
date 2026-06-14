@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Room } from '../../types';
 import { usePropertyStore } from '../../store/propertyStore';
 import { useAuthStore } from '../../store/authStore';
+import { formatCompactVND } from '../../utils/formatPrice';
 
 interface PropertyCardProps {
     item: Room;
@@ -165,7 +166,7 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
         try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await Share.share({
-                message: `🏠 ${item.title}\n📍 ${getFullAddress(item)}\n💰 ${formatPrice(item.price)}/tháng\n\nXem thêm trên HomeSwipe`,
+                message: `🏠 ${item.title}\n📍 ${getFullAddress(item)}\n💰 ${formatCompactVND(item.price)}/tháng\n\nXem thêm trên HomeSwipe`,
                 title: item.title,
             });
         } catch (e) { }
@@ -180,11 +181,6 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
     const handlePressDetails = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push(`/property/${item.id}`);
-    };
-
-    const formatPrice = (price: number) => {
-        if (price >= 1000000000) return `${(price / 1000000000).toFixed(1)} tỷ`;
-        return `${(price / 1000000).toFixed(0)} tr`;
     };
 
     const heartAnimatedStyle = useAnimatedStyle(() => ({
@@ -331,7 +327,7 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
                         </Text>
                     </View>
                     <View style={styles.priceTag}>
-                        <Text style={styles.priceText}>{formatPrice(item.price)}</Text>
+                        <Text style={styles.priceText}>{formatCompactVND(item.price)}</Text>
                         {item.transactionType === 'FOR_RENT' && (
                             <Text style={styles.unitText}>/ tháng</Text>
                         )}
