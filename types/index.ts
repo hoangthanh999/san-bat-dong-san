@@ -44,7 +44,7 @@ export interface Room {
     latitude: number;
     longitude: number;
 
-    propertyType: string;           // "APARTMENT" | "HOUSE" | "LAND" | "ROOM" ...
+    propertyType: string;           // "APARTMENT" | "HOUSE" | "VILLA" | "COMMERCIAL" | "ROOM"
     capacity?: number;
 
     images: string[];               // List<String> URL Cloudinary
@@ -79,10 +79,10 @@ export interface Room {
 
     furnishingStatus?: string;      // "UNFURNISHED" | "FULLY_FURNISHED" ...
     availabilityStatus?: string;    // "IMMEDIATELY" | "NEGOTIABLE" ...
-    electricityPrice?: string;      // "STATE_PRICE" | "FREE" ...
+    electricityPrice?: string;      // "FREE" | "STATE_PRICE" | "LANDLORD_PRICE" | "SHARED" | "NEGOTIABLE"
     waterPrice?: string;
     internetPrice?: string;
-    legalDocumentType?: string;     // "SO_DO" | "SO_HONG" ...
+    legalDocumentType?: string;     // "NONE" | "CERTIFICATE_OF_OWNERSHIP" | "LEASE_CONTRACT" | "AUTHORIZATION_LETTER"
 }
 
 // Backward compatibility alias
@@ -233,7 +233,7 @@ export interface PropertyRequestDTO {
     district: string;                  // Backend @NotBlank
     latitude: number;
     longitude: number;
-    propertyType: string;              // "APARTMENT" | "HOUSE" | "LAND" | "ROOM"
+    propertyType: string;              // "APARTMENT" | "HOUSE" | "VILLA" | "COMMERCIAL" | "ROOM"
 
     ownerNameSnapshot?: string;
     ownerAvatarSnapshot?: string;
@@ -252,10 +252,10 @@ export interface PropertyRequestDTO {
 
     furnishingStatus?: string;         // "UNFURNISHED" | "PARTIALLY_FURNISHED" | "FULLY_FURNISHED" 
     availabilityStatus?: string;    // "IMMEDIATELY" | "THIS_MONTH" | "NEXT_MONTH" | "NEGOTIABLE"
-    electricityPrice?: string;         // "STATE_PRICE" | "FREE"
+    electricityPrice?: string;         // "FREE" | "STATE_PRICE" | "LANDLORD_PRICE" | "SHARED" | "NEGOTIABLE"
     waterPrice?: string;
     internetPrice?: string;
-    legalDocumentType?: string;        // "SO_DO" | "SO_HONG" ...
+    legalDocumentType?: string;        // "NONE" | "CERTIFICATE_OF_OWNERSHIP" | "LEASE_CONTRACT" | "AUTHORIZATION_LETTER"
 }
 
 // Backward compatibility

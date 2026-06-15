@@ -83,6 +83,16 @@ const TRANSACTION_TYPE_OPTIONS = [
     { val: 'FOR_SALE', label: 'Bán' },
 ] as const;
 
+const UTILITY_PRICE_OPTIONS = [
+    { val: 'FREE', label: 'Miễn phí' },
+    { val: 'STATE_PRICE', label: 'Giá nhà nước' },
+    { val: 'LANDLORD_PRICE', label: 'Theo quy định chủ nhà' },
+    { val: 'SHARED', label: 'Chia đều' },
+    { val: 'NEGOTIABLE', label: 'Thỏa thuận' },
+] as const;
+const UTILITY_PRICE_VALUES = new Set(UTILITY_PRICE_OPTIONS.map(opt => opt.val));
+const isValidUtilityPrice = (value: string) => UTILITY_PRICE_VALUES.has(value as any);
+
 const PROVINCES: Record<string, Record<string, string[]>> = {
     'Hồ Chí Minh': {
         'Quận 1': ['Phường Bến Nghé', 'Phường Bến Thành', 'Phường Cầu Kho', 'Phường Cô Giang', 'Phường Đa Kao', 'Phường Nguyễn Cư Trinh', 'Phường Nguyễn Thái Bình', 'Phường Phạm Ngũ Lão', 'Phường Tân Định'],
@@ -220,7 +230,7 @@ function NumberStepper({ value, onChange, min = 0, max = 20 }: { value: number; 
 }
 
 function OptionButtonGroup<T extends string>({ options, value, onChange }: {
-    options: { val: T; label: string }[]; value: T; onChange: (v: T) => void;
+    options: readonly { val: T; label: string }[]; value: T; onChange: (v: T) => void;
 }) {
     return (
         <View style={styles.toggleRow}>
@@ -237,29 +247,19 @@ function OptionButtonGroup<T extends string>({ options, value, onChange }: {
     );
 }
 
-function UtilityPriceField({ label, value, onChange, options, customPlaceholder }: {
+function UtilityPriceField({ label, value, onChange, options }: {
     label: string;
     value: string;
     onChange: (v: string) => void;
-    options: { val: string; label: string }[];
-    customPlaceholder: string;
+    options: readonly { val: string; label: string }[];
 }) {
-    const isCustom = !options.some(opt => opt.val === value);
     return (
         <FormField label={label}>
             <OptionButtonGroup
-                options={[...options, { val: 'CUSTOM', label: 'Tự nhập' }]}
-                value={(isCustom ? 'CUSTOM' : value) as string}
-                onChange={v => onChange(v === 'CUSTOM' ? '' : v)}
+                options={options}
+                value={value}
+                onChange={onChange}
             />
-            {isCustom && (
-                <TextInput
-                    style={[styles.input, { marginTop: 8 }]}
-                    placeholder={customPlaceholder}
-                    value={value}
-                    onChangeText={onChange}
-                />
-            )}
         </FormField>
     );
 }
@@ -295,6 +295,7 @@ function PostScreenContent() {
 
     const [amenityList, setAmenityList] = useState<Amenity[]>([]);
     const [amenityLoading, setAmenityLoading] = useState(false);
+    const [amenityError, setAmenityError] = useState<string | null>(null);
     const [projectList, setProjectList] = useState<ProjectResponseDTO[]>([]);
     const [projectLoading, setProjectLoading] = useState(false);
 
@@ -315,9 +316,9 @@ function PostScreenContent() {
         furnishingStatus: 'PARTIALLY_FURNISHED',
         hasBalcony: false,
         availabilityStatus: 'IMMEDIATELY',
-        electricityPrice: 'STATE_PRICE',
-        waterPrice: 'STATE_PRICE',
-        internetPrice: 'FREE',
+        electricityPrice: 'NEGOTIABLE',
+        waterPrice: 'NEGOTIABLE',
+        internetPrice: 'NEGOTIABLE',
         amenities: [] as string[],
         latitude: '',   // ✅ Để trống, geocode sẽ fill
         longitude: '',  // ✅ Để trống, geocode sẽ fill
@@ -333,23 +334,17 @@ function PostScreenContent() {
     useEffect(() => {
         const fetchAmenities = async () => {
             setAmenityLoading(true);
+            setAmenityError(null);
             try {
                 const data = await amenityService.getAll();
-                setAmenityList(data || []);
+                if (__DEV__) {
+                    console.log('[Post] amenities loaded:', data);
+                }
+                setAmenityList(data);
             } catch (err) {
                 console.warn('[Post] Failed to fetch amenities:', err);
-                setAmenityList([
-                    { id: 2, name: 'Wifi', icon: 'wifi' },
-                    { id: 3, name: 'Điều hòa', icon: 'air-conditioner' },
-                    { id: 4, name: 'Máy giặt', icon: 'washing-machine' },
-                    { id: 5, name: 'Bãi đỗ xe', icon: 'parking' },
-                    { id: 6, name: 'Hồ bơi', icon: 'pool' },
-                    { id: 7, name: 'Gym', icon: 'gym' },
-                    { id: 8, name: 'Thang máy', icon: 'elevator' },
-                    { id: 9, name: 'Bảo vệ 24/7', icon: 'security' },
-                    { id: 10, name: 'Camera an ninh', icon: 'camera' },
-                    { id: 11, name: 'Sân vườn', icon: 'garden' },
-                ] as Amenity[]);
+                setAmenityError('Không tải được danh sách tiện ích');
+                setAmenityList([]);
             } finally {
                 setAmenityLoading(false);
             }
@@ -445,9 +440,9 @@ function PostScreenContent() {
             ...prev,
             transactionType,
             capacity: transactionType === 'FOR_RENT' && prev.propertyType !== 'LAND' ? prev.capacity : '',
-            electricityPrice: transactionType === 'FOR_RENT' ? prev.electricityPrice : 'STATE_PRICE',
-            waterPrice: transactionType === 'FOR_RENT' ? prev.waterPrice : 'STATE_PRICE',
-            internetPrice: transactionType === 'FOR_RENT' ? prev.internetPrice : 'FREE',
+            electricityPrice: transactionType === 'FOR_RENT' ? prev.electricityPrice : 'NEGOTIABLE',
+            waterPrice: transactionType === 'FOR_RENT' ? prev.waterPrice : 'NEGOTIABLE',
+            internetPrice: transactionType === 'FOR_RENT' ? prev.internetPrice : 'NEGOTIABLE',
         }));
     };
 
@@ -511,8 +506,10 @@ function PostScreenContent() {
             if (!form.title.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề'); return false; }
             if (!form.province) { Alert.alert('Lỗi', 'Vui lòng chọn tỉnh/thành phố'); return false; }
             if (!form.district) { Alert.alert('Lỗi', 'Vui lòng chọn quận/huyện'); return false; }
-            if (!form.price || isNaN(Number(form.price))) { Alert.alert('Lỗi', 'Vui lòng nhập giá hợp lệ'); return false; }
-            if (!form.area || isNaN(Number(form.area))) { Alert.alert('Lỗi', 'Vui lòng nhập diện tích hợp lệ'); return false; }
+            const priceValue = Number(form.price);
+            const areaValue = Number(form.area);
+            if (!form.price || Number.isNaN(priceValue) || priceValue < 0) { Alert.alert('Lỗi', 'Vui lòng nhập giá hợp lệ'); return false; }
+            if (!form.area || Number.isNaN(areaValue) || areaValue <= 0) { Alert.alert('Lỗi', 'Vui lòng nhập diện tích lớn hơn 0'); return false; }
             // Validate tọa độ sau khi chọn địa chỉ
             if (!form.latitude || !form.longitude) {
                 Alert.alert('Thiếu vị trí', 'Vui lòng chọn Phường/Xã để hệ thống xác định tọa độ tự động.');
@@ -522,6 +519,12 @@ function PostScreenContent() {
         if (step === 1 && form.transactionType === 'FOR_SALE' && !form.legalDocumentType) {
             Alert.alert('Lỗi', 'Vui lòng chọn giấy tờ pháp lý cho tin bán');
             return false;
+        }
+        if (step === 1 && isRent && !isLand) {
+            if (!isValidUtilityPrice(form.electricityPrice) || !isValidUtilityPrice(form.waterPrice) || !isValidUtilityPrice(form.internetPrice)) {
+                Alert.alert('Lỗi', 'Vui lòng chọn giá điện/nước/internet theo danh sách hợp lệ');
+                return false;
+            }
         }
         if (step === 2) {
             if (images.length === 0) { Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 1 ảnh'); return false; }
@@ -540,16 +543,23 @@ function PostScreenContent() {
         setIsSubmitting(true);
         try {
             setUploadProgress('Đang tải ảnh lên...');
-            let imageUrls: string[] = images;
+            let imageUrls: string[] = [];
             if (images.length > 0) {
                 try {
                     const imageFiles = images.map((uri, i) => ({
                         uri, name: `property_${Date.now()}_${i}.jpg`, type: 'image/jpeg',
                     }));
                     imageUrls = await mediaService.uploadMultiple(imageFiles, 'properties');
+                    if (
+                        !Array.isArray(imageUrls) ||
+                        imageUrls.length !== images.length ||
+                        imageUrls.some(url => typeof url !== 'string' || !url.startsWith('http'))
+                    ) {
+                        throw new Error('Upload ảnh không trả về URL hợp lệ');
+                    }
                 } catch (uploadErr) {
-                    console.warn('[Post] Media upload failed, using local URIs:', uploadErr);
-                    imageUrls = images;
+                    console.warn('[Post] Media upload failed:', uploadErr);
+                    throw new Error('Upload ảnh thất bại. Vui lòng thử lại trước khi đăng tin.');
                 }
             }
 
@@ -568,6 +578,7 @@ function PostScreenContent() {
             setUploadProgress('Đang đăng tin...');
             const address = [form.addressDetail, form.ward, form.district, form.province].filter(Boolean).join(', ');
             const validAmenityNames = new Set(amenityList.map(a => a.name));
+            const selectedAmenities = form.amenities.filter(name => validAmenityNames.has(name));
             const body: PropertyRequestDTO = {
                 transactionType: form.transactionType,
                 title: form.title,
@@ -587,7 +598,7 @@ function PostScreenContent() {
                 validityDays: Number(form.validityDays),
                 images: imageUrls,
                 videoUrl,
-                amenities: form.amenities.filter(name => validAmenityNames.has(name)),
+                amenities: selectedAmenities,
                 bedrooms: isLand ? undefined : Number(form.bedrooms),
                 bathrooms: isLand ? undefined : Number(form.bathrooms),
                 hasBalcony: isLand ? undefined : form.hasBalcony,
@@ -599,7 +610,10 @@ function PostScreenContent() {
                 legalDocumentType: form.legalDocumentType || undefined,
             };
 
-            console.log('[Post] create property payload:', body);
+            if (__DEV__) {
+                console.log('[Post] selected amenities:', selectedAmenities);
+            }
+            console.log('[Post] final create property payload:', body);
             await roomService.createRoom(body);
             setStep(3);
         } catch (error: any) {
@@ -617,7 +631,7 @@ function PostScreenContent() {
             price: '', area: '', transactionType: 'FOR_RENT', propertyType: 'ROOM', description: '',
             bedrooms: '1', bathrooms: '1', capacity: '', furnishingStatus: 'PARTIALLY_FURNISHED',
             hasBalcony: false, availabilityStatus: 'IMMEDIATELY',
-            electricityPrice: 'STATE_PRICE', waterPrice: 'STATE_PRICE', internetPrice: 'FREE',
+            electricityPrice: 'NEGOTIABLE', waterPrice: 'NEGOTIABLE', internetPrice: 'NEGOTIABLE',
             amenities: [],
             projectId: '',
             legalDocumentType: '',
@@ -890,31 +904,31 @@ function PostScreenContent() {
                                 placeholder="Chọn thời hạn"
                             />
 
-                            {isRent && !isLand && (
-                                <>
-                                    <UtilityPriceField
-                                        label="Giá điện"
-                                        value={form.electricityPrice}
-                                        onChange={v => updateForm('electricityPrice', v)}
-                                        options={[{ val: 'STATE_PRICE', label: 'Giá nhà nước' }]}
-                                        customPlaceholder="VD: 3,500đ/kWh"
-                                    />
-                                    <UtilityPriceField
-                                        label="Giá nước"
-                                        value={form.waterPrice}
-                                        onChange={v => updateForm('waterPrice', v)}
-                                        options={[{ val: 'STATE_PRICE', label: 'Giá nhà nước' }, { val: 'FREE', label: 'Miễn phí' }]}
-                                        customPlaceholder="VD: 20,000đ/khối"
-                                    />
-                                    <UtilityPriceField
-                                        label="Internet"
-                                        value={form.internetPrice}
-                                        onChange={v => updateForm('internetPrice', v)}
-                                        options={[{ val: 'FREE', label: 'Miễn phí' }]}
-                                        customPlaceholder="VD: 100,000đ/tháng"
-                                    />
-                                </>
-                            )}
+                      {isRent && !isLand && (
+    <>
+        <DropdownPicker
+            label="Giá điện"
+            options={UTILITY_PRICE_OPTIONS.map(o => o.label)}
+            value={UTILITY_PRICE_OPTIONS.find(o => o.val === form.electricityPrice)?.label || ''}
+            onChange={v => updateForm('electricityPrice', UTILITY_PRICE_OPTIONS.find(o => o.label === v)?.val || v)}
+            placeholder="Chọn giá điện"
+        />
+        <DropdownPicker
+            label="Giá nước"
+            options={UTILITY_PRICE_OPTIONS.map(o => o.label)}
+            value={UTILITY_PRICE_OPTIONS.find(o => o.val === form.waterPrice)?.label || ''}
+            onChange={v => updateForm('waterPrice', UTILITY_PRICE_OPTIONS.find(o => o.label === v)?.val || v)}
+            placeholder="Chọn giá nước"
+        />
+        <DropdownPicker
+            label="Internet"
+            options={UTILITY_PRICE_OPTIONS.map(o => o.label)}
+            value={UTILITY_PRICE_OPTIONS.find(o => o.val === form.internetPrice)?.label || ''}
+            onChange={v => updateForm('internetPrice', UTILITY_PRICE_OPTIONS.find(o => o.label === v)?.val || v)}
+            placeholder="Chọn internet"
+        />
+    </>
+)}
 
                             <FormField label="Tiện ích">
                                 {amenityLoading ? (
@@ -922,8 +936,10 @@ function PostScreenContent() {
                                         <ActivityIndicator size="small" color="#0066FF" />
                                         <Text style={{ color: '#999', fontSize: 13 }}>Đang tải tiện ích...</Text>
                                     </View>
+                                ) : amenityError ? (
+                                    <Text style={{ color: '#999', fontSize: 13, paddingVertical: 8 }}>{amenityError}</Text>
                                 ) : amenityList.length === 0 ? (
-                                    <Text style={{ color: '#999', fontSize: 13, paddingVertical: 8 }}>Không có tiện ích nào.</Text>
+                                    <Text style={{ color: '#999', fontSize: 13, paddingVertical: 8 }}>Chưa có tiện ích</Text>
                                 ) : (
                                     <ChipSelector
                                         options={amenityList.map(a => a.name)}

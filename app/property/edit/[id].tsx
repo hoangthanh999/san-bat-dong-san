@@ -21,6 +21,18 @@ const FURNITURE_MAP: Record<string, string> = {
 const FURNITURE_REVERSE_MAP: Record<string, string> = {
     'UNFURNISHED': 'Không có', 'PARTIALLY_FURNISHED': 'Cơ bản', 'FULLY_FURNISHED': 'Đầy đủ',
 };
+const UTILITY_PRICE_OPTIONS = [
+    { val: 'FREE', label: 'Miễn phí' },
+    { val: 'STATE_PRICE', label: 'Theo giá nhà nước' },
+    { val: 'LANDLORD_PRICE', label: 'Chủ nhà quy định' },
+    { val: 'SHARED', label: 'Chia đều' },
+    { val: 'NEGOTIABLE', label: 'Thỏa thuận' },
+] as const;
+type UtilityPriceValue = typeof UTILITY_PRICE_OPTIONS[number]['val'];
+const UTILITY_PRICE_VALUES = new Set<string>(UTILITY_PRICE_OPTIONS.map(opt => opt.val));
+const isValidUtilityPrice = (value: string) => UTILITY_PRICE_VALUES.has(value);
+const normalizeUtilityPrice = (value?: string | null): UtilityPriceValue =>
+    isValidUtilityPrice(value || '') ? value as UtilityPriceValue : 'NEGOTIABLE';
 
 export default function EditPropertyScreen() {
     const router = useRouter();
@@ -31,6 +43,8 @@ export default function EditPropertyScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [amenityList, setAmenityList] = useState<Amenity[]>([]);
+    const [amenityLoading, setAmenityLoading] = useState(false);
+    const [amenityError, setAmenityError] = useState<string | null>(null);
     const [images, setImages] = useState<string[]>([]);
     const [originalRoom, setOriginalRoom] = useState<Room | null>(null);
 
@@ -49,9 +63,9 @@ export default function EditPropertyScreen() {
         capacity: '',
         hasBalcony: false,
         availabilityStatus: 'IMMEDIATELY',
-        electricityPrice: 'STATE_PRICE',
-        waterPrice: 'STATE_PRICE',
-        internetPrice: 'FREE',
+        electricityPrice: 'NEGOTIABLE',
+        waterPrice: 'NEGOTIABLE',
+        internetPrice: 'NEGOTIABLE',
         latitude: '10.762622',
         longitude: '106.660172',
     });
@@ -83,9 +97,9 @@ export default function EditPropertyScreen() {
                 capacity: String(room.capacity || ''),
                 hasBalcony: room.hasBalcony || false,
                 availabilityStatus: room.availabilityStatus || 'IMMEDIATELY',
-                electricityPrice: room.electricityPrice || 'STATE_PRICE',
-                waterPrice: room.waterPrice || 'STATE_PRICE',
-                internetPrice: room.internetPrice || 'FREE',
+                electricityPrice: normalizeUtilityPrice(room.electricityPrice),
+                waterPrice: normalizeUtilityPrice(room.waterPrice),
+                internetPrice: normalizeUtilityPrice(room.internetPrice),
                 latitude: String(room.latitude || '10.762622'),
                 longitude: String(room.longitude || '106.660172'),
             });
@@ -99,10 +113,21 @@ export default function EditPropertyScreen() {
     };
 
     const loadAmenities = async () => {
+        setAmenityLoading(true);
+        setAmenityError(null);
         try {
             const data = await amenityService.getAll();
-            setAmenityList(data || []);
-        } catch { }
+            if (__DEV__) {
+                console.log('[EditProperty] amenities loaded:', data);
+            }
+            setAmenityList(data);
+        } catch (err) {
+            console.warn('[EditProperty] Failed to fetch amenities:', err);
+            setAmenityError('Không tải được danh sách tiện ích');
+            setAmenityList([]);
+        } finally {
+            setAmenityLoading(false);
+        }
     };
 
     const updateForm = (key: keyof typeof form, value: any) =>
@@ -130,7 +155,19 @@ export default function EditPropertyScreen() {
 
     const handleSave = async () => {
         if (!form.title.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập tiêu đề'); return; }
-        if (!form.price || isNaN(Number(form.price))) { Alert.alert('Lỗi', 'Vui lòng nhập giá hợp lệ'); return; }
+        const priceValue = Number(form.price);
+        const areaValue = Number(form.area);
+        if (!form.price || Number.isNaN(priceValue) || priceValue < 0) { Alert.alert('Lỗi', 'Vui lòng nhập giá hợp lệ'); return; }
+        if (!form.area || Number.isNaN(areaValue) || areaValue <= 0) { Alert.alert('Lỗi', 'Vui lòng nhập diện tích lớn hơn 0'); return; }
+        const isRent = form.transactionType === 'FOR_RENT';
+        const isLand = form.propertyType === 'LAND';
+        if (
+            isRent && !isLand &&
+            (!isValidUtilityPrice(form.electricityPrice) || !isValidUtilityPrice(form.waterPrice) || !isValidUtilityPrice(form.internetPrice))
+        ) {
+            Alert.alert('Lỗi', 'Vui lòng chọn giá điện/nước/internet theo danh sách hợp lệ');
+            return;
+        }
         if (images.length === 0) { Alert.alert('Lỗi', 'Vui lòng chọn ít nhất 1 ảnh'); return; }
 
         setIsSaving(true);
@@ -145,13 +182,25 @@ export default function EditPropertyScreen() {
                 }));
                 try {
                     uploadedUrls = await mediaService.uploadMultiple(files, 'properties');
-                } catch {
-                    uploadedUrls = newLocalImages;
+                    if (
+                        !Array.isArray(uploadedUrls) ||
+                        uploadedUrls.length !== newLocalImages.length ||
+                        uploadedUrls.some(url => typeof url !== 'string' || !url.startsWith('http'))
+                    ) {
+                        throw new Error('Upload ảnh không trả về URL hợp lệ');
+                    }
+                } catch (uploadErr) {
+                    console.warn('[EditProperty] Media upload failed:', uploadErr);
+                    throw new Error('Upload ảnh thất bại. Vui lòng thử lại trước khi lưu tin.');
                 }
             }
             const finalImages = [...existingUrls, ...uploadedUrls];
 
             const address = [form.addressDetail, form.ward, form.district, form.province].filter(Boolean).join(', ');
+            const validAmenityNames = new Set(amenityList.map(a => a.name));
+            const selectedAmenities = amenityList.length > 0
+                ? form.amenities.filter(name => validAmenityNames.has(name))
+                : form.amenities;
             const body: PropertyRequestDTO = {
                 transactionType: form.transactionType,
                 title: form.title,
@@ -166,19 +215,23 @@ export default function EditPropertyScreen() {
                 latitude: Number(form.latitude),
                 longitude: Number(form.longitude),
                 propertyType: form.propertyType,
-                capacity: form.capacity ? Number(form.capacity) : undefined,
+                capacity: isRent && !isLand && form.capacity ? Number(form.capacity) : undefined,
                 images: finalImages,
-                amenities: form.amenities,
-                bedrooms: Number(form.bedrooms),
-                bathrooms: Number(form.bathrooms),
-                hasBalcony: form.hasBalcony,
-                furnishingStatus: form.furnishingStatus,
+                amenities: selectedAmenities,
+                bedrooms: isLand ? undefined : Number(form.bedrooms),
+                bathrooms: isLand ? undefined : Number(form.bathrooms),
+                hasBalcony: isLand ? undefined : form.hasBalcony,
+                furnishingStatus: isLand ? undefined : form.furnishingStatus,
                 availabilityStatus: form.availabilityStatus,
-                electricityPrice: form.electricityPrice,
-                waterPrice: form.waterPrice,
-                internetPrice: form.internetPrice,
+                electricityPrice: isRent && !isLand ? form.electricityPrice : undefined,
+                waterPrice: isRent && !isLand ? form.waterPrice : undefined,
+                internetPrice: isRent && !isLand ? form.internetPrice : undefined,
             };
 
+            if (__DEV__) {
+                console.log('[EditProperty] selected amenities:', selectedAmenities);
+            }
+            console.log('[EditProperty] final update property payload:', body);
             await roomService.updateRoom(propertyId, body);
             Alert.alert('Thành công', 'Cập nhật bài đăng thành công!', [
                 { text: 'OK', onPress: () => router.back() }
@@ -264,8 +317,37 @@ export default function EditPropertyScreen() {
                             </View>
                         </FormField>
 
-                        {amenityList.length > 0 && (
-                            <FormField label="Tiện ích">
+                        {form.transactionType === 'FOR_RENT' && form.propertyType !== 'LAND' && (
+                            <>
+                                <UtilityPriceField
+                                    label="Giá điện"
+                                    value={form.electricityPrice}
+                                    onChange={v => updateForm('electricityPrice', v)}
+                                />
+                                <UtilityPriceField
+                                    label="Giá nước"
+                                    value={form.waterPrice}
+                                    onChange={v => updateForm('waterPrice', v)}
+                                />
+                                <UtilityPriceField
+                                    label="Internet"
+                                    value={form.internetPrice}
+                                    onChange={v => updateForm('internetPrice', v)}
+                                />
+                            </>
+                        )}
+
+                        <FormField label="Tiện ích">
+                            {amenityLoading ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+                                    <ActivityIndicator size="small" color="#0066FF" />
+                                    <Text style={{ color: '#999', fontSize: 13 }}>Đang tải tiện ích...</Text>
+                                </View>
+                            ) : amenityError ? (
+                                <Text style={{ color: '#999', fontSize: 13, paddingVertical: 8 }}>{amenityError}</Text>
+                            ) : amenityList.length === 0 ? (
+                                <Text style={{ color: '#999', fontSize: 13, paddingVertical: 8 }}>Chưa có tiện ích</Text>
+                            ) : (
                                 <View style={styles.chipRow}>
                                     {amenityList.map(a => {
                                         const isActive = form.amenities.includes(a.name);
@@ -278,8 +360,8 @@ export default function EditPropertyScreen() {
                                         );
                                     })}
                                 </View>
-                            </FormField>
-                        )}
+                            )}
+                        </FormField>
                     </View>
 
                     {/* Images */}
@@ -337,6 +419,33 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
     );
 }
 
+function UtilityPriceField({ label, value, onChange }: {
+    label: string;
+    value: string;
+    onChange: (value: UtilityPriceValue) => void;
+}) {
+    return (
+        <FormField label={label}>
+            <View style={styles.utilityChipRow}>
+                {UTILITY_PRICE_OPTIONS.map(opt => {
+                    const isActive = value === opt.val;
+                    return (
+                        <TouchableOpacity
+                            key={opt.val}
+                            style={[styles.utilityChip, isActive && styles.utilityChipSelected]}
+                            onPress={() => onChange(opt.val)}
+                        >
+                            <Text style={[styles.utilityChipText, isActive && styles.utilityChipTextSelected]}>
+                                {opt.label}
+                            </Text>
+                        </TouchableOpacity>
+                    );
+                })}
+            </View>
+        </FormField>
+    );
+}
+
 function NumberStepper({ value, onChange, min = 0, max = 20 }: {
     value: number; onChange: (v: number) => void; min?: number; max?: number;
 }) {
@@ -378,6 +487,11 @@ const styles = StyleSheet.create({
     chipSelected: { borderColor: '#0066FF', backgroundColor: '#E8F0FF' },
     chipText: { fontSize: 13, color: '#666' },
     chipTextSelected: { color: '#0066FF', fontWeight: '600' },
+    utilityChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    utilityChip: { paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 12, backgroundColor: '#F8F9FA' },
+    utilityChipSelected: { borderColor: '#0066FF', backgroundColor: '#E8F0FF' },
+    utilityChipText: { fontSize: 13, color: '#666', fontWeight: '500' },
+    utilityChipTextSelected: { color: '#0066FF', fontWeight: '700' },
     stepper: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: '#F8F9FA', borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12 },
     stepperBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
     stepperValue: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', minWidth: 30, textAlign: 'center' },

@@ -2,6 +2,22 @@ import apiClient from './client';
 import { API_ENDPOINTS } from '../../constants';
 import { Amenity } from '../../types';
 
+function normalizeAmenityResponse(data: any): Amenity[] {
+    const payload = data?.result ?? data?.data ?? data;
+    const list = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.content)
+            ? payload.content
+            : [];
+
+    return list.filter((item: any): item is Amenity =>
+        item &&
+        typeof item.id === 'number' &&
+        typeof item.name === 'string' &&
+        item.name.trim().length > 0
+    );
+}
+
 /**
  * Amenity Service
  * Tất cả đi qua apiClient (nginx /amenities → property-service:8086)
@@ -13,8 +29,8 @@ export const amenityService = {
      * Backend: AmenityController.getAllAmenities() → ResponseEntity<List<Amenity>>
      */
     getAll: async (): Promise<Amenity[]> => {
-        const response = await apiClient.get<Amenity[]>(API_ENDPOINTS.AMENITIES);
-        return response.data;
+        const response = await apiClient.get<Amenity[] | { result?: Amenity[]; content?: Amenity[] }>(API_ENDPOINTS.AMENITIES);
+        return normalizeAmenityResponse(response.data);
     },
 
     /**
