@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { useAuthStore } from './authStore';
-import { WS_CHAT_URL } from '../constants';
+import { getAiWebSocketUrl } from '../services/api/environment';
 import { searchService } from '../services/api/search';
 import { PropertySearchItem } from '../types';
 
@@ -102,7 +102,7 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
 
     clearMessages: () => set({ messages: [] }),
 
-    connectAiWebSocket: () => {
+    connectAiWebSocket: async () => {
         const { token, user } = useAuthStore.getState();
         if (!token || !user) {
             console.warn('[AI-WS] Chưa đăng nhập, bỏ qua kết nối');
@@ -119,9 +119,11 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
         const conversationId = generateConversationId(user.id);
         set({ conversationId });
 
+        const wsUrl = await getAiWebSocketUrl();
+
         const client = new Client({
             // ✅ SockJS factory - dùng http:// (không phải ws://)
-            webSocketFactory: () => new (SockJS as any)(WS_CHAT_URL),
+            webSocketFactory: () => new (SockJS as any)(wsUrl),
 
             // ✅ Token trong STOMP CONNECT headers
             connectHeaders: {
@@ -181,7 +183,7 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
 
         client.activate();
         set({ _client: client });
-        console.log('[AI-WS] Đang kết nối tới', WS_CHAT_URL);
+        console.log('[AI-WS] Đang kết nối tới', wsUrl);
     },
 
     disconnectAiWebSocket: () => {

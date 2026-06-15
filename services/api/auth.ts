@@ -48,6 +48,7 @@ export const authService = {
             console.warn('[Auth] Logout API failed, clearing local storage anyway');
         }
         await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+        await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
         await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
     },
 

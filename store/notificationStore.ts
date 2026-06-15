@@ -7,9 +7,10 @@ import {
     setBadgeCount,
 } from '../services/pushNotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS, WS_URL } from '../constants';
+import { STORAGE_KEYS } from '../constants';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { getNotificationWebSocketUrl } from '../services/api/environment';
 
 
 
@@ -130,7 +131,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     },
 
     // ── Kết nối WebSocket STOMP ──────────────────────────────────────────────
-    connectWS: (userId: number) => {
+    connectWS: async (userId: number) => {
         // Tránh tạo nhiều connection
         const existing = get()._stompClient;
         if (existing?.connected) {
@@ -143,10 +144,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             return raw ?? '';
         };
 
-        const createClient = (token: string): Client => {
+        const createClient = (token: string, wsUrl: string): Client => {
             const client = new Client({
                 // SockJS factory — STOMP over SockJS
-                webSocketFactory: () => new SockJS(WS_URL) as any,
+                webSocketFactory: () => new SockJS(wsUrl) as any,
 
                 // Gửi JWT để backend UserPresenceChannelInterceptor xác thực
                 connectHeaders: {
@@ -197,16 +198,23 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             return client;
         };
 
-        // Lấy token rồi mới activate
-        getToken().then((token) => {
+        try {
+            const [token, wsUrl] = await Promise.all([
+                getToken(),
+                getNotificationWebSocketUrl(),
+            ]);
+
             if (!token) {
                 console.warn('[NotifWS] Không có token, bỏ qua kết nối WS.');
                 return;
             }
-            const client = createClient(token);
+
+            const client = createClient(token, wsUrl);
             client.activate();
             set({ _stompClient: client });
-        });
+        } catch (error) {
+            console.error('[NotifWS] Không thể khởi tạo kết nối WS:', error);
+        }
     },
 
     // ── Ngắt kết nối WebSocket ───────────────────────────────────────────────

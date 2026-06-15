@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, STORAGE_KEYS } from '../../constants';
+import { STORAGE_KEYS } from '../../constants';
 import { API_ENDPOINTS } from '../../constants';
 import apiClient from './client';
+import { getApiBaseUrl } from './environment';
 import { KycOcrResponseDTO, KYCSubmitData, KYCStatusResponse, CustomerResponseDTO } from '../../types';
 
 /**
@@ -48,7 +49,7 @@ function mapErrorMessage(serverMessage: string, statusCode: number): string {
  */
 async function multipartFetch<T>(endpoint: string, formData: FormData): Promise<T> {
     const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = `${await getApiBaseUrl()}${endpoint}`;
 
     console.log(`[KYC] POST ${url}`);
 

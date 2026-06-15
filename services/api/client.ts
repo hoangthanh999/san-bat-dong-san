@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, STORAGE_KEYS } from '../../constants';
+import { getApiBaseUrl } from './environment';
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;
@@ -42,6 +43,7 @@ function extractToken(data: any): string | null {
 
 async function clearAuthState() {
     await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
 
     try {
@@ -57,6 +59,9 @@ async function refreshAccessToken(): Promise<string> {
             if (!currentToken) {
                 throw new Error('Missing access token');
             }
+
+            const baseURL = await getApiBaseUrl();
+            refreshClient.defaults.baseURL = baseURL;
 
             const response = await refreshClient.post('/auth/refresh', null, {
                 headers: {
@@ -88,9 +93,16 @@ async function refreshAccessToken(): Promise<string> {
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         try {
+            const baseURL = await getApiBaseUrl();
+            config.baseURL = baseURL;
+            apiClient.defaults.baseURL = baseURL;
+            refreshClient.defaults.baseURL = baseURL;
+
             const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
+            } else if (config.headers?.Authorization) {
+                delete (config.headers as any).Authorization;
             }
 
             // Tự động set Content-Type dựa trên loại data

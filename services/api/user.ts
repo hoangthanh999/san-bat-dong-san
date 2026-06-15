@@ -1,6 +1,7 @@
 import apiClient from './client';
 import { API_ENDPOINTS } from '../../constants';
 import { User, CustomerResponseDTO, CustomerProfileDTO, Room, Favorite, PaginatedResponse } from '../../types';
+import { getApiBaseUrl } from './environment';
 
 export interface UserSummaryDTO {
     id: number;
@@ -34,9 +35,9 @@ export const userService = {
      */
     updateAvatar: async (formData: FormData): Promise<CustomerResponseDTO> => {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const { API_BASE_URL, STORAGE_KEYS } = await import('../../constants');
+        const { STORAGE_KEYS } = await import('../../constants');
         const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CUSTOMER_AVATAR}`, {
+        const response = await fetch(`${await getApiBaseUrl()}${API_ENDPOINTS.CUSTOMER_AVATAR}`, {
             method: 'POST',
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: formData,
@@ -52,9 +53,9 @@ export const userService = {
      */
     updateBanner: async (formData: FormData): Promise<CustomerResponseDTO> => {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const { API_BASE_URL, STORAGE_KEYS } = await import('../../constants');
+        const { STORAGE_KEYS } = await import('../../constants');
         const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CUSTOMER_BANNER}`, {
+        const response = await fetch(`${await getApiBaseUrl()}${API_ENDPOINTS.CUSTOMER_BANNER}`, {
             method: 'POST',
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: formData,

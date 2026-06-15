@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PROPERTY_API_BASE_URL, STORAGE_KEYS } from '../../constants';
+import { getApiBaseUrl } from './environment';
 
 /**
  * propertyClient.ts
@@ -25,10 +26,16 @@ const propertyClient: AxiosInstance = axios.create({
 propertyClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         try {
+            const baseURL = await getApiBaseUrl();
+            config.baseURL = baseURL;
+            propertyClient.defaults.baseURL = baseURL;
+
             const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
 
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
+            } else if (config.headers?.Authorization) {
+                delete (config.headers as any).Authorization;
             }
 
             console.log(`[Property API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
@@ -59,6 +66,7 @@ propertyClient.interceptors.response.use(
 
         if (error.response?.status === 401) {
             await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+            await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
             await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
 
             return Promise.reject({

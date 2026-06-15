@@ -16,7 +16,7 @@ import { Button } from '../../components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
-import { API_BASE_URL } from '../../constants';
+import { getApiBaseUrl } from '../../services/api/environment';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -125,7 +125,7 @@ function GoogleLoginButton() {
             const { Alert } = require('react-native');
 
             // URL backend Google OAuth2 (qua nginx gateway)
-            const backendOAuthUrl = `${API_BASE_URL}/oauth2/authorization/google`;
+            const backendOAuthUrl = `${await getApiBaseUrl()}/oauth2/authorization/google`;
             const redirectUri = Linking.createURL('login-success');
 
             // Mở in-app browser để đăng nhập Google

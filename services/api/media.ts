@@ -1,4 +1,5 @@
 import { API_ENDPOINTS } from '../../constants';
+import { getApiBaseUrl } from './environment';
 
 
 async function sha1(str: string): Promise<string> {
@@ -54,7 +55,7 @@ export const mediaService = {
         folder: string = 'properties'
     ): Promise<string> => {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const { API_BASE_URL, STORAGE_KEYS } = await import('../../constants');
+        const { STORAGE_KEYS } = await import('../../constants');
 
         const formData = new FormData();
         formData.append('file', {
@@ -65,7 +66,7 @@ export const mediaService = {
         formData.append('folder', folder);
 
         const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.MEDIA_UPLOAD}`, {
+        const response = await fetch(`${await getApiBaseUrl()}${API_ENDPOINTS.MEDIA_UPLOAD}`, {
             method: 'POST',
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: formData,
@@ -85,7 +86,7 @@ export const mediaService = {
         folder: string = 'properties'
     ): Promise<string[]> => {
         const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const { API_BASE_URL, STORAGE_KEYS } = await import('../../constants');
+        const { STORAGE_KEYS } = await import('../../constants');
 
         const formData = new FormData();
           console.log('[uploadMultiple] files count:', files.length);
@@ -99,7 +100,7 @@ export const mediaService = {
         formData.append('folder', folder);
 
         const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-        const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.MEDIA_UPLOAD_MULTIPLE}`, {
+        const response = await fetch(`${await getApiBaseUrl()}${API_ENDPOINTS.MEDIA_UPLOAD_MULTIPLE}`, {
             method: 'POST',
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: formData,

@@ -4,7 +4,7 @@ import SockJS from 'sockjs-client';
 import { Conversation, ChatMessage } from '../types';
 import { chatService } from '../services/api/chat';
 import { userService } from '../services/api/user';
-import { WS_CHAT_URL } from '../constants';
+import { getChatWebSocketUrl } from '../services/api/environment';
 import { useAuthStore } from './authStore';
 
 interface ChatState {
@@ -191,7 +191,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
     },
 
-    connectWebSocket: () => {
+    connectWebSocket: async () => {
         const { token, user } = useAuthStore.getState();
         if (!token || !user?.id) return;
 
@@ -212,8 +212,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }
         };
 
+        const wsUrl = await getChatWebSocketUrl();
+
         const client = new Client({
-            webSocketFactory: () => new (SockJS as any)(WS_CHAT_URL),
+            webSocketFactory: () => new (SockJS as any)(wsUrl),
             connectHeaders: {
                 Authorization: `Bearer ${token}`,
             },

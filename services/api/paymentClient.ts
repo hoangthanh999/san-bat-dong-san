@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PAYMENT_API_BASE_URL, STORAGE_KEYS } from '../../constants';
+import { getApiBaseUrl } from './environment';
 
 /**
  * Axios client cho payment-service (port 8087)
@@ -19,10 +20,16 @@ const paymentClient: AxiosInstance = axios.create({
 paymentClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         try {
+            const baseURL = await getApiBaseUrl();
+            config.baseURL = baseURL;
+            paymentClient.defaults.baseURL = baseURL;
+
             const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
 
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
+            } else if (config.headers?.Authorization) {
+                delete (config.headers as any).Authorization;
             }
 
             console.log(`[Payment API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
@@ -54,6 +61,7 @@ paymentClient.interceptors.response.use(
 
         if (error.response?.status === 401) {
             await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+            await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
             await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
 
             return Promise.reject({

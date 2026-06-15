@@ -1,5 +1,7 @@
 // API Base URL - Gateway (nginx)
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://homeverse-bds.duckdns.org';
+export const API_FALLBACK_BASE_URL = process.env.EXPO_PUBLIC_API_FALLBACK_BASE_URL || '';
+export const ENABLE_API_FALLBACK = process.env.EXPO_PUBLIC_ENABLE_API_FALLBACK === 'true';
 
 // Property Service - nginx đã route /properties, /public/properties, /admin/properties → 8086
 export const PROPERTY_API_BASE_URL = process.env.EXPO_PUBLIC_PROPERTY_API_BASE_URL || 'https://homeverse-bds.duckdns.org';
@@ -54,6 +56,7 @@ export const DEFAULT_MAP_REGION = {
 // Storage Keys
 export const STORAGE_KEYS = {
     AUTH_TOKEN: 'auth_token',
+    REFRESH_TOKEN: 'refresh_token',
     USER_DATA: 'user_data',
     THEME: 'theme_mode',
     LANGUAGE: 'language',
@@ -62,6 +65,7 @@ export const STORAGE_KEYS = {
     FILTERS: 'saved_filters',
     PUSH_TOKEN: 'push_token',
     NOTIFICATIONS_ENABLED: 'notifications_enabled',
+    API_ENVIRONMENT_BASE_URL: 'api_environment_base_url',
 };
 
 // Animation Durations
