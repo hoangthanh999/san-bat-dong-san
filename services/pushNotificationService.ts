@@ -15,6 +15,37 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
 import { notificationService } from './api/notifications';
 
+const LAST_HANDLED_NOTIFICATION_RESPONSE_KEY = 'last_handled_notification_response_id';
+
+function getNotificationResponseKey(response: Notifications.NotificationResponse): string {
+    const identifier = response.notification.request.identifier;
+    const action = response.actionIdentifier || 'default';
+    const date = response.notification.date || 0;
+    return `${identifier}:${action}:${date}`;
+}
+
+async function clearLastNotificationResponse(): Promise<void> {
+    const clearResponse = (Notifications as any).clearLastNotificationResponseAsync;
+    if (typeof clearResponse === 'function') {
+        await clearResponse();
+    }
+}
+
+async function shouldHandleNotificationResponse(
+    response: Notifications.NotificationResponse
+): Promise<boolean> {
+    const key = getNotificationResponseKey(response);
+    const handledKey = await AsyncStorage.getItem(LAST_HANDLED_NOTIFICATION_RESPONSE_KEY);
+
+    if (handledKey === key) {
+        await clearLastNotificationResponse();
+        return false;
+    }
+
+    await AsyncStorage.setItem(LAST_HANDLED_NOTIFICATION_RESPONSE_KEY, key);
+    return true;
+}
+
 // ─── Channel mặc định cho Android ────────────────────────────────────────────
 export async function setupNotificationChannel() {
     if (Platform.OS === 'android') {
@@ -173,9 +204,11 @@ export function setupNotificationHandlers(
 
     // Listener 2: Response – User bấm vào notification
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(
-        (response) => {
+        async (response) => {
             const data = response.notification.request.content.data as any;
             console.log('[PushNotif] User bấm vào notification:', data);
+            await shouldHandleNotificationResponse(response);
+            await clearLastNotificationResponse();
             handleNotificationNavigation(router, data);
         }
     );
@@ -243,7 +276,14 @@ export async function handleInitialNotification(router: any): Promise<void> {
     try {
         const lastResponse = await Notifications.getLastNotificationResponseAsync();
         if (lastResponse) {
+            const shouldHandle = await shouldHandleNotificationResponse(lastResponse);
+            if (!shouldHandle) {
+                console.log('[PushNotif] Skip stale notification response.');
+                return;
+            }
+
             const data = lastResponse.notification.request.content.data as any;
+            await clearLastNotificationResponse();
             console.log('[PushNotif] App được mở từ notification:', data);
             // Delay nhỏ để router sẵn sàng
             setTimeout(() => handleNotificationNavigation(router, data), 500);

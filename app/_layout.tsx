@@ -1,7 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,11 +12,13 @@ import {
     handleInitialNotification,
 } from '../services/pushNotificationService';
 import { ToastProvider } from '../components/ui/Toast';
+import { AppStartupScreen } from '../components/startup/AppStartupScreen';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
     const [loaded] = useFonts({});
+    const [bootstrapReady, setBootstrapReady] = useState(false);
 
     // ✅ Lấy thêm user để có user.id cho connectWS
     const { checkAuth, isAuthenticated, user } = useAuthStore();
@@ -38,12 +40,30 @@ export default function RootLayout() {
 
     // Khởi động app
     useEffect(() => {
-        checkAuth();
-    }, []);
+        let mounted = true;
+
+        const bootstrap = async () => {
+            try {
+                await checkAuth();
+            } catch (error) {
+                console.warn('[Startup] Auth restore failed, continue into app.', error);
+            } finally {
+                if (mounted) {
+                    setBootstrapReady(true);
+                }
+            }
+        };
+
+        bootstrap();
+
+        return () => {
+            mounted = false;
+        };
+    }, [checkAuth]);
 
     useEffect(() => {
         if (loaded) {
-            SplashScreen.hideAsync();
+            SplashScreen.hideAsync().catch(() => {});
         }
     }, [loaded]);
 
@@ -90,10 +110,21 @@ export default function RootLayout() {
 
     if (!loaded) return null;
 
+    if (!bootstrapReady) {
+        return (
+            <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaProvider>
+                    <AppStartupScreen />
+                </SafeAreaProvider>
+            </GestureHandlerRootView>
+        );
+    }
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
                 <Stack>
+                    <Stack.Screen name="index" options={{ headerShown: false }} />
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                     <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                     <Stack.Screen

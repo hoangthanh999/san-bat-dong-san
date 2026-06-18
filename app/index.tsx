@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppStartupScreen } from '../components/startup/AppStartupScreen';
 
 export default function Index() {
     const [targetRoute, setTargetRoute] = useState<'/(tabs)' | '/(auth)/onboarding' | null>(null);
@@ -29,7 +30,14 @@ export default function Index() {
         };
     }, []);
 
-    if (!targetRoute) return null;
+    if (!targetRoute) {
+        return (
+            <AppStartupScreen
+                message="Đang tải dữ liệu..."
+                subMessage="Chuẩn bị màn khám phá bất động sản..."
+            />
+        );
+    }
 
     return <Redirect href={targetRoute} />;
 }
