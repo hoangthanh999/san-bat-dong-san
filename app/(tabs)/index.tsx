@@ -403,15 +403,15 @@ const styles = StyleSheet.create({
     categoryBar: {
         position: 'absolute', left: 0, right: 0, zIndex: 99,
         paddingVertical: 6,
-        backgroundColor: 'rgba(0,0,0,0.25)', // subtle separator
+        backgroundColor: 'transparent',
     },
     catChip: {
         paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.12)',
+        backgroundColor: 'rgba(0,0,0,0.28)',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
+        borderColor: 'rgba(255,255,255,0.22)',
     },
     catChipActive: {
         backgroundColor: '#0066FF',

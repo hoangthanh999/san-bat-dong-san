@@ -54,27 +54,20 @@ interface VideoReelProps {
     isActive: boolean;
     onProgress: (progress: number) => void;
     onPlayingChange: (playing: boolean) => void;
-    isMuted: boolean;           // ← prop cũ, không còn dùng
+    isMuted: boolean;
     shouldTogglePlay: boolean;
     onToggleHandled: () => void;
 }
 const VideoReel = React.memo(({
-    uri, isActive, onProgress, onPlayingChange, isMutedRef, shouldTogglePlay, onToggleHandled,
-}: {
-    uri: string;
-    isActive: boolean;
-    onProgress: (progress: number) => void;
-    onPlayingChange: (playing: boolean) => void;
-    isMutedRef: React.MutableRefObject<boolean>;
-    shouldTogglePlay: boolean;
-    onToggleHandled: () => void;
-}) => {
+    uri, isActive, onProgress, onPlayingChange, isMuted, shouldTogglePlay, onToggleHandled,
+}: VideoReelProps) => {
     const isReleasedRef = useRef(false);
 
     const player = useVideoPlayer(uri, p => {
         p.loop = true;
         p.playbackRate = 1;
-        p.muted = true; // ← luôn bắt đầu muted, tránh flash audio
+        p.muted = isMuted;
+        try { (p as any).volume = isMuted ? 0 : 1; } catch (_) { }
     });
 
     const safeCall = useCallback((fn: () => void) => {
@@ -88,7 +81,8 @@ const VideoReel = React.memo(({
     useEffect(() => {
         if (isActive) {
             safeCall(() => {
-                player.muted = isMutedRef.current;
+                player.muted = isMuted;
+                try { (player as any).volume = isMuted ? 0 : 1; } catch (_) { }
                 player.play();
             });
         } else {
@@ -103,16 +97,14 @@ const VideoReel = React.memo(({
             });
         }
     }, [isActive, player, safeCall]);
-    // ⚠️ isMutedRef KHÔNG vào deps — đọc .current trực tiếp, không trigger re-render
-
-    // ✅ Effect mute riêng — chỉ chạy khi user nhấn mute button (signal từ ngoài)
-    // isMutedRef.current đã được update trước khi effect này chạy
-    // Dùng một signal boolean để trigger, không dùng isMuted state
+    // ✅ Effect mute riêng — chỉ chạy khi user nhấn mute button
     useEffect(() => {
         if (!isActive) return; // inactive thì luôn muted, không cần làm gì
-        safeCall(() => { player.muted = isMutedRef.current; });
-    }, [isActive, player, safeCall]);
-    // ^ Effect này sẽ được trigger bởi forceUpdate từ ngoài — xem giải thích bên dưới
+        safeCall(() => {
+            player.muted = isMuted;
+            try { (player as any).volume = isMuted ? 0 : 1; } catch (_) { }
+        });
+    }, [isActive, isMuted, player, safeCall]);
 
     // ✅ Toggle play/pause khi tap
     useEffect(() => {
@@ -122,12 +114,13 @@ const VideoReel = React.memo(({
                 player.muted = true;
                 player.pause();
             } else {
-                player.muted = isMutedRef.current;
+                player.muted = isMuted;
+                try { (player as any).volume = isMuted ? 0 : 1; } catch (_) { }
                 player.play();
             }
         });
         onToggleHandled();
-    }, [shouldTogglePlay, player, safeCall, onToggleHandled]);
+    }, [shouldTogglePlay, isMuted, player, safeCall, onToggleHandled]);
 
     // ✅ Progress listener
     useEffect(() => {
@@ -174,13 +167,12 @@ interface ReelItemProps {
     isActive: boolean;
     insetBottom: number;
     insetTop: number;
-    isMutedRef: React.MutableRefObject<boolean>;
-    mutedDisplay: boolean;         // ← chỉ dùng để render icon
+    isMuted: boolean;
     onMuteChange: (v: boolean) => void;
 }
 
 const ReelItem = React.memo(({
-    item, isActive, insetBottom, insetTop, isMutedRef, mutedDisplay, onMuteChange,
+    item, isActive, insetBottom, insetTop, isMuted, onMuteChange,
 }: ReelItemProps) => {
     const router = useRouter();
     const { toggleLike, toggleSave, isLiked, isSaved } = useInteractionStore();
@@ -195,10 +187,9 @@ const ReelItem = React.memo(({
     const handleLike = useCallback(() => toggleLike(item.id), [item.id]);
     const handleSave = useCallback(() => toggleSave(item.id), [item.id]);
 
-    // ✅ toggleMute: đọc ref hiện tại, không cần isMuted state trong closure
     const toggleMute = useCallback(() => {
-        onMuteChange(!isMutedRef.current);
-    }, [isMutedRef, onMuteChange]);
+        onMuteChange(!isMuted);
+    }, [isMuted, onMuteChange]);
 
     const togglePlay = useCallback(() => setToggleSignal(true), []);
 
@@ -227,7 +218,7 @@ const ReelItem = React.memo(({
                     isActive={isActive}
                     onProgress={setProgress}
                     onPlayingChange={setIsPlaying}
-                    isMutedRef={isMutedRef}       // ← ref, không gây re-render
+                    isMuted={isMuted}
                     shouldTogglePlay={toggleSignal}
                     onToggleHandled={() => setToggleSignal(false)}
                 />
@@ -268,7 +259,7 @@ const ReelItem = React.memo(({
                     {item.videoUrl && (
                         <TouchableOpacity onPress={toggleMute} style={styles.muteBtn}>
                             <Ionicons
-                                name={mutedDisplay ? 'volume-mute' : 'volume-high'} // ← dùng mutedDisplay
+                                name={isMuted ? 'volume-mute' : 'volume-high'}
                                 size={16} color="#fff"
                             />
                         </TouchableOpacity>
@@ -389,8 +380,7 @@ export default function ReelsScreen() {
 
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
-const isMutedRef = useRef(false);
-const [mutedDisplay, setMutedDisplay] = useState(false);
+const [isMuted, setIsMuted] = useState(false);
 const [activeIdx, setActiveIdx] = useState(0);
 const [appActive, setAppActive] = useState(true);
 
@@ -415,8 +405,7 @@ useEffect(() => {
 
     const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
     const handleMuteChange = useCallback((value: boolean) => {
-        isMutedRef.current = value;
-        setMutedDisplay(value);
+        setIsMuted(value);
     }, []);
     const isFocused = useIsFocused();
 
@@ -427,8 +416,7 @@ useEffect(() => {
   isActive={isFocused && appActive && index === activeIdx}
                 insetBottom={insets.bottom}
                 insetTop={insets.top}
-                isMutedRef={isMutedRef}        // ← ref ổn định, không re-render
-                mutedDisplay={mutedDisplay}    // ← state, nhưng chỉ active item dùng icon này
+                isMuted={isMuted}
                 onMuteChange={handleMuteChange}
             />
         ),
@@ -439,9 +427,8 @@ useEffect(() => {
   handleMuteChange,
   insets.bottom,
   insets.top,
-  mutedDisplay
+  isMuted
 ]
-        // mutedDisplay vẫn trong deps nhưng chỉ icon re-render, không có VideoReel re-render
     );
     const keyExtractor = useCallback((item: PropertyReel) => item.id.toString(), []);
     const getItemLayout = useCallback(

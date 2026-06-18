@@ -48,7 +48,8 @@ function getSmartTags(item: Room): { label: string; color: string; bg: string }[
 
 export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tagsTopProp }: PropertyCardProps) {
     const router = useRouter();
-   const [isMuted, setIsMuted] = useState(false);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isManuallyPaused, setIsManuallyPaused] = useState(false);
     const { isAuthenticated } = useAuthStore();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
@@ -101,17 +102,20 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
     useEffect(() => {
         if (!item.videoUrl || !player) return;
         try {
-            if (isActive) {
+            if (isActive && !isManuallyPaused) {
                 player.play();
             } else {
                 player.pause();
-                player.currentTime = 0;
+                if (!isActive) {
+                    player.currentTime = 0;
+                    setIsManuallyPaused(false);
+                }
             }
         } catch (e) {
             // Player có thể đã bị release khi component unmount/remount
             console.warn('[PropertyCard] Video player error:', e);
         }
-    }, [isActive]);
+    }, [isActive, isManuallyPaused]);
 
     useEffect(() => {
         if (!player) return;
@@ -121,6 +125,11 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
             // Bỏ qua nếu player đã release
         }
     }, [isMuted]);
+
+    const handleTogglePlayback = () => {
+        if (!item.videoUrl || !isActive) return;
+        setIsManuallyPaused(prev => !prev);
+    };
 
 
 
@@ -209,7 +218,7 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
             {/* Media Layer */}
             {item.videoUrl && player ? (
                 <Pressable
-                    onPress={() => setIsMuted(!isMuted)}
+                    onPress={handleTogglePlayback}
                     onLongPress={handleLike}
                     style={styles.mediaContainer}
                 >
@@ -224,14 +233,23 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
                     <Animated.View style={[styles.centerOverlay, overlayHeartStyle]} pointerEvents="none">
                         <Ionicons name="heart" size={100} color="white" />
                     </Animated.View>
+                    {isManuallyPaused && (
+                        <View style={styles.playPauseIndicator} pointerEvents="none">
+                            <Ionicons name="play" size={34} color="white" />
+                        </View>
+                    )}
                     {/* Mute indicator */}
-                    <View style={[styles.muteIndicator, { top: muteTop }]}>
+                    <TouchableOpacity
+                        style={[styles.muteIndicator, { top: muteTop }]}
+                        onPress={() => setIsMuted(prev => !prev)}
+                        activeOpacity={0.8}
+                    >
                         <Ionicons
                             name={isMuted ? 'volume-mute' : 'volume-high'}
                             size={14}
                             color="white"
                         />
-                    </View>
+                    </TouchableOpacity>
                 </Pressable>
             ) : item.images && item.images.length > 0 ? (
                 <View style={styles.mediaContainer}>
@@ -448,6 +466,19 @@ const styles = StyleSheet.create({
     image: { flex: 1, width: '100%', height: '100%' },
     centerOverlay: {
         ...StyleSheet.absoluteFillObject,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    playPauseIndicator: {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        width: 68,
+        height: 68,
+        marginLeft: -34,
+        marginTop: -34,
+        borderRadius: 34,
+        backgroundColor: 'rgba(0,0,0,0.42)',
         justifyContent: 'center',
         alignItems: 'center',
     },
