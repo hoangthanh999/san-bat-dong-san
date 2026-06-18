@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePropertyStore } from '../../store/propertyStore';
 import { useAuthStore } from '../../store/authStore';
 import { useReviewStore } from '../../store/reviewStore';
+import { useCommentStore } from '../../store/commentStore';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { roomService } from '../../services/api/rooms';
@@ -137,14 +138,24 @@ export default function PropertyDetailScreen() {
     const insets = useSafeAreaInsets();
     const { currentRoom, fetchRoomDetail, isLoading } = usePropertyStore();
     const { user, isAuthenticated } = useAuthStore();
-    const { reviewsByRoom, totalReviews: totalReviewsMap, fetchReviews, addReview, isSubmitting } = useReviewStore();
+    const {
+        reviewsByOwner, summaryByOwner,
+        fetchOwnerReviews, fetchOwnerSummary,
+        submitReview, replyReview: replyOwnerReview,
+        isSubmitting,
+    } = useReviewStore();
+    const {
+        commentsByProperty, countByProperty,
+        fetchComments, addComment, deleteComment,
+        isSubmitting: isCommentSubmitting,
+    } = useCommentStore();
     const { createAppointment, isSubmitting: bookingSubmitting } = useAppointmentStore();
     const {
         isLiked, isSaved: isPropertySaved, toggleLike, toggleSave: toggleSaveInteraction,
         setSaved, setLiked,
     } = useInteractionStore();
 
-    const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'reviews' | 'comments'>('info');
     const [isSavedLocal, setIsSavedLocal] = useState(false);
     const [isLikedLocal, setIsLikedLocal] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
@@ -153,6 +164,7 @@ export default function PropertyDetailScreen() {
     const [reviewRating, setReviewRating] = useState(5);
     const [reviewComment, setReviewComment] = useState('');
     const [reviewImages, setReviewImages] = useState<string[]>([]);
+    const [commentText, setCommentText] = useState('');
     const [bookingDate, setBookingDate] = useState('');
     const [bookingNote, setBookingNote] = useState('');
     const [userDistance, setUserDistance] = useState<string | null>(null);
@@ -161,18 +173,39 @@ export default function PropertyDetailScreen() {
 
     const roomId = Number(id);
     const room = currentRoom?.id === roomId ? currentRoom : null;
-    const reviews = reviewsByRoom[roomId] || [];
-    const reviewTotal = totalReviewsMap[roomId] || 0;
-    const reviewAvg = reviews.length > 0
-        ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
-        : 0;
+
+    // Owner review data — keyed by ownerId
+    const ownerId = room?.ownerId || 0;
+    // Guard: luôn là array dù store/service trả về bất kỳ shape nào
+    const rawOwnerReviews = reviewsByOwner[ownerId];
+    const safeOwnerReviews = Array.isArray(rawOwnerReviews) ? rawOwnerReviews : ([] as import('../../types').OwnerReviewResponse[]);
+    const reviewSummary = summaryByOwner[ownerId] || null;
+    const reviewTotal = reviewSummary?.reviewCount ?? safeOwnerReviews.length;
+    const reviewAvg = reviewSummary?.averageRating ?? (
+        safeOwnerReviews.length > 0
+            ? safeOwnerReviews.reduce((sum, r) => sum + (r.rating || 0), 0) / safeOwnerReviews.length
+            : 0
+    );
+
+    // Comment data — keyed by propertyId
+    const rawComments = commentsByProperty[roomId];
+    const safeComments = Array.isArray(rawComments) ? rawComments : ([] as import('../../types').CommentResponse[]);
+    const commentCount = countByProperty[roomId] || 0;
 
     useEffect(() => {
         if (roomId) {
             fetchRoomDetail(roomId);
-            fetchReviews(roomId, true);
+            fetchComments(roomId, true);
         }
     }, [roomId]);
+
+    // Khi room load xong và có ownerId → tải review + summary
+    useEffect(() => {
+        if (room?.ownerId) {
+            fetchOwnerReviews(room.ownerId);
+            fetchOwnerSummary(room.ownerId);
+        }
+    }, [room?.ownerId]);
 
     useEffect(() => {
         if (room?.latitude && room?.longitude) {
@@ -292,15 +325,60 @@ export default function PropertyDetailScreen() {
     };
 
     const handleSubmitReview = async () => {
+        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
         if (!reviewComment.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập nội dung đánh giá'); return; }
+        if (!room?.ownerId) { Alert.alert('Lỗi', 'Không xác định được chủ nhà.'); return; }
+        // Lọc chỉ gửi URL hợp lệ (không gửi local file:// lên backend)
+        const validImageUrls = reviewImages.filter(uri => uri.startsWith('http'));
         try {
-            await addReview(roomId, reviewRating, reviewComment, reviewImages.length > 0 ? reviewImages : undefined);
+            await submitReview({
+                ownerId: room.ownerId,
+                propertyId: roomId,
+                rating: reviewRating,
+                comment: reviewComment,
+                images: validImageUrls.length > 0 ? validImageUrls : undefined,
+            });
+            // Refresh summary sau khi gửi
+            fetchOwnerSummary(room.ownerId);
             setShowReviewModal(false);
-            setReviewComment(''); setReviewRating(5); setReviewImages([]);
+            setReviewComment('');
+            setReviewRating(5);
+            setReviewImages([]);
             Alert.alert('Thành công', 'Cảm ơn bạn đã đánh giá!');
         } catch (e: any) {
             Alert.alert('Lỗi', e.message || 'Gửi đánh giá thất bại');
         }
+    };
+
+    const handleSubmitComment = async () => {
+        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+        if (!commentText.trim()) return;
+        try {
+            await addComment({ propertyId: roomId, content: commentText.trim() });
+            setCommentText('');
+        } catch (e: any) {
+            Alert.alert('Lỗi', e.message || 'Gửi bình luận thất bại');
+        }
+    };
+
+    const handleDeleteComment = async (commentId: number) => {
+        Alert.alert(
+            'Xoá bình luận',
+            'Bạn có chắc muốn xoá bình luận này?',
+            [
+                { text: 'Huỷ', style: 'cancel' },
+                {
+                    text: 'Xoá', style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteComment(commentId, roomId);
+                        } catch (e: any) {
+                            Alert.alert('Lỗi', e.message || 'Không thể xoá bình luận');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const pickReviewImages = async () => {
@@ -555,17 +633,28 @@ export default function PropertyDetailScreen() {
 
                     {/* Tabs */}
                     <View style={styles.tabBar}>
-                        {(['info', 'reviews'] as const).map(tab => (
-                            <TouchableOpacity
-                                key={tab}
-                                style={[styles.tab, activeTab === tab && styles.tabActive]}
-                                onPress={() => setActiveTab(tab)}
-                            >
-                                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                                    {tab === 'info' ? 'Thông tin' : `Đánh giá (${reviewTotal})`}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'info' && styles.tabActive]}
+                            onPress={() => setActiveTab('info')}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'info' && styles.tabTextActive]}>Thông tin</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'comments' && styles.tabActive]}
+                            onPress={() => setActiveTab('comments')}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'comments' && styles.tabTextActive]}>
+                                {`Bình luận (${commentCount})`}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'reviews' && styles.tabActive]}
+                            onPress={() => setActiveTab('reviews')}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>
+                                {`Đánh giá (${reviewTotal})`}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* ===== TAB INFO ===== */}
@@ -739,9 +828,86 @@ export default function PropertyDetailScreen() {
                         </>
                     )}
 
+                    {/* ===== TAB COMMENTS ===== */}
+                    {activeTab === 'comments' && (
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>💬 Bình luận ({commentCount})</Text>
+
+                            {/* Ô nhập comment */}
+                            {isAuthenticated ? (
+                                <View style={styles.commentInputRow}>
+                                    <TextInput
+                                        style={styles.commentInput}
+                                        placeholder="Viết bình luận..."
+                                        value={commentText}
+                                        onChangeText={setCommentText}
+                                        multiline
+                                        maxLength={500}
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.commentSendBtn, (!commentText.trim() || isCommentSubmitting) && styles.commentSendBtnDisabled]}
+                                        onPress={handleSubmitComment}
+                                        disabled={!commentText.trim() || isCommentSubmitting}
+                                    >
+                                        {isCommentSubmitting
+                                            ? <ActivityIndicator size="small" color="white" />
+                                            : <Ionicons name="send" size={18} color="white" />
+                                        }
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <TouchableOpacity
+                                    style={styles.loginToCommentBtn}
+                                    onPress={() => router.push('/(auth)/login')}
+                                >
+                                    <Ionicons name="log-in-outline" size={16} color="#0066FF" />
+                                    <Text style={styles.loginToCommentText}>Đăng nhập để bình luận</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Danh sách comment */}
+                            {safeComments.length === 0 ? (
+                                <View style={styles.emptyReviews}>
+                                    <Ionicons name="chatbubble-outline" size={48} color="#CCC" />
+                                    <Text style={styles.emptyText}>Chưa có bình luận nào. Hãy là người đầu tiên!</Text>
+                                </View>
+                            ) : (
+                                safeComments.map(c => (
+                                    <View key={c.id} style={styles.commentCard}>
+                                        <View style={styles.commentHeader}>
+                                            <Image
+                                                source={{ uri: `https://ui-avatars.com/api/?name=${c.userId ? 'User+' + c.userId : 'Khach'}&background=0066FF&color=fff` }}
+                                                style={styles.commentAvatar}
+                                            />
+                                            <View style={styles.commentMeta}>
+                                                <Text style={styles.commentUser}>
+                                                    {c.userId ? `Người dùng #${c.userId}` : 'Khách'}
+                                                </Text>
+                                                <Text style={styles.commentDate}>
+                                                    {c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : ''}
+                                                </Text>
+                                            </View>
+                                            {/* Nút xoá — chỉ hiện nếu là comment của mình */}
+                                            {user && c.userId === user.id && (
+                                                <TouchableOpacity
+                                                    onPress={() => handleDeleteComment(c.id)}
+                                                    style={styles.commentDeleteBtn}
+                                                >
+                                                    <Ionicons name="trash-outline" size={16} color="#FF4444" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                        <Text style={styles.commentContent}>{c.content}</Text>
+                                    </View>
+                                ))
+                            )}
+                        </View>
+                    )}
+
                     {/* ===== TAB REVIEWS ===== */}
                     {activeTab === 'reviews' && (
                         <View style={styles.section}>
+                            {/* Summary */}
                             <View style={styles.reviewSummary}>
                                 <Text style={styles.bigRating}>{reviewAvg.toFixed(1)}</Text>
                                 <View>
@@ -751,22 +917,36 @@ export default function PropertyDetailScreen() {
                                         ))}
                                     </View>
                                     <Text style={styles.reviewCount}>{reviewTotal} đánh giá</Text>
+                                    {reviewSummary && reviewSummary.verifiedReviewCount > 0 && (
+                                        <Text style={styles.verifiedCount}>{reviewSummary.verifiedReviewCount} đã xác minh</Text>
+                                    )}
                                 </View>
                             </View>
-                            {isAuthenticated && (
+
+                            {/* Nút viết đánh giá — chỉ hiện cho user không phải owner */}
+                            {isAuthenticated && user?.id !== room?.ownerId && (
                                 <TouchableOpacity style={styles.writeReviewBtn} onPress={() => setShowReviewModal(true)}>
                                     <Ionicons name="create-outline" size={18} color="#0066FF" />
-                                    <Text style={styles.writeReviewText}>Viết đánh giá</Text>
+                                    <Text style={styles.writeReviewText}>Viết đánh giá chủ nhà</Text>
                                 </TouchableOpacity>
                             )}
-                            {reviews.length === 0 ? (
+
+                            {safeOwnerReviews.length === 0 ? (
                                 <View style={styles.emptyReviews}>
-                                    <Ionicons name="chatbubbles-outline" size={48} color="#CCC" />
-                                    <Text style={styles.emptyText}>Chưa có đánh giá nào</Text>
+                                    <Ionicons name="star-outline" size={48} color="#CCC" />
+                                    <Text style={styles.emptyText}>Chưa có đánh giá nào về chủ nhà</Text>
                                 </View>
                             ) : (
-                                reviews.map(review => (
-                                    <ReviewCard key={review.id} review={review} isMyReview={user?.id === review.userId} />
+                                safeOwnerReviews.map(review => (
+                                    <ReviewCard
+                                        key={review.id}
+                                        review={review}
+                                        isOwner={user?.id === room?.ownerId}
+                                        onReply={user?.id === room?.ownerId
+                                            ? (reviewId, replyText) => replyOwnerReview(reviewId, room!.ownerId, replyText)
+                                            : undefined
+                                        }
+                                    />
                                 ))
                             )}
                         </View>
@@ -1089,4 +1269,20 @@ const styles = StyleSheet.create({
     submitBtn: { backgroundColor: '#0066FF', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
     submitBtnDisabled: { backgroundColor: '#AAC8FF' },
     submitBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
+    // Comment styles
+    commentCard: { backgroundColor: 'white', borderRadius: 12, padding: 12, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
+    commentHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+    commentAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#F0F0F0' },
+    commentMeta: { flex: 1, marginLeft: 8 },
+    commentUser: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
+    commentDate: { fontSize: 11, color: '#999', marginTop: 1 },
+    commentDeleteBtn: { padding: 4 },
+    commentContent: { fontSize: 14, color: '#444', lineHeight: 20 },
+    commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 14, backgroundColor: '#F8F8F8', borderRadius: 12, padding: 8, borderWidth: 1, borderColor: '#E8E8E8' },
+    commentInput: { flex: 1, fontSize: 14, color: '#1A1A1A', maxHeight: 80, minHeight: 36, paddingTop: 4 },
+    commentSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0066FF', justifyContent: 'center', alignItems: 'center' },
+    commentSendBtnDisabled: { backgroundColor: '#AAC8FF' },
+    loginToCommentBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', backgroundColor: '#EEF4FF', borderRadius: 10, paddingVertical: 12, marginBottom: 14 },
+    loginToCommentText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
+    verifiedCount: { fontSize: 12, color: '#22C55E', marginTop: 2 },
 });

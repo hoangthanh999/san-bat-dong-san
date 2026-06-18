@@ -10,21 +10,22 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { Review } from '../../types';
+import { OwnerReviewResponse } from '../../types';
 
 interface ReviewCardProps {
-    review: Review;
-    isMyReview?: boolean;
+    review: OwnerReviewResponse;
+    /** true nếu người xem là chủ nhà (owner) → hiện nút Phản hồi */
+    isOwner?: boolean;
     onReply?: (reviewId: number, replyText: string) => void;
-    onDelete?: (reviewId: number) => void;
 }
 
-export function ReviewCard({ review, isMyReview, onReply, onDelete }: ReviewCardProps) {
+export function ReviewCard({ review, isOwner, onReply }: ReviewCardProps) {
     const [showReplyInput, setShowReplyInput] = useState(false);
     const [replyText, setReplyText] = useState('');
     const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
-    const formatDate = (dateStr: string) => {
+    const formatDate = (dateStr?: string | null) => {
+        if (!dateStr) return '';
         const d = new Date(dateStr);
         return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
@@ -37,22 +38,29 @@ export function ReviewCard({ review, isMyReview, onReply, onDelete }: ReviewCard
         }
     };
 
+    // Backend không trả tên/avatar reviewer → fallback an toàn
+    const reviewerName = 'Người dùng';
+    const reviewerAvatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(reviewerName)}&background=0066FF&color=fff`;
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <Image
-                    source={{ uri: review.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.userName)}&background=0066FF&color=fff` }}
+                    source={{ uri: reviewerAvatarUrl }}
                     style={styles.avatar}
                 />
                 <View style={styles.headerInfo}>
-                    <Text style={styles.userName}>{review.userName}</Text>
+                    <View style={styles.nameRow}>
+                        <Text style={styles.userName}>{reviewerName}</Text>
+                        {review.verified && (
+                            <View style={styles.verifiedBadge}>
+                                <Ionicons name="checkmark-circle" size={12} color="#22C55E" />
+                                <Text style={styles.verifiedText}>Đã xác minh</Text>
+                            </View>
+                        )}
+                    </View>
                     <Text style={styles.date}>{formatDate(review.createdAt)}</Text>
                 </View>
-                {isMyReview && (
-                    <TouchableOpacity onPress={() => onDelete?.(review.id)} style={styles.deleteBtn}>
-                        <Ionicons name="trash-outline" size={18} color="#FF4444" />
-                    </TouchableOpacity>
-                )}
             </View>
 
             {/* Star Rating */}
@@ -69,10 +77,10 @@ export function ReviewCard({ review, isMyReview, onReply, onDelete }: ReviewCard
 
             <Text style={styles.comment}>{review.comment}</Text>
 
-            {/* Review Images */}
-            {review.reviewImages && review.reviewImages.length > 0 && (
+            {/* Review Images — field đúng backend: images (không phải reviewImages) */}
+            {review.images && review.images.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageScroll}>
-                    {review.reviewImages.map((img, index) => (
+                    {review.images.map((img, index) => (
                         <TouchableOpacity key={index} onPress={() => setFullScreenImage(img)} activeOpacity={0.8}>
                             <Image source={{ uri: img }} style={styles.reviewImage} contentFit="cover" />
                         </TouchableOpacity>
@@ -80,19 +88,22 @@ export function ReviewCard({ review, isMyReview, onReply, onDelete }: ReviewCard
                 </ScrollView>
             )}
 
-            {/* Reply from landlord */}
-            {(review.reply || review.landlordReply) && (
+            {/* Reply from owner — field đúng backend: ownerReply (không phải landlordReply) */}
+            {review.ownerReply && (
                 <View style={styles.replyBox}>
                     <View style={styles.replyHeader}>
                         <Ionicons name="arrow-redo" size={14} color="#0066FF" />
                         <Text style={styles.replyLabel}>Phản hồi từ chủ nhà</Text>
+                        {review.ownerReplyAt && (
+                            <Text style={styles.replyDate}> · {formatDate(review.ownerReplyAt)}</Text>
+                        )}
                     </View>
-                    <Text style={styles.replyText}>{review.reply || review.landlordReply}</Text>
+                    <Text style={styles.replyText}>{review.ownerReply}</Text>
                 </View>
             )}
 
-            {/* Reply button for landlord */}
-            {onReply && !review.reply && !review.landlordReply && (
+            {/* Reply button — chỉ hiện cho owner chưa reply */}
+            {isOwner && !review.ownerReply && (
                 <TouchableOpacity
                     style={styles.replyButton}
                     onPress={() => setShowReplyInput(!showReplyInput)}
@@ -159,18 +170,30 @@ const styles = StyleSheet.create({
         flex: 1,
         marginLeft: 10,
     },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
     userName: {
         fontSize: 14,
         fontWeight: '600',
         color: '#1A1A1A',
     },
+    verifiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+    },
+    verifiedText: {
+        fontSize: 11,
+        color: '#22C55E',
+        fontWeight: '500',
+    },
     date: {
         fontSize: 12,
         color: '#999',
         marginTop: 1,
-    },
-    deleteBtn: {
-        padding: 4,
     },
     starsRow: {
         flexDirection: 'row',
@@ -210,6 +233,10 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#0066FF',
         fontWeight: '600',
+    },
+    replyDate: {
+        fontSize: 11,
+        color: '#999',
     },
     replyText: {
         fontSize: 13,

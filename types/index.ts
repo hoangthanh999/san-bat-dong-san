@@ -533,21 +533,66 @@ export interface WalletInfo {
 }
 
 // ============================
-// Review Types (chưa có backend)
+// Comment Types (khớp backend PropertyCommentController + CommentResponse)
 // ============================
-export interface Review {
+export interface CommentRequest {
+    propertyId: number;
+    parentId?: number | null;
+    replyToUserId?: number | null;
+    content: string;
+}
+
+export interface CommentResponse {
     id: number;
-    roomId: number;
-    userId: number;
-    userName: string;
-    userAvatar?: string;
-    rating: number;
+    propertyId: number;
+    userId?: number | null;          // null nếu là guest
+    guestId?: string | null;         // null nếu là user đã login
+    parentId?: number | null;        // null nếu là comment gốc
+    replyToUserId?: number | null;
+    content: string;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+// ============================
+// Owner Review Types (khớp backend OwnerReviewController + OwnerReviewResponse)
+// ============================
+export interface OwnerReviewRequest {
+    ownerId: number;
+    propertyId: number;
+    rating: number;                  // 1–5
+    images?: string[];               // List URL (không gửi local file://)
     comment: string;
-    reviewImages?: string[];
-    landlordReply?: string;
-    reply?: string;
+}
+
+export interface OwnerReviewResponse {
+    id: number;
+    ownerId: number;
+    reviewerId: number;
+    propertyId: number;
+    verified?: boolean;
+    rating: number;
+    images?: string[];
+    comment: string;
+    ownerReply?: string | null;
+    ownerReplyAt?: string | null;
     createdAt: string;
 }
+
+export interface OwnerRatingSummary {
+    ownerId: number;
+    averageRating: number;
+    verifiedReviewCount: number;
+    reviewCount: number;
+    fiveStar: number;
+    fourStar: number;
+    threeStar: number;
+    twoStar: number;
+    oneStar: number;
+}
+
+// Backward-compat alias (tránh break các chỗ import Review nếu còn)
+export type Review = OwnerReviewResponse;
 
 // ============================
 // Favorite Types (chưa có backend)

@@ -1,103 +1,128 @@
+/**
+ * reviewStore.ts
+ * Zustand store quản lý Owner Review.
+ * Gọi đúng backend endpoint qua reviewService (không mock).
+ *
+ * Endpoint backend (OwnerReviewController.java):
+ *   POST   /owners/reviews
+ *   GET    /owners/reviews/{ownerId}
+ *   GET    /owners/reviews/{ownerId}/summary
+ *   POST   /owners/reviews/{reviewId}/reply
+ */
+
 import { create } from 'zustand';
-import { Review, PaginatedResponse } from '../types';
+import { OwnerReviewResponse, OwnerReviewRequest, OwnerRatingSummary } from '../types';
 import { reviewService } from '../services/api/reviews';
 
 interface ReviewState {
-    reviewsByRoom: Record<number, Review[]>;
+    // reviewsByOwner: ownerId → danh sách review
+    reviewsByOwner: Record<number, OwnerReviewResponse[]>;
+    // summaryByOwner: ownerId → rating summary
+    summaryByOwner: Record<number, OwnerRatingSummary>;
+
     isLoading: boolean;
     isSubmitting: boolean;
     error: string | null;
-    totalReviews: Record<number, number>;
-    hasMore: Record<number, boolean>;
 
-    fetchReviews: (roomId: number, reset?: boolean) => Promise<void>;
-    addReview: (roomId: number, rating: number, comment: string, reviewImages?: string[]) => Promise<void>;
-    replyReview: (reviewId: number, roomId: number, reply: string) => Promise<void>;
-    deleteReview: (reviewId: number, roomId: number) => Promise<void>;
+    fetchOwnerReviews: (ownerId: number) => Promise<void>;
+    fetchOwnerSummary: (ownerId: number) => Promise<void>;
+    submitReview: (request: OwnerReviewRequest) => Promise<void>;
+    replyReview: (reviewId: number, ownerId: number, reply: string) => Promise<void>;
+    clearError: () => void;
 }
 
 export const useReviewStore = create<ReviewState>((set, get) => ({
-    reviewsByRoom: {},
+    reviewsByOwner: {},
+    summaryByOwner: {},
     isLoading: false,
     isSubmitting: false,
     error: null,
-    totalReviews: {},
-    hasMore: {},
 
-    fetchReviews: async (roomId: number, reset = false) => {
+    fetchOwnerReviews: async (ownerId: number) => {
         set({ isLoading: true, error: null });
         try {
-            const existing = get().reviewsByRoom[roomId] || [];
-            const page = reset ? 0 : Math.floor(existing.length / 10);
-            const data = await reviewService.getRoomReviews(roomId, page);
-
+            const reviews = await reviewService.getOwnerReviews(ownerId);
+            // reviewService.getOwnerReviews đã normalize → luôn là array
+            const safeReviews = Array.isArray(reviews) ? reviews : [];
             set(state => ({
-                reviewsByRoom: {
-                    ...state.reviewsByRoom,
-                    [roomId]: reset ? data.content : [...(state.reviewsByRoom[roomId] || []), ...data.content],
+                reviewsByOwner: {
+                    ...state.reviewsByOwner,
+                    [ownerId]: safeReviews,
                 },
-                totalReviews: { ...state.totalReviews, [roomId]: data.totalElements },
-                hasMore: { ...state.hasMore, [roomId]: !data.last },
                 isLoading: false,
             }));
         } catch (error: any) {
-            set({ error: error.message, isLoading: false });
+            // Ngay cả khi lỗi vẫn set [] để tránh crash UI
+            set(state => ({
+                reviewsByOwner: { ...state.reviewsByOwner, [ownerId]: [] },
+                error: error.message || 'Không thể tải đánh giá',
+                isLoading: false,
+            }));
         }
     },
 
-    addReview: async (roomId: number, rating: number, comment: string, reviewImages?: string[]) => {
+    fetchOwnerSummary: async (ownerId: number) => {
+        try {
+            const summary = await reviewService.getOwnerRatingSummary(ownerId);
+            set(state => ({
+                summaryByOwner: {
+                    ...state.summaryByOwner,
+                    [ownerId]: summary,
+                },
+            }));
+        } catch (error: any) {
+            console.warn('[reviewStore] fetchOwnerSummary error:', error.message);
+        }
+    },
+
+    submitReview: async (request: OwnerReviewRequest) => {
         set({ isSubmitting: true, error: null });
         try {
-            const review = await reviewService.addReview(roomId, rating, comment, reviewImages);
-            if (review) {
-                set(state => ({
-                    reviewsByRoom: {
-                        ...state.reviewsByRoom,
-                        [roomId]: [review, ...(state.reviewsByRoom[roomId] || [])],
+            const newReview = await reviewService.createOrUpdateReview(request);
+
+            set(state => {
+                const ownerId = request.ownerId;
+                const existing = state.reviewsByOwner[ownerId] || [];
+                // Backend unique theo ownerId+reviewerId+propertyId → nếu đã tồn tại thì update
+                const idx = existing.findIndex(
+                    r => r.propertyId === request.propertyId && r.reviewerId === newReview.reviewerId,
+                );
+                let updated: OwnerReviewResponse[];
+                if (idx >= 0) {
+                    updated = existing.map((r, i) => (i === idx ? newReview : r));
+                } else {
+                    updated = [newReview, ...existing];
+                }
+                return {
+                    reviewsByOwner: {
+                        ...state.reviewsByOwner,
+                        [ownerId]: updated,
                     },
-                    totalReviews: { ...state.totalReviews, [roomId]: (state.totalReviews[roomId] || 0) + 1 },
                     isSubmitting: false,
-                }));
-            } else {
-                set({ isSubmitting: false });
-            }
+                };
+            });
         } catch (error: any) {
             set({ error: error.message || 'Gửi đánh giá thất bại', isSubmitting: false });
             throw error;
         }
     },
 
-    replyReview: async (reviewId: number, roomId: number, reply: string) => {
+    replyReview: async (reviewId: number, ownerId: number, reply: string) => {
         try {
             const updated = await reviewService.replyReview(reviewId, reply);
-            if (updated) {
-                set(state => ({
-                    reviewsByRoom: {
-                        ...state.reviewsByRoom,
-                        [roomId]: (state.reviewsByRoom[roomId] || []).map(r =>
-                            r.id === reviewId ? updated : r
-                        ),
-                    },
-                }));
-            }
+            set(state => ({
+                reviewsByOwner: {
+                    ...state.reviewsByOwner,
+                    [ownerId]: (state.reviewsByOwner[ownerId] || []).map(r =>
+                        r.id === reviewId ? updated : r,
+                    ),
+                },
+            }));
         } catch (error: any) {
             set({ error: error.message || 'Phản hồi đánh giá thất bại' });
             throw error;
         }
     },
 
-    deleteReview: async (reviewId: number, roomId: number) => {
-        try {
-            await reviewService.deleteReview(reviewId);
-            set(state => ({
-                reviewsByRoom: {
-                    ...state.reviewsByRoom,
-                    [roomId]: (state.reviewsByRoom[roomId] || []).filter(r => r.id !== reviewId),
-                },
-                totalReviews: { ...state.totalReviews, [roomId]: Math.max(0, (state.totalReviews[roomId] || 1) - 1) },
-            }));
-        } catch (error) {
-            console.error('Delete review error', error);
-        }
-    },
+    clearError: () => set({ error: null }),
 }));
