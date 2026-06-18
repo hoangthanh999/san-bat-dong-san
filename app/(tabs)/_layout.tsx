@@ -146,14 +146,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="map"
                 options={{
-                    title: 'Bản đồ',
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons
-                            name={focused ? 'map' : 'map-outline'}
-                            size={24}
-                            color={color}
-                        />
-                    ),
+                    href: null,
                 }}
             />
         </Tabs>

@@ -248,6 +248,14 @@ useEffect(() => {
                 <View style={styles.headerActions}>
                     <TouchableOpacity
                         style={styles.headerBtn}
+                        onPress={() => router.push('/map' as any)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Bản đồ toàn cảnh bất động sản"
+                    >
+                        <Ionicons name="map-outline" size={22} color="white" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.headerBtn}
                         onPress={() => router.push('/analytics' as any)}
                     >
                         <Ionicons name="bar-chart-outline" size={22} color="white" />
