@@ -74,3 +74,7 @@ docs/
 BAO_CAO_BO_SUNG.md
 BAO_CAO_DO_AN.md
 TỔNG HỢP HOÀN CHỈNH APP BẤT ĐỘNG SẢN HIỆN ĐẠI.docx
+
+# Android signing keys
+*.jks
+*.keystore
