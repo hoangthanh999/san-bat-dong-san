@@ -6,7 +6,6 @@ import {
 import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
@@ -14,6 +13,7 @@ import { useKYCStore } from '../../store/kycStore';
 import { roomService } from '../../services/api/rooms';
 import { mediaService } from '../../services/api/media';
 import { amenityService } from '../../services/api/amenities';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 import { projectService } from '../../services/api/projects';
 import { PropertyRequestDTO, Amenity, ProjectResponseDTO } from '../../types';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
@@ -277,7 +277,7 @@ export default function PostScreen() {
 // ─── PostScreenContent ────────────────────────────────────────
 
 function PostScreenContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { isAuthenticated } = useAuthStore();
     const { kycStatus, fetchKYCStatus } = useKYCStore();
@@ -649,7 +649,7 @@ function PostScreenContent() {
                 <StatusBar barStyle="dark-content" />
                 <Ionicons name="home-outline" size={72} color="#CCC" />
                 <Text style={styles.authTitle}>Đăng nhập để đăng tin</Text>
-                <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/(auth)/login')}>
+                <TouchableOpacity style={styles.loginBtn} onPress={() => safePush('/(auth)/login' as any)}>
                     <Text style={styles.loginBtnText}>Đăng nhập ngay</Text>
                 </TouchableOpacity>
             </View>
@@ -668,7 +668,7 @@ function PostScreenContent() {
                         : 'Bạn cần xác minh danh tính (KYC) trước khi đăng tin bất động sản.'}
                 </Text>
                 {kycStatus !== 'PENDING' && (
-                    <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/kyc' as any)}>
+                    <TouchableOpacity style={styles.loginBtn} onPress={() => safePush('/kyc' as any)}>
                         <Text style={styles.loginBtnText}>Xác minh ngay</Text>
                     </TouchableOpacity>
                 )}
@@ -687,7 +687,7 @@ function PostScreenContent() {
                 <TouchableOpacity style={styles.homeBtn} onPress={resetForm}>
                     <Text style={styles.homeBtnText}>Đăng tin mới</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.viewBtn} onPress={() => router.push('/(tabs)/profile')}>
+                <TouchableOpacity style={styles.viewBtn} onPress={() => safePush('/(tabs)/profile' as any)}>
                     <Text style={styles.viewBtnText}>Xem tin đã đăng</Text>
                 </TouchableOpacity>
             </View>

@@ -4,11 +4,12 @@ import {
     ScrollView, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useWalletStore } from '../../store/walletStore';
 import { Transaction } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 // ─── TransactionItem ──────────────────────────────────────────
 function TransactionItem({ item }: { item: Transaction }) {
@@ -72,7 +73,7 @@ export default function WalletScreen() {
 
 // ─── WalletContent ────────────────────────────────────────────
 function WalletContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { wallet, transactions, isLoading, fetchWallet, fetchTransactions } = useWalletStore();
     const [refreshing, setRefreshing] = React.useState(false);
@@ -119,7 +120,7 @@ function WalletContent() {
                     <Ionicons name="arrow-back" size={24} color="white" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Ví của tôi</Text>
-                <TouchableOpacity onPress={() => router.push('/wallet/history' as any)}>
+                <TouchableOpacity onPress={() => safePush('/wallet/history' as any)}>
                     <Ionicons name="receipt-outline" size={24} color="white" />
                 </TouchableOpacity>
             </View>
@@ -137,7 +138,7 @@ function WalletContent() {
                 )}
                 <TouchableOpacity
                     style={styles.depositBtn}
-                    onPress={() => router.push('/wallet/deposit' as any)}
+                    onPress={() => safePush('/wallet/deposit' as any)}
                     activeOpacity={0.85}
                 >
                     <Ionicons name="add-circle-outline" size={20} color="white" />
@@ -165,7 +166,7 @@ function WalletContent() {
                             <TouchableOpacity
                                 key={action.label}
                                 style={styles.quickAction}
-                                onPress={() => router.push(action.path as any)}
+                                onPress={() => safePush(action.path as any)}
                                 activeOpacity={0.75}
                             >
                                 <View style={[
@@ -187,7 +188,7 @@ function WalletContent() {
                     <View style={styles.divider} />
                     <TouchableOpacity
                         style={styles.withdrawBtn}
-                        onPress={() => router.push('/wallet/withdraw' as any)}
+                        onPress={() => safePush('/wallet/withdraw' as any)}
                         activeOpacity={0.85}
                     >
                         <Ionicons name="card-outline" size={20} color="#FF9500" />
@@ -200,7 +201,7 @@ function WalletContent() {
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
-                        <TouchableOpacity onPress={() => router.push('/wallet/history' as any)}>
+                        <TouchableOpacity onPress={() => safePush('/wallet/history' as any)}>
                             <Text style={styles.seeAll}>Xem tất cả</Text>
                         </TouchableOpacity>
                     </View>

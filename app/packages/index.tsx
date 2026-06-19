@@ -4,11 +4,12 @@ import {
     Platform, Modal, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { usePackageStore } from '../../store/packageStore';
 import { useWalletStore } from '../../store/walletStore';
 import { ServicePackage } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 
 function PackageCard({ pkg, onBuy }: { pkg: ServicePackage; onBuy: () => void }) {
@@ -48,7 +49,7 @@ function PackageCard({ pkg, onBuy }: { pkg: ServicePackage; onBuy: () => void })
 }
 
 export default function PackagesScreen() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { membershipPackages, boostPackages, isLoading, isPurchasing, fetchPackages, purchaseMembership } = usePackageStore();
     const { transactions, fetchTransactions } = useWalletStore();
@@ -83,7 +84,7 @@ export default function PackagesScreen() {
                 `Bạn cần thêm ${(confirmPkg.price - balance).toLocaleString('vi-VN')}đ để mua gói này.`,
                 [
                     { text: 'Hủy', style: 'cancel' },
-                    { text: 'Nạp tiền', onPress: () => router.push('/wallet/deposit' as any) },
+                    { text: 'Nạp tiền', onPress: () => safePush('/wallet/deposit' as any) },
                 ]
             );
             return;
@@ -109,7 +110,7 @@ export default function PackagesScreen() {
                     <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Gói dịch vụ</Text>
-                <TouchableOpacity onPress={() => router.push('/wallet' as any)}>
+                <TouchableOpacity onPress={() => safePush('/wallet' as any)}>
                     <View style={styles.balanceBadge}>
                         <Ionicons name="wallet-outline" size={14} color="#0066FF" />
                         <Text style={styles.balanceText}>{(balance / 1000).toFixed(0)}K</Text>

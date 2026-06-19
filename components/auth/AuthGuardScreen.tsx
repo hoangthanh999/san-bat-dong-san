@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 interface Props {
     children: React.ReactNode;
@@ -20,7 +20,7 @@ interface Props {
  */
 export function AuthGuardScreen({ children, message, icon = 'lock-closed-outline' }: Props) {
     const { isAuthenticated, isLoading } = useAuthStore();
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
 
     if (isLoading) {
@@ -48,7 +48,7 @@ export function AuthGuardScreen({ children, message, icon = 'lock-closed-outline
                     </Text>
                     <TouchableOpacity
                         style={styles.loginBtn}
-                        onPress={() => router.push('/(auth)/login')}
+                        onPress={() => safePush('/(auth)/login' as any)}
                         activeOpacity={0.85}
                     >
                         <Ionicons name="log-in-outline" size={20} color="white" />
@@ -56,7 +56,7 @@ export function AuthGuardScreen({ children, message, icon = 'lock-closed-outline
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.registerLink}
-                        onPress={() => router.push('/(auth)/register')}
+                        onPress={() => safePush('/(auth)/register' as any)}
                     >
                         <Text style={styles.registerText}>Chưa có tài khoản? <Text style={styles.registerBold}>Đăng ký</Text></Text>
                     </TouchableOpacity>

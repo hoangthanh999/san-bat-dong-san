@@ -2,10 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function PaymentSuccessScreen() {
-    const router = useRouter();
+    const { safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { amount, txRef } = useLocalSearchParams<{ amount: string; txRef: string }>();
     const amountNum = parseInt(amount || '0', 10);
@@ -34,7 +35,7 @@ export default function PaymentSuccessScreen() {
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.walletBtn}
-                    onPress={() => router.replace('/wallet' as any)}
+                    onPress={() => safeReplace('/wallet' as any)}
                     activeOpacity={0.85}
                 >
                     <Ionicons name="wallet-outline" size={20} color="white" />
@@ -42,7 +43,7 @@ export default function PaymentSuccessScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.homeBtn}
-                    onPress={() => router.replace('/(tabs)' as any)}
+                    onPress={() => safeReplace('/(tabs)' as any)}
                     activeOpacity={0.85}
                 >
                     <Text style={styles.homeBtnText}>Về trang chủ</Text>

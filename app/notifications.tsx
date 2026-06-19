@@ -4,11 +4,12 @@ import {
     StatusBar, Platform, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useNotificationStore } from '../store/notificationStore';
 import { Notification } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGuardScreen } from '../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../hooks/useSafeRouter';
 
 function NotificationItem({ item, onPress }: { item: Notification; onPress: () => void }) {
     const icons: Record<string, { name: string; bg: string; color: string }> = {
@@ -76,7 +77,7 @@ export default function NotificationsScreen() {
 }
 
 function NotificationsContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { notifications, fetchNotifications, markAsRead, markAllAsRead, isLoading, unreadCount } = useNotificationStore();
 
@@ -99,20 +100,20 @@ function NotificationsContent() {
         // Navigate based on notification type (backend chỉ có type, không có data field)
         switch (notif.type) {
             case 'APPOINTMENT':
-                router.push('/appointments' as any);
+                safePush('/appointments' as any);
                 break;
             case 'CONTRACT':
-                router.push('/contracts' as any);
+                safePush('/contracts' as any);
                 break;
             case 'BILL':
-                router.push('/wallet' as any);
+                safePush('/wallet' as any);
                 break;
             case 'ROOM_APPROVED':
                 // Quay về danh sách BĐS của tôi
-                router.push('/(tabs)/profile' as any);
+                safePush('/(tabs)/profile' as any);
                 break;
             case 'CHAT':
-                router.push('/(tabs)/chat' as any);
+                safePush('/(tabs)/chat' as any);
                 break;
             default:
                 break;

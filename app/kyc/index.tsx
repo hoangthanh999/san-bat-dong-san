@@ -5,8 +5,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const BENEFITS = [
     { icon: 'home-outline', text: 'Đăng tin bất động sản không giới hạn' },
@@ -27,7 +28,7 @@ export default function KYCIntroScreen() {
 }
 
 function KYCIntroContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
 
     return (
@@ -96,7 +97,7 @@ function KYCIntroContent() {
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.startBtn}
-                    onPress={() => router.push('/kyc/upload-front' as any)}
+                    onPress={() => safePush('/kyc/upload-front' as any)}
                     activeOpacity={0.85}
                 >
                     <Text style={styles.startBtnText}>Bắt đầu xác minh</Text>

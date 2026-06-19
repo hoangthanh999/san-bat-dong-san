@@ -4,11 +4,12 @@ import {
     ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { Appointment } from '../../types';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     PENDING: { label: 'Cho xac nhan', color: '#FF9500', bg: '#FFF3E0' },
@@ -102,7 +103,7 @@ export default function AppointmentsScreen() {
 }
 
 function AppointmentsContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { appointments, isLoading, fetchAppointments, cancelAppointment } = useAppointmentStore();
     const [activeTab, setActiveTab] = useState('upcoming');
@@ -187,7 +188,7 @@ function AppointmentsContent() {
                     renderItem={({ item }) => (
                         <AppointmentCard
                             appt={item}
-                            onPress={() => router.push(`/appointments/${item.id}` as any)}
+                            onPress={() => safePush(`/appointments/${item.id}` as any)}
                             onCancel={() => handleCancel(item.id)}
                         />
                     )}

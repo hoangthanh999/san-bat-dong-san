@@ -4,12 +4,13 @@ import {
     StatusBar, Platform, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKYCStore } from '../../store/kycStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function KYCUploadFrontScreen() {
     return (
@@ -23,7 +24,7 @@ export default function KYCUploadFrontScreen() {
 }
 
 function KYCUploadFrontContent() {
-    const router = useRouter();
+    const { router, safePush, safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const [imageUri, setImageUri] = useState<string | null>(null);
     const { scanCitizenId, isScanning } = useKYCStore();
@@ -78,14 +79,14 @@ function KYCUploadFrontContent() {
             } as any;
 
             await scanCitizenId(imageFile);
-            router.push('/kyc/upload-back' as any);
+            safePush('/kyc/upload-back' as any);
         } catch (error: any) {
             const msg = error.message || 'Không thể đọc thông tin từ ảnh.';
 
             // Nếu phiên hết hạn hoặc đã xác thực → về trang chính
             if (msg.includes('đã xác thực') || msg.includes('đang chờ duyệt')) {
                 Alert.alert('Thông báo', msg, [
-                    { text: 'OK', onPress: () => router.replace('/(tabs)/profile' as any) }
+                    { text: 'OK', onPress: () => safeReplace('/(tabs)/profile' as any) }
                 ]);
                 return;
             }

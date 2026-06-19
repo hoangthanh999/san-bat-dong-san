@@ -4,10 +4,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function KYCPendingScreen() {
-    const router = useRouter();
+    const { safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
 
     return (
@@ -63,7 +64,7 @@ export default function KYCPendingScreen() {
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.homeBtn}
-                    onPress={() => router.replace('/(tabs)' as any)}
+                    onPress={() => safeReplace('/(tabs)' as any)}
                     activeOpacity={0.85}
                 >
                     <Ionicons name="home-outline" size={20} color="white" />
@@ -71,7 +72,7 @@ export default function KYCPendingScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.profileBtn}
-                    onPress={() => router.replace('/(tabs)/profile' as any)}
+                    onPress={() => safeReplace('/(tabs)/profile' as any)}
                     activeOpacity={0.85}
                 >
                     <Text style={styles.profileBtnText}>Xem hồ sơ</Text>

@@ -6,12 +6,13 @@ import {
     TouchableOpacity,
     StatusBar,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function WithdrawScreen() {
-    const router = useRouter();
+    const { router, safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
 
     return (
@@ -53,7 +54,7 @@ export default function WithdrawScreen() {
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.primaryBtn}
-                    onPress={() => router.replace('/wallet' as any)}
+                    onPress={() => safeReplace('/wallet' as any)}
                     activeOpacity={0.85}
                 >
                     <Ionicons name="wallet-outline" size={20} color="#fff" />

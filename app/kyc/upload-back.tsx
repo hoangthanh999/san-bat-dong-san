@@ -4,11 +4,12 @@ import {
     StatusBar, Platform, Alert, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function KYCUploadBackScreen() {
     return (
@@ -22,7 +23,7 @@ export default function KYCUploadBackScreen() {
 }
 
 function KYCUploadBackContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const [imageUri, setImageUri] = useState<string | null>(null);
 
@@ -69,7 +70,7 @@ function KYCUploadBackContent() {
         // Lưu URI ảnh mặt sau
         await AsyncStorage.setItem('kyc_back_uri', imageUri);
 
-        router.push('/kyc/info' as any);
+        safePush('/kyc/info' as any);
     };
 
     return (

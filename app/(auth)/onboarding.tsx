@@ -10,10 +10,10 @@ import {
     Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const { width } = Dimensions.get('window');
 
@@ -76,7 +76,7 @@ const STEPS: OnboardingStep[] = [
 ];
 
 export default function OnboardingScreen() {
-    const router = useRouter();
+    const { safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const [currentStep, setCurrentStep] = useState(0);
     const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -120,7 +120,7 @@ export default function OnboardingScreen() {
         } catch {
             // Even if storage fails, let the user enter the app; next launch can show onboarding again.
         }
-        router.replace('/(tabs)');
+        safeReplace('/(tabs)' as any);
     };
 
     const handleNext = async () => {

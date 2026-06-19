@@ -6,9 +6,10 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProjectStore } from '../../store/projectStore';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 // ──────────────────────────────────────────
 // Config loại dự án (shared config)
@@ -85,7 +86,7 @@ function PropertyRow({ item, onPress }: { item: any; onPress: () => void }) {
 // Main Screen
 // ──────────────────────────────────────────
 export default function ProjectDetailScreen() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { id } = useLocalSearchParams<{ id: string }>();
     const projectId = Number(id);
@@ -260,7 +261,7 @@ export default function ProjectDetailScreen() {
                             </View>
                             <TouchableOpacity
                                 style={styles.mapBtn}
-                                onPress={() => router.push('/map' as any)}
+                                onPress={() => safePush('/map' as any)}
                             >
                                 <Ionicons name="map-outline" size={16} color="#0066FF" />
                                 <Text style={styles.mapBtnText}>Xem trên bản đồ</Text>
@@ -284,7 +285,7 @@ export default function ProjectDetailScreen() {
                                 <PropertyRow
                                     key={item.id}
                                     item={item}
-                                    onPress={() => router.push(`/property/${item.id}` as any)}
+                                    onPress={() => safePush(`/property/${item.id}` as any)}
                                 />
                             ))
                         )}

@@ -9,7 +9,7 @@ import {
     Image,
     StatusBar,
 } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import { Link } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -17,9 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { getApiBaseUrl } from '../../services/api/environment';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function LoginScreen() {
-    const router = useRouter();
+    const { safePush, safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { login, isLoading, error } = useAuthStore();
 
@@ -31,7 +32,7 @@ export default function LoginScreen() {
 
         try {
             await login({ email, password });
-            router.replace('/(tabs)');
+            safeReplace('/(tabs)' as any);
         } catch (err) {
             // Error handled in store
         }
@@ -74,7 +75,7 @@ export default function LoginScreen() {
 
                     <TouchableOpacity
                         style={styles.forgotPassword}
-                        onPress={() => router.push('/(auth)/forgot-password' as any)}
+                        onPress={() => safePush('/(auth)/forgot-password' as any)}
                     >
                         <Text style={styles.linkText}>Quên mật khẩu?</Text>
                     </TouchableOpacity>
@@ -114,7 +115,7 @@ export default function LoginScreen() {
 // Google Login Button — dùng expo-web-browser + deep link
 // ============================================================
 function GoogleLoginButton() {
-    const router = useRouter();
+    const { safeReplace } = useSafeRouter();
     const { loginWithGoogle } = useAuthStore();
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -142,7 +143,7 @@ function GoogleLoginButton() {
                 if (tokenMatch && tokenMatch[1]) {
                     const token = decodeURIComponent(tokenMatch[1]);
                     await loginWithGoogle(token);
-                    router.replace('/(tabs)');
+                    safeReplace('/(tabs)' as any);
                 } else {
                     Alert.alert('Lỗi', 'Không nhận được token từ Google. Vui lòng thử lại.');
                 }

@@ -8,7 +8,6 @@ import { VideoView, useVideoPlayer, VideoPlayer } from 'expo-video';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useInteractionStore } from '../../store/interactionStore';
 import Animated, {
@@ -24,6 +23,7 @@ import { Room } from '../../types';
 import { usePropertyStore } from '../../store/propertyStore';
 import { useAuthStore } from '../../store/authStore';
 import { formatCompactVND } from '../../utils/formatPrice';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 interface PropertyCardProps {
     item: Room;
@@ -47,7 +47,7 @@ function getSmartTags(item: Room): { label: string; color: string; bg: string }[
 }
 
 export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tagsTopProp }: PropertyCardProps) {
-    const router = useRouter();
+    const { safePush } = useSafeRouter();
     const [isMuted, setIsMuted] = useState(false);
     const [isManuallyPaused, setIsManuallyPaused] = useState(false);
     const { isAuthenticated } = useAuthStore();
@@ -155,7 +155,7 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
 
     const handleCall = () => {
         if (!isAuthenticated) {
-            router.push('/(auth)/login');
+            safePush('/(auth)/login' as any);
             return;
         }
         const ownerPhone = item.ownerPhoneSnapshot || item.ownerPhone;
@@ -182,14 +182,14 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
     };
 
     const handleChat = () => {
-        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push(`/chat/${item.ownerId}`);
+        safePush(`/chat/${item.ownerId}` as any);
     };
 
     const handlePressDetails = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push(`/property/${item.id}`);
+        safePush(`/property/${item.id}` as any);
     };
 
     const heartAnimatedStyle = useAnimatedStyle(() => ({

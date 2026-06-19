@@ -4,10 +4,11 @@ import {
     StatusBar, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProjectStore } from '../../store/projectStore';
 import { ProjectResponseDTO, ProjectType } from '../../types';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 // ──────────────────────────────────────────
 // Config loại dự án
@@ -94,7 +95,7 @@ function ProjectCard({ item, onPress }: { item: ProjectResponseDTO; onPress: () 
 // Main Screen
 // ──────────────────────────────────────────
 export default function ProjectsScreen() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const {
         projects, isLoading, isLoadingMore, hasMore, filterType,
@@ -192,7 +193,7 @@ export default function ProjectsScreen() {
                     renderItem={({ item }) => (
                         <ProjectCard
                             item={item}
-                            onPress={() => router.push(`/projects/${item.id}` as any)}
+                            onPress={() => safePush(`/projects/${item.id}` as any)}
                         />
                     )}
                     contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 20 }}

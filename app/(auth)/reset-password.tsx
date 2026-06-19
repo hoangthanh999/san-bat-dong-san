@@ -3,13 +3,14 @@ import {
     View, Text, StyleSheet, TouchableOpacity, TextInput,
     KeyboardAvoidingView, Platform, StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService } from '../../services/api/auth';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function ResetPasswordScreen() {
-    const router = useRouter();
+    const { router, safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { token } = useLocalSearchParams<{ token: string }>();
 
@@ -63,7 +64,7 @@ export default function ResetPasswordScreen() {
 
                     <TouchableOpacity
                         style={styles.primaryBtn}
-                        onPress={() => router.replace('/(auth)/login')}
+                        onPress={() => safeReplace('/(auth)/login' as any)}
                     >
                         <Text style={styles.primaryBtnText}>Đăng nhập ngay</Text>
                     </TouchableOpacity>
@@ -171,7 +172,7 @@ export default function ResetPasswordScreen() {
                     )}
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={() => router.replace('/(auth)/forgot-password' as any)}>
+                <TouchableOpacity onPress={() => safeReplace('/(auth)/forgot-password' as any)}>
                     <Text style={styles.backToForgot}>← Gửi lại email khôi phục</Text>
                 </TouchableOpacity>
             </View>

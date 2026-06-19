@@ -5,13 +5,13 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { useUserStore } from '../../store/userStore';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 import { Room, Appointment } from '../../types';
@@ -152,7 +152,7 @@ export default function ProfileScreen() {
 }
 
 function ProfileScreenContent() {
-    const router = useRouter();
+    const { safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { user, isAuthenticated, logout } = useAuthStore();
     const { profile, myRooms, fetchProfile, fetchMyRooms, isLoading } = useUserStore();
@@ -270,7 +270,7 @@ function ProfileScreenContent() {
 
                 <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
                     <Text style={styles.screenTitle}>Hồ sơ</Text>
-                    <TouchableOpacity onPress={() => router.push('/notifications' as any)}>
+                    <TouchableOpacity onPress={() => safePush('/notifications' as any)}>
                         <Ionicons name="notifications-outline" size={24} color="white" />
                     </TouchableOpacity>
                 </View>
@@ -284,11 +284,11 @@ function ProfileScreenContent() {
                             source={{ uri: displayUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayUser?.fullName || 'User')}&background=0066FF&color=fff&size=200` }}
                             style={styles.avatar}
                         />
-                        <TouchableOpacity style={styles.editAvatarBtn} onPress={() => router.push('/edit-profile' as any)}>
+                        <TouchableOpacity style={styles.editAvatarBtn} onPress={() => safePush('/edit-profile' as any)}>
                             <Ionicons name="camera" size={14} color="white" />
                         </TouchableOpacity>
                     </View>
-                    <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/edit-profile' as any)}>
+                    <TouchableOpacity style={styles.editProfileBtn} onPress={() => safePush('/edit-profile' as any)}>
                         <Ionicons name="create-outline" size={16} color="#0066FF" />
                         <Text style={styles.editProfileText}>Chỉnh sửa</Text>
                     </TouchableOpacity>
@@ -354,7 +354,7 @@ function ProfileScreenContent() {
                         <View style={styles.emptyState}>
                             <Ionicons name="home-outline" size={48} color="#CCC" />
                             <Text style={styles.emptyTitle}>Chưa có tin đăng</Text>
-                            <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/(tabs)/post')}>
+                            <TouchableOpacity style={styles.ctaBtn} onPress={() => safePush('/(tabs)/post' as any)}>
                                 <Text style={styles.ctaBtnText}>Đăng tin ngay</Text>
                             </TouchableOpacity>
                         </View>
@@ -364,8 +364,8 @@ function ProfileScreenContent() {
                                 <MiniRoomCard
                                     key={room.id}
                                     room={room}
-                                    onPress={() => router.push(`/property/${room.id}` as any)}
-                                    onEdit={() => router.push(`/property/edit/${room.id}` as any)}
+                                    onPress={() => safePush(`/property/${room.id}` as any)}
+                                    onEdit={() => safePush(`/property/edit/${room.id}` as any)}
                                     onDelete={() => handleDeleteRoom(room)}
                                 />
                             ))}
@@ -386,7 +386,7 @@ function ProfileScreenContent() {
                                 <Ionicons name="bookmark-outline" size={48} color="#CCC" />
                                 <Text style={styles.emptyTitle}>Chưa có BĐS nào được lưu</Text>
                                 <Text style={styles.emptySub}>Nhấn biểu tượng bookmark trên tin đăng để lưu lại</Text>
-                                <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/(tabs)' as any)}>
+                                <TouchableOpacity style={styles.ctaBtn} onPress={() => safePush('/(tabs)' as any)}>
                                     <Text style={styles.ctaBtnText}>Khám phá BĐS</Text>
                                 </TouchableOpacity>
                             </View>
@@ -396,7 +396,7 @@ function ProfileScreenContent() {
                                     <SavedPropertyCard
                                         key={item.id}
                                         item={item}
-                                        onPress={() => router.push(`/property/${item.id}` as any)}
+                                        onPress={() => safePush(`/property/${item.id}` as any)}
                                         onUnsave={() => {
                                             Alert.alert(
                                                 'Bỏ lưu BĐS',
@@ -446,7 +446,7 @@ function ProfileScreenContent() {
                         )}
                         <TouchableOpacity
                             style={styles.seeAllBtn}
-                            onPress={() => router.push('/appointments' as any)}
+                            onPress={() => safePush('/appointments' as any)}
                         >
                             <Text style={styles.seeAllText}>Xem tất cả lịch hẹn →</Text>
                         </TouchableOpacity>
@@ -475,11 +475,11 @@ function ProfileScreenContent() {
                 {/* Account items */}
                 <Text style={styles.settingsGroupLabel}>Tài khoản</Text>
                 {[
-                    { icon: 'person-outline', label: 'Thông tin cá nhân', onPress: () => router.push('/edit-profile' as any) },
-                    { icon: 'heart-outline', label: 'Sở thích của tôi', onPress: () => router.push('/profile/lifestyle' as any) },
-                    { icon: 'heart-circle-outline', label: 'BĐS đã Like', onPress: () => router.push('/liked-properties' as any) },
-                    { icon: 'card-outline', label: 'Xác minh danh tính (KYC)', onPress: () => router.push('/kyc' as any) },
-                    { icon: 'wallet-outline', label: 'Ví điện tử', onPress: () => router.push('/wallet' as any) },
+                    { icon: 'person-outline', label: 'Thông tin cá nhân', onPress: () => safePush('/edit-profile' as any) },
+                    { icon: 'heart-outline', label: 'Sở thích của tôi', onPress: () => safePush('/profile/lifestyle' as any) },
+                    { icon: 'heart-circle-outline', label: 'BĐS đã Like', onPress: () => safePush('/liked-properties' as any) },
+                    { icon: 'card-outline', label: 'Xác minh danh tính (KYC)', onPress: () => safePush('/kyc' as any) },
+                    { icon: 'wallet-outline', label: 'Ví điện tử', onPress: () => safePush('/wallet' as any) },
                 ].map(({ icon, label, onPress }) => (
                     <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
                         <Ionicons name={icon as any} size={20} color="#555" />
@@ -491,14 +491,14 @@ function ProfileScreenContent() {
                 {/* Services */}
                 <Text style={styles.settingsGroupLabel}>Dịch vụ</Text>
                 {[
-                    { icon: 'calendar-outline', label: 'Lịch hẹn xem phòng', onPress: () => router.push('/appointments' as any) },
-                    { icon: 'document-text-outline', label: 'Hợp đồng của tôi', onPress: () => router.push('/contracts' as any) },
+                    { icon: 'calendar-outline', label: 'Lịch hẹn xem phòng', onPress: () => safePush('/appointments' as any) },
+                    { icon: 'document-text-outline', label: 'Hợp đồng của tôi', onPress: () => safePush('/contracts' as any) },
                     ...(user?.role === 'OWNER' || user?.role === 'ADMIN' ? [
-                        { icon: 'trash-outline', label: 'Thùng rác bài đăng', onPress: () => router.push('/property/trash' as any) },
-                        { icon: 'receipt-outline', label: 'Tạo hóa đơn tiền trọ', onPress: () => router.push('/bills/create' as any) },
+                        { icon: 'trash-outline', label: 'Thùng rác bài đăng', onPress: () => safePush('/property/trash' as any) },
+                        { icon: 'receipt-outline', label: 'Tạo hóa đơn tiền trọ', onPress: () => safePush('/bills/create' as any) },
                     ] : []),
-                    { icon: 'star-outline', label: 'Gói dịch vụ & Boost tin', onPress: () => router.push('/packages' as any) },
-                    { icon: 'bar-chart-outline', label: '📊 Thống kê thị trường', onPress: () => router.push('/analytics' as any) },
+                    { icon: 'star-outline', label: 'Gói dịch vụ & Boost tin', onPress: () => safePush('/packages' as any) },
+                    { icon: 'bar-chart-outline', label: '📊 Thống kê thị trường', onPress: () => safePush('/analytics' as any) },
                 ].map(({ icon, label, onPress }) => (
                     <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
                         <Ionicons name={icon as any} size={20} color="#555" />
@@ -510,8 +510,8 @@ function ProfileScreenContent() {
                 {/* Support */}
                 <Text style={styles.settingsGroupLabel}>Hỗ trợ</Text>
                 {[
-                    { icon: 'notifications-circle-outline', label: 'Lịch sử thông báo', onPress: () => router.push('/notifications' as any) },
-                    { icon: 'shield-outline', label: 'Bảo mật & Mật khẩu', onPress: () => router.push('/settings/security' as any) },
+                    { icon: 'notifications-circle-outline', label: 'Lịch sử thông báo', onPress: () => safePush('/notifications' as any) },
+                    { icon: 'shield-outline', label: 'Bảo mật & Mật khẩu', onPress: () => safePush('/settings/security' as any) },
                     { icon: 'help-circle-outline', label: 'Hỗ trợ', onPress: () => { } },
                 ].map(({ icon, label, onPress }) => (
                     <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>

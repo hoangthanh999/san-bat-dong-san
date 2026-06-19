@@ -5,7 +5,6 @@ import {
     useWindowDimensions, LayoutChangeEvent, ScrollView,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { usePropertyStore } from '../../store/propertyStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useProjectStore } from '../../store/projectStore';
@@ -15,6 +14,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { AppState } from 'react-native';
 import { Room } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 // ─── Category config ──────────────────────────────────────
 const CATEGORIES = [
@@ -27,7 +27,7 @@ const CATEGORIES = [
 ];
 
 export default function FeedScreen() {
-    const router = useRouter();
+    const { safePush } = useSafeRouter();
     const {
         rooms, fetchRooms, isLoading, isLoadingMore,
         loadMoreRooms, filters, error,
@@ -248,7 +248,7 @@ useEffect(() => {
                 <View style={styles.headerActions}>
                     <TouchableOpacity
                         style={styles.headerBtn}
-                        onPress={() => router.push('/map' as any)}
+                        onPress={() => safePush('/map' as any)}
                         accessibilityRole="button"
                         accessibilityLabel="Bản đồ toàn cảnh bất động sản"
                     >
@@ -256,19 +256,19 @@ useEffect(() => {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.headerBtn}
-                        onPress={() => router.push('/analytics' as any)}
+                        onPress={() => safePush('/analytics' as any)}
                     >
                         <Ionicons name="bar-chart-outline" size={22} color="white" />
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.headerBtn}
-                        onPress={() => router.push('/filter' as any)}
+                        onPress={() => safePush('/filter' as any)}
                     >
                         <Ionicons name="search-outline" size={22} color="white" />
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.headerBtn}
-                        onPress={() => router.push('/notifications' as any)}
+                        onPress={() => safePush('/notifications' as any)}
                     >
                         <Ionicons name="notifications-outline" size={22} color="white" />
                         {unreadCount > 0 && (
@@ -328,7 +328,7 @@ useEffect(() => {
                     >
                         <TouchableOpacity
                             style={styles.projectChip}
-                            onPress={() => router.push('/projects' as any)}
+                            onPress={() => safePush('/projects' as any)}
                         >
                             <MaterialCommunityIcons name="domain" size={13} color="white" />
                             <Text style={styles.projectChipText}>Dự án BĐS</Text>
@@ -338,7 +338,7 @@ useEffect(() => {
                             <TouchableOpacity
                                 key={proj.id}
                                 style={styles.projectChip}
-                                onPress={() => router.push(`/projects/${proj.id}` as any)}
+                                onPress={() => safePush(`/projects/${proj.id}` as any)}
                             >
                                 <Text style={styles.projectChipText} numberOfLines={1}>
                                     {proj.name.length > 18 ? proj.name.slice(0, 16) + '…' : proj.name}

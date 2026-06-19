@@ -8,10 +8,10 @@ import {
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { AppState } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 import { VideoView, useVideoPlayer } from 'expo-video';   // ✅ expo-video 3.x
 import { useReelsStore } from '../../store/reelsStore';
 import { useInteractionStore } from '../../store/interactionStore';
@@ -174,7 +174,7 @@ interface ReelItemProps {
 const ReelItem = React.memo(({
     item, isActive, insetBottom, insetTop, isMuted, onMuteChange,
 }: ReelItemProps) => {
-    const router = useRouter();
+    const { safePush } = useSafeRouter();
     const { toggleLike, toggleSave, isLiked, isSaved } = useInteractionStore();
 
     const [progress, setProgress] = useState(0);
@@ -201,8 +201,8 @@ const ReelItem = React.memo(({
             });
         } catch (_) { }
     }, [item]);
-    const goToDetail = useCallback(() => router.push(`/property/${item.id}` as any), [item.id]);
-    const goToOwner = useCallback(() => router.push(`/landlord-profile?slug=${item.ownerSlug}` as any), [item.ownerSlug]);
+    const goToDetail = useCallback(() => safePush(`/property/${item.id}` as any), [item.id, safePush]);
+    const goToOwner = useCallback(() => safePush(`/landlord-profile?slug=${item.ownerSlug}` as any), [item.ownerSlug, safePush]);
 
     const displayLikeCount = liked && !item.liked
         ? item.likeCount + 1

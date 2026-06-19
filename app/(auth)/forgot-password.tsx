@@ -3,13 +3,13 @@ import {
     View, Text, StyleSheet, TouchableOpacity, TextInput,
     KeyboardAvoidingView, Platform, StatusBar, Alert, ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 import { authService } from '../../services/api/auth';
 
 export default function ForgotPasswordScreen() {
-    const router = useRouter();
+    const { router, safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -54,7 +54,7 @@ export default function ForgotPasswordScreen() {
                         Vui lòng kiểm tra hộp thư (bao gồm thư rác) và làm theo hướng dẫn trong email.
                     </Text>
 
-                    <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace('/(auth)/login')}>
+                    <TouchableOpacity style={styles.primaryBtn} onPress={() => safeReplace('/(auth)/login' as any)}>
                         <Text style={styles.primaryBtnText}>Quay lại đăng nhập</Text>
                     </TouchableOpacity>
 

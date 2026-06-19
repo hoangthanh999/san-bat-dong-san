@@ -4,10 +4,11 @@ import {
     ScrollView, TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useWalletStore } from '../../store/walletStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const QUICK_AMOUNTS = [100000, 200000, 500000, 1000000, 2000000, 5000000];
 
@@ -23,7 +24,7 @@ export default function DepositScreen() {
 }
 
 function DepositContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
 
     // ✅ THAY ĐỔI 1: Lấy thêm wallet + fetchWallet
@@ -74,7 +75,7 @@ function DepositContent() {
         }
         try {
             const paymentUrl = await createPayment(amount);
-            router.push({ pathname: '/wallet/vnpay' as any, params: { paymentUrl, amount } });
+            safePush({ pathname: '/wallet/vnpay' as any, params: { paymentUrl, amount } });
         } catch (error: any) {
             Alert.alert('Lỗi', error.message || 'Không thể tạo giao dịch. Vui lòng thử lại.');
         }

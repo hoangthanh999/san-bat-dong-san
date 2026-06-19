@@ -6,13 +6,13 @@ import {
 import { WebView } from 'react-native-webview';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { searchService } from '../../services/api/search';
 import { Room, PropertySearchItem } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatCompactVND } from '../../utils/formatPrice';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const { width } = Dimensions.get('window');
 const CARD_HEIGHT = 130;
@@ -196,7 +196,7 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, rad
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function MapScreen() {
-    const router = useRouter();
+    const { safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const [mapRooms, setMapRooms] = useState<Room[]>([]);
     const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -345,14 +345,14 @@ export default function MapScreen() {
             <View style={[styles.searchContainer, { top: insets.top + 8 }]}>
                 <TouchableOpacity
                     style={styles.searchBar}
-                    onPress={() => router.push('/filter' as any)}
+                    onPress={() => safePush('/filter' as any)}
                     activeOpacity={0.8}
                 >
                     <Ionicons name="search" size={18} color="#666" />
                     <Text style={styles.searchText}>Tìm kiếm khu vực, địa chỉ...</Text>
                     <TouchableOpacity
                         style={styles.filterIconBtn}
-                        onPress={() => router.push('/filter' as any)}
+                        onPress={() => safePush('/filter' as any)}
                     >
                         <Ionicons name="options-outline" size={18} color="#0066FF" />
                     </TouchableOpacity>
@@ -437,7 +437,7 @@ export default function MapScreen() {
             {selectedRoom && (
                 <TouchableOpacity
                     style={[styles.bottomCard, { bottom: Math.max(insets.bottom, 16) + 4 }]}
-                    onPress={() => router.push(`/property/${selectedRoom.id}`)}
+                    onPress={() => safePush(`/property/${selectedRoom.id}` as any)}
                     activeOpacity={0.92}
                 >
                     <Image

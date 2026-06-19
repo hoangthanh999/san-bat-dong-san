@@ -4,14 +4,15 @@ import {
     Platform, Modal, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { usePackageStore } from '../../../store/packageStore';
 import { useWalletStore } from '../../../store/walletStore';
 import { ServicePackage } from '../../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../../hooks/useSafeRouter';
 
 export default function BoostRoomScreen() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { roomId } = useLocalSearchParams<{ roomId: string }>();
     const { boostPackages, isLoading, isPurchasing, fetchPackages, boostRoom } = usePackageStore();
@@ -49,7 +50,7 @@ export default function BoostRoomScreen() {
                 `Cần thêm ${(selectedPkg.price - balance).toLocaleString('vi-VN')}đ`,
                 [
                     { text: 'Hủy', style: 'cancel' },
-                    { text: 'Nạp tiền', onPress: () => router.push('/wallet/deposit' as any) },
+                    { text: 'Nạp tiền', onPress: () => safePush('/wallet/deposit' as any) },
                 ]
             );
             return;
@@ -59,7 +60,7 @@ export default function BoostRoomScreen() {
             setShowConfirm(false);
             await fetchTransactions();
             Alert.alert('Thành công! 🚀', `Tin đăng đã được đẩy lên top trong ${selectedPkg.durationDays} ngày!`, [
-                { text: 'Xem giao dịch', onPress: () => router.push('/wallet/transactions' as any) },
+                { text: 'Xem giao dịch', onPress: () => safePush('/wallet/transactions' as any) },
                 { text: 'OK', onPress: () => router.back() },
             ]);
         } catch (e: any) {
@@ -129,7 +130,7 @@ export default function BoostRoomScreen() {
                         <Ionicons name="wallet-outline" size={18} color="#0066FF" />
                         <Text style={styles.balanceLabel}>Số dư ví:</Text>
                         <Text style={styles.balanceValue}>{balance.toLocaleString('vi-VN')}đ</Text>
-                        <TouchableOpacity onPress={() => router.push('/wallet/deposit' as any)}>
+                        <TouchableOpacity onPress={() => safePush('/wallet/deposit' as any)}>
                             <Text style={styles.topUpLink}>Nạp thêm</Text>
                         </TouchableOpacity>
                     </View>

@@ -10,14 +10,15 @@ import {
     StatusBar,
     Alert,
 } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import { Link } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function RegisterScreen() {
-    const router = useRouter();
+    const { safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { register, isLoading, error } = useAuthStore();
 
@@ -70,7 +71,7 @@ export default function RegisterScreen() {
 
         try {
             await register({ email: email.trim(), password, fullName: fullName.trim() });
-            router.replace('/(auth)/login');
+            safeReplace('/(auth)/login' as any);
         } catch (err: any) {
             const status = err?.response?.status;
             const backendMsg = err?.response?.data?.message || err?.message;

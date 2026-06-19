@@ -4,7 +4,7 @@ import {
     Linking, Dimensions, Alert, TextInput, Modal, Share,
     StatusBar, Platform, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';   // ✅ Thay react-native-maps
 import { Image } from 'expo-image';
@@ -24,6 +24,7 @@ import { ImageGallery } from '../../components/property/ImageGallery';
 import { ReviewCard } from '../../components/property/ReviewCard';
 import { Room } from '../../types';
 import { formatCompactVND } from '../../utils/formatPrice';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const { width } = Dimensions.get('window');
 
@@ -134,7 +135,7 @@ const getStatusBadge = (status: string) => {
 
 export default function PropertyDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { currentRoom, fetchRoomDetail, isLoading } = usePropertyStore();
     const { user, isAuthenticated } = useAuthStore();
@@ -245,7 +246,7 @@ export default function PropertyDetailScreen() {
     };
 
     const handleFavorite = async () => {
-        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const newSaved = !isSavedLocal;
         setIsSavedLocal(newSaved);
@@ -260,7 +261,7 @@ export default function PropertyDetailScreen() {
     };
 
     const handleLike = async () => {
-        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const newLiked = !isLikedLocal;
         setIsLikedLocal(newLiked);
@@ -283,7 +284,7 @@ export default function PropertyDetailScreen() {
     };
 
     const handleCall = () => {
-        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         const ownerPhone = room ? getOwnerPhone(room) : undefined;
         if (ownerPhone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -294,8 +295,8 @@ export default function PropertyDetailScreen() {
     };
 
     const handleChat = () => {
-        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
-        router.push(`/chat/${room?.ownerId}`);
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
+        safePush(`/chat/${room?.ownerId}` as any);
     };
 
     const handleNavigate = () => {
@@ -325,7 +326,7 @@ export default function PropertyDetailScreen() {
     };
 
     const handleSubmitReview = async () => {
-        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         if (!reviewComment.trim()) { Alert.alert('Lỗi', 'Vui lòng nhập nội dung đánh giá'); return; }
         if (!room?.ownerId) { Alert.alert('Lỗi', 'Không xác định được chủ nhà.'); return; }
         // Lọc chỉ gửi URL hợp lệ (không gửi local file:// lên backend)
@@ -351,7 +352,7 @@ export default function PropertyDetailScreen() {
     };
 
     const handleSubmitComment = async () => {
-        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         if (!commentText.trim()) return;
         try {
             await addComment({ propertyId: roomId, content: commentText.trim() });
@@ -464,7 +465,7 @@ export default function PropertyDetailScreen() {
     };
 
     const handleBooking = async () => {
-        if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         if (!bookingDate.trim()) { Alert.alert('Lỗi', 'Vui lòng chọn ngày xem phòng'); return; }
         const appointmentDate = parseBookingDateToDate(bookingDate);
         if (!appointmentDate) {
@@ -782,7 +783,7 @@ export default function PropertyDetailScreen() {
                                     <Text style={styles.sectionTitle}>👤 Thông tin chủ nhà</Text>
                                     <TouchableOpacity
                                         style={styles.landlordCard}
-                                        onPress={() => router.push(`/landlord-profile?landlordId=${room.ownerId}` as any)}
+                                    onPress={() => safePush(`/landlord-profile?landlordId=${room.ownerId}` as any)}
                                         activeOpacity={0.7}
                                     >
                                         <Image source={{ uri: ownerAvatar }} style={styles.landlordAvatar} />
@@ -858,7 +859,7 @@ export default function PropertyDetailScreen() {
                             ) : (
                                 <TouchableOpacity
                                     style={styles.loginToCommentBtn}
-                                    onPress={() => router.push('/(auth)/login')}
+                                    onPress={() => safePush('/(auth)/login' as any)}
                                 >
                                     <Ionicons name="log-in-outline" size={16} color="#0066FF" />
                                     <Text style={styles.loginToCommentText}>Đăng nhập để bình luận</Text>
@@ -964,11 +965,11 @@ export default function PropertyDetailScreen() {
                 </View>
                 {user?.id === room.ownerId ? (
                     <View style={styles.bottomBtns}>
-                        <TouchableOpacity style={styles.scheduleBtn} onPress={() => router.push(`/packages/boost/${roomId}` as any)}>
+                        <TouchableOpacity style={styles.scheduleBtn} onPress={() => safePush(`/packages/boost/${roomId}` as any)}>
                             <Ionicons name="rocket-outline" size={18} color="#0066FF" />
                             <Text style={styles.scheduleBtnText}>Boost tin</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.chatBtn} onPress={() => router.push('/edit-profile' as any)}>
+                        <TouchableOpacity style={styles.chatBtn} onPress={() => safePush('/edit-profile' as any)}>
                             <Ionicons name="create-outline" size={18} color="white" />
                             <Text style={styles.chatBtnText}>Sửa thông tin</Text>
                         </TouchableOpacity>
@@ -976,7 +977,7 @@ export default function PropertyDetailScreen() {
                 ) : (
                     <View style={styles.bottomBtns}>
                         <TouchableOpacity style={styles.scheduleBtn} onPress={() => {
-                            if (!isAuthenticated) { router.push('/(auth)/login'); return; }
+                            if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
                             openBookingModal();
                         }}>
                             <Ionicons name="calendar-outline" size={18} color="#0066FF" />

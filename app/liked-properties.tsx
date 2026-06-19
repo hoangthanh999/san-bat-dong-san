@@ -10,11 +10,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGuardScreen } from '../components/auth/AuthGuardScreen';
 import { InteractionPropertyDTO } from '../services/api/interaction';
 import { useInteractionStore } from '../store/interactionStore';
+import { useSafeRouter } from '../hooks/useSafeRouter';
 
 const fallbackImage = 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400';
 
@@ -59,7 +60,7 @@ export default function LikedPropertiesScreen() {
 }
 
 function LikedPropertiesContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const {
         likedProperties,
@@ -106,7 +107,7 @@ function LikedPropertiesContent() {
                     renderItem={({ item }) => (
                         <LikedCard
                             item={item}
-                            onPress={() => router.push(`/property/${item.id}` as any)}
+                            onPress={() => safePush(`/property/${item.id}` as any)}
                             onUnlike={() => unlike(item)}
                         />
                     )}

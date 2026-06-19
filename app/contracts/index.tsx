@@ -4,11 +4,12 @@ import {
     Platform, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useContractStore } from '../../store/contractStore';
 import { Contract, ContractStatus } from '../../types';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     PENDING: { label: 'Chờ ký', color: '#FF9500', bg: '#FFF3E0' },
@@ -81,7 +82,7 @@ export default function ContractsScreen() {
 }
 
 function ContractsContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { contracts, isLoading, fetchContracts } = useContractStore();
     const [activeTab, setActiveTab] = useState<ContractStatus | 'ALL'>('ACTIVE');
@@ -151,7 +152,7 @@ function ContractsContent() {
                     renderItem={({ item }) => (
                         <ContractCard
                             contract={item}
-                            onPress={() => router.push(`/contracts/${item.id}` as any)}
+                            onPress={() => safePush(`/contracts/${item.id}` as any)}
                         />
                     )}
                     contentContainerStyle={{ padding: 16, gap: 12 }}

@@ -2,10 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 export default function PaymentFailedScreen() {
-    const router = useRouter();
+    const { safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
 
     return (
@@ -38,7 +39,7 @@ export default function PaymentFailedScreen() {
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                 <TouchableOpacity
                     style={styles.retryBtn}
-                    onPress={() => router.replace('/wallet/deposit' as any)}
+                    onPress={() => safeReplace('/wallet/deposit' as any)}
                     activeOpacity={0.85}
                 >
                     <Ionicons name="refresh" size={20} color="white" />
@@ -46,7 +47,7 @@ export default function PaymentFailedScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.walletBtn}
-                    onPress={() => router.replace('/wallet' as any)}
+                    onPress={() => safeReplace('/wallet' as any)}
                     activeOpacity={0.85}
                 >
                     <Text style={styles.walletBtnText}>Về ví của tôi</Text>

@@ -5,12 +5,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { Conversation } from '../../types';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { useHeaderHeight } from '../../hooks/useResponsive';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 
 function formatTime(dateStr?: string) {
@@ -58,7 +58,7 @@ function ConversationItem({ item, onPress, onDelete }: {
 }
 
 export default function ChatListScreen() {
-    const router = useRouter();
+    const { safePush } = useSafeRouter();
     const { conversations, fetchConversations, isLoading } = useChatStore();
     const { isAuthenticated } = useAuthStore();
     const [refreshing, setRefreshing] = useState(false);
@@ -83,7 +83,7 @@ export default function ChatListScreen() {
                 <Ionicons name="chatbubbles-outline" size={64} color="#CCC" />
                 <Text style={styles.authTitle}>Đăng nhập để chat</Text>
                 <Text style={styles.authSub}>Kết nối với chủ nhà và người thuê để trao đổi trực tiếp</Text>
-                <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/(auth)/login')}>
+                <TouchableOpacity style={styles.loginBtn} onPress={() => safePush('/(auth)/login' as any)}>
                     <Text style={styles.loginBtnText}>Đăng nhập ngay</Text>
                 </TouchableOpacity>
             </View>
@@ -100,7 +100,7 @@ export default function ChatListScreen() {
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                     <TouchableOpacity
                         style={styles.aiHeaderBtn}
-                        onPress={() => router.push('/chat/ai' as any)}
+                        onPress={() => safePush('/chat/ai' as any)}
                     >
                         <Ionicons name="sparkles" size={18} color="white" />
                         <Text style={styles.aiHeaderBtnText}>AI</Text>
@@ -124,7 +124,7 @@ export default function ChatListScreen() {
                         // AI Chat Banner — luôn hiển thị đầu danh sách
                         <TouchableOpacity
                             style={styles.aiBanner}
-                            onPress={() => router.push('/chat/ai' as any)}
+                            onPress={() => safePush('/chat/ai' as any)}
                             activeOpacity={0.88}
                         >
                             <View style={styles.aiBannerIcon}>
@@ -144,7 +144,7 @@ export default function ChatListScreen() {
                             item={item}
                          onPress={() => {
     if (!item?.id) return; // ✅ không navigate nếu id undefined
-    router.push(`/chat/${item.id}`);
+    safePush(`/chat/${item.id}` as any);
 }}
                             onDelete={() => {
                                 Alert.alert('Xoá cuộc trò chuyện', 'Chức năng đang phát triển.');
