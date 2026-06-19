@@ -6,6 +6,16 @@ import {
     RegionTransactionStat,
 } from '../../types';
 
+type AnalyticsParams = Record<string, string | number | undefined | null>;
+
+function compactParams<T extends AnalyticsParams>(params?: T) {
+    return Object.fromEntries(
+        Object.entries(params ?? {}).filter(([, value]) => (
+            value !== undefined && value !== null && value !== ''
+        ))
+    );
+}
+
 /**
  * Analytics Service
  * Tất cả đi qua apiClient (nginx /api/v1/analytics → search-service:8088)
@@ -33,7 +43,7 @@ export const analyticsService = {
     }): Promise<PropertyAnalyticsResponse> => {
         const response = await apiClient.get<PropertyAnalyticsResponse>(
             API_ENDPOINTS.ANALYTICS_PRICE_TRENDS,
-            { params }
+            { params: compactParams(params) }
         );
         return response.data;
     },
@@ -47,14 +57,14 @@ export const analyticsService = {
      * @param propertyType     Tùy chọn
      */
     getWardPrices: async (params: {
-        district: string;
+        district?: string;
         transactionType: 'FOR_RENT' | 'FOR_SALE';
         province?: string;
         propertyType?: string;
     }): Promise<WardPriceDTO[]> => {
         const response = await apiClient.get<WardPriceDTO[]>(
             API_ENDPOINTS.ANALYTICS_WARD_PRICES,
-            { params }
+            { params: compactParams(params) }
         );
         return response.data;
     },
@@ -71,7 +81,7 @@ export const analyticsService = {
     }): Promise<RegionTransactionStat[]> => {
         const response = await apiClient.get<RegionTransactionStat[]>(
             API_ENDPOINTS.ANALYTICS_TOP_REGIONS,
-            { params: { limit: 5, ...params } }
+            { params: compactParams({ limit: 5, ...params }) }
         );
         return response.data;
     },

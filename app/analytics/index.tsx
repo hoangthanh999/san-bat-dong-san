@@ -7,7 +7,12 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAnalyticsStore, HCM_DISTRICTS } from '../../store/analyticsStore';
+import {
+    useAnalyticsStore,
+    HCM_DISTRICTS,
+    ALL_HCM_WARDS_LABEL,
+    DEFAULT_ANALYTICS_PROVINCE,
+} from '../../store/analyticsStore';
 import { PriceTrendItem, WardPriceDTO, RegionTransactionStat } from '../../types';
 
 // ──────────────────────────────────────────
@@ -23,13 +28,37 @@ const formatPrice = (price: number) => {
 
 const formatMonth = (month: string) => {
     // "2025-03" → "T3/25"
-    const [y, m] = month.split('-');
-    return `T${parseInt(m)}/${y.slice(2)}`;
+    const value = String(month || '').trim();
+    if (!value) return '';
+
+    const monthYearMatch = value.match(/^(\d{1,2})\/(\d{4})$/);
+    if (monthYearMatch) {
+        const [, m, y] = monthYearMatch;
+        return `T${m.padStart(2, '0')}/${y}`;
+    }
+
+    const yearMonthMatch = value.match(/^(\d{4})-(\d{1,2})$/);
+    if (yearMonthMatch) {
+        const [, y, m] = yearMonthMatch;
+        return `T${m.padStart(2, '0')}/${y}`;
+    }
+
+    return value;
 };
 
 // ──────────────────────────────────────────
 // Bar Chart (tự vẽ, không dùng lib ngoài)
 // ──────────────────────────────────────────
+const formatWardPrice = (item: WardPriceDTO) => {
+    const price = String(item.averagePrice ?? '').trim();
+    const unit = item.unit?.trim();
+
+    if (!price) return '—';
+    if (!unit || price.includes(unit)) return price;
+
+    return `${price} ${unit}`;
+};
+
 function BarChart({ data }: { data: PriceTrendItem[] }) {
     const barAnimations = useRef<Animated.Value[]>([]).current;
 
@@ -227,7 +256,7 @@ function WardRow({ item, maxPrice }: { item: WardPriceDTO; maxPrice: number }) {
                 </View>
             </View>
             <View style={wardStyles.priceWrap}>
-                <Text style={wardStyles.price}>{item.averagePrice}</Text>
+                <Text style={wardStyles.price}>{formatWardPrice(item)}</Text>
                 <Text style={wardStyles.posts}>{item.totalPosts} tin</Text>
             </View>
         </View>
@@ -258,7 +287,7 @@ export default function AnalyticsScreen() {
 
     const {
         transactionType, priceTrends, marketInsights,
-        topRegions, wardPrices, selectedDistrict,
+        topRegions, wardPrices, selectedDistrict, error,
         isLoadingTrends, isLoadingRegions, isLoadingWards,
         setTransactionType, setSelectedDistrict,
         fetchPriceTrends, fetchTopRegions, fetchWardPrices,
@@ -267,6 +296,7 @@ export default function AnalyticsScreen() {
     useEffect(() => {
         fetchPriceTrends();
         fetchTopRegions();
+        fetchWardPrices();
     }, []);
 
     // Reload khi đổi loại giao dịch
@@ -280,7 +310,7 @@ export default function AnalyticsScreen() {
     }, []);
 
     const handleDistrictChange = useCallback((district: string) => {
-        setSelectedDistrict(district);
+        setSelectedDistrict(district === ALL_HCM_WARDS_LABEL ? '' : district);
         setShowDistrictPicker(false);
         setTimeout(() => useAnalyticsStore.getState().fetchWardPrices(), 0);
     }, []);
@@ -340,6 +370,12 @@ export default function AnalyticsScreen() {
                 contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32, gap: 16 }}
                 showsVerticalScrollIndicator={false}
             >
+                {error && (
+                    <View style={styles.errorBanner}>
+                        <Ionicons name="warning-outline" size={16} color="#B45309" />
+                        <Text style={styles.errorBannerText}>{error}</Text>
+                    </View>
+                )}
 
                 {/* ── Section 1: Market Insights ── */}
                 <View style={styles.section}>
@@ -423,6 +459,9 @@ export default function AnalyticsScreen() {
                         <Ionicons name="map-outline" size={18} color="#0066FF" />
                         <Text style={styles.sectionTitle}>Giá theo phường/xã</Text>
                     </View>
+                    <Text style={styles.sectionSub}>
+                        Khu vực mặc định: {DEFAULT_ANALYTICS_PROVINCE}
+                    </Text>
 
                     {/* District picker trigger */}
                     <TouchableOpacity
@@ -430,7 +469,9 @@ export default function AnalyticsScreen() {
                         onPress={() => setShowDistrictPicker(true)}
                     >
                         <Ionicons name="location-outline" size={16} color="#0066FF" />
-                        <Text style={styles.districtPickerText}>{selectedDistrict}</Text>
+                        <Text style={styles.districtPickerText}>
+                            {selectedDistrict || ALL_HCM_WARDS_LABEL}
+                        </Text>
                         <Ionicons name="chevron-down" size={16} color="#888" style={{ marginLeft: 'auto' }} />
                     </TouchableOpacity>
 
@@ -448,7 +489,7 @@ export default function AnalyticsScreen() {
                         <View style={styles.noDataWrap}>
                             <Ionicons name="map-outline" size={32} color="#DDD" />
                             <Text style={styles.noData}>
-                                Chọn quận và nhấn "Tải dữ liệu" để xem giá theo phường
+                                Không có dữ liệu giá phường/xã cho bộ lọc hiện tại
                             </Text>
                         </View>
                     ) : (
@@ -470,23 +511,23 @@ export default function AnalyticsScreen() {
                             </TouchableOpacity>
                         </View>
                         <FlatList
-                            data={HCM_DISTRICTS}
+                            data={[ALL_HCM_WARDS_LABEL, ...HCM_DISTRICTS]}
                             keyExtractor={(item) => item}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
                                     style={[
                                         styles.districtItem,
-                                        selectedDistrict === item && styles.districtItemActive,
+                                        (selectedDistrict || ALL_HCM_WARDS_LABEL) === item && styles.districtItemActive,
                                     ]}
                                     onPress={() => handleDistrictChange(item)}
                                 >
                                     <Text style={[
                                         styles.districtItemText,
-                                        selectedDistrict === item && styles.districtItemTextActive,
+                                        (selectedDistrict || ALL_HCM_WARDS_LABEL) === item && styles.districtItemTextActive,
                                     ]}>
                                         {item}
                                     </Text>
-                                    {selectedDistrict === item && (
+                                    {(selectedDistrict || ALL_HCM_WARDS_LABEL) === item && (
                                         <Ionicons name="checkmark" size={18} color="#0066FF" />
                                     )}
                                 </TouchableOpacity>
@@ -537,6 +578,12 @@ const styles = StyleSheet.create({
     insightGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
 
     loadingCenter: { paddingVertical: 24, alignItems: 'center' },
+    errorBanner: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+        borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+    },
+    errorBannerText: { flex: 1, color: '#92400E', fontSize: 12, fontWeight: '600' },
     noData: { fontSize: 13, color: '#AAA', textAlign: 'center', paddingVertical: 16 },
     noDataWrap: { alignItems: 'center', paddingVertical: 24, gap: 8 },
 
