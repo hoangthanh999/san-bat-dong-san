@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, Pressable,
     TouchableOpacity, Linking, Share, Alert,
@@ -37,6 +37,7 @@ function getSmartTags(item: Room): { label: string; color: string; bg: string }[
     const now = Date.now();
     const createdMs = new Date(item.createdAt).getTime();
     const hoursSince = (now - createdMs) / 3600000;
+    
 
     if (hoursSince < 24) tags.push({ label: 'Mới đăng', color: '#00C853', bg: 'rgba(0,200,83,0.2)' });
     if (item.price < 5000000) tags.push({ label: 'Giá tốt', color: '#FF6B35', bg: 'rgba(255,107,53,0.2)' });
@@ -83,48 +84,45 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
 
     const heartScale = useSharedValue(1);
     const likeOpacity = useSharedValue(0);
+    const isReleasedRef = useRef(false);
 
     // ✅ Fix: Release player khi component unmount để tránh lỗi
     // "Cannot set prop 'player' on view ... Already Released"
-    useEffect(() => {
-        return () => {
-            if (player && item.videoUrl) {
-                try {
-                    player.pause();
-                    player.release();
-                } catch (_) {
-                    // Bỏ qua nếu player đã được release
-                }
-            }
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!item.videoUrl || !player) return;
-        try {
-            if (isActive && !isManuallyPaused) {
-                player.play();
-            } else {
+   useEffect(() => {
+    return () => {
+        isReleasedRef.current = true;
+        if (player && item.videoUrl) {
+            try {
                 player.pause();
-                if (!isActive) {
-                    player.currentTime = 0;
-                    setIsManuallyPaused(false);
-                }
-            }
-        } catch (e) {
-            // Player có thể đã bị release khi component unmount/remount
-            console.warn('[PropertyCard] Video player error:', e);
+                player.release();
+            } catch (_) {}
         }
-    }, [isActive, isManuallyPaused]);
+    };
+}, []);
 
-    useEffect(() => {
-        if (!player) return;
-        try {
-            player.muted = isMuted;
-        } catch (e) {
-            // Bỏ qua nếu player đã release
+  useEffect(() => {
+    if (!item.videoUrl || !player || isReleasedRef.current) return; // ✅ thêm check
+    try {
+        if (isActive && !isManuallyPaused) {
+            player.play();
+        } else {
+            player.pause();
+            if (!isActive) {
+                player.currentTime = 0;
+                setIsManuallyPaused(false);
+            }
         }
-    }, [isMuted]);
+    } catch (e) {
+        console.warn('[PropertyCard] Video player error:', e);
+    }
+}, [isActive, isManuallyPaused]);
+
+  useEffect(() => {
+    if (!player || isReleasedRef.current) return; // ✅ thêm check
+    try {
+        player.muted = isMuted;
+    } catch (e) {}
+}, [isMuted]);
 
     const handleTogglePlayback = () => {
         if (!item.videoUrl || !isActive) return;
@@ -181,12 +179,28 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
         } catch (e) { }
     };
 
-    const handleChat = () => {
-        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        safePush(`/chat/${item.ownerId}` as any);
-    };
-
+const handleChat = () => {
+    if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
+     const { user } = useAuthStore.getState();
+  
+       // ✅ Chặn sớm nhất có thể, hiện Alert ngay
+    if (user?.id === item.ownerId) {
+        Alert.alert('Thông báo', 'Đây là tin đăng của bạn.');
+        return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    safePush({
+        pathname: `/chat/${item.ownerId}`,
+        params: {
+            propertyId: item.id,
+            propertyTitle: item.title,
+            propertyPrice: item.price,
+            propertyAddress: item.address || '',
+            propertyArea: item.area,
+            propertyImage: item.images?.[0] || '',
+        },
+    } as any);
+};
     const handlePressDetails = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         safePush(`/property/${item.id}` as any);

@@ -129,7 +129,9 @@ export async function registerForPushNotifications(): Promise<string | null> {
             projectId: '02500ffe-d6bd-4cd1-9073-75858fa35112', // Thay bằng EAS project ID thật
         });
         const token = tokenData.data;
-        console.log('[PushNotif] Expo Push Token:', token);
+        if (__DEV__) {
+            console.log('[PushNotif] Expo Push Token received.');
+        }
 
         // 7. Lưu token vào AsyncStorage
         await AsyncStorage.setItem(STORAGE_KEYS.PUSH_TOKEN, token);

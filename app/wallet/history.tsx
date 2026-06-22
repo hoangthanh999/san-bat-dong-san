@@ -12,15 +12,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const FILTER_TABS = [
     { key: '', label: 'Tất cả' },
     { key: 'DEPOSIT', label: 'Nạp tiền' },
-    { key: 'POST_FEE,MEMBERSHIP,BOOST', label: 'Chi tiêu' },
+    { key: 'DEBIT', label: 'Chi tiêu' },
     { key: '__PAYMENT__', label: 'VNPay' },
 ];
 
 const TYPE_LABELS: Record<string, string> = {
-    DEPOSIT: 'Nạp tiền VNPay',
-    POST_FEE: 'Phí đăng tin',
-    MEMBERSHIP: 'Mua gói hội viên',
-    BOOST: 'Đẩy tin',
+    DEPOSIT: 'Nạp tiền',
+    DEBIT: 'Chi tiêu dịch vụ',
     REFUND: 'Hoàn tiền',
 };
 

@@ -6,12 +6,13 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAiChatStore, AiChatMessage, PropertyCardDTO } from '../../store/aiChatStore';
 import { useAuthStore } from '../../store/authStore';
 import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
+import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const AI_SUGGESTIONS = [
     'Tìm căn hộ 2 phòng ngủ tại Hà Nội dưới 10 triệu/tháng',
@@ -93,7 +94,7 @@ function TypingIndicator() {
 }
 
 function AiChatContent() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { user } = useAuthStore();
     const {
@@ -170,7 +171,7 @@ function AiChatContent() {
                                     <PropertyCard
                                         key={prop.propertyId}
                                         item={prop}
-                                        onPress={() => router.push(`/property/${prop.propertyId}` as any)}
+                                        onPress={() => safePush(`/property/${prop.propertyId}` as any)}
                                     />
                                 ))}
                             </View>

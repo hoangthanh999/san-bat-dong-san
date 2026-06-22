@@ -5,6 +5,7 @@ import {
     API_FALLBACK_BASE_URL,
     ENABLE_API_FALLBACK,
     STORAGE_KEYS,
+    WS_AI_URL,
 } from '../../constants';
 
 type ApiEnvironmentName = 'production' | 'fallback';
@@ -135,5 +136,5 @@ export async function getNotificationWebSocketUrl(): Promise<string> {
 }
 
 export async function getAiWebSocketUrl(): Promise<string> {
-    return getChatWebSocketUrl();
+    return normalizeBaseUrl(WS_AI_URL) || `${await getApiBaseUrl()}/ws-ai`;
 }

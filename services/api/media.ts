@@ -1,4 +1,8 @@
-import { API_ENDPOINTS } from '../../constants';
+import {
+    API_ENDPOINTS,
+    CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_UPLOAD_PRESET,
+} from '../../constants';
 import { getApiBaseUrl } from './environment';
 
 
@@ -117,24 +121,17 @@ uploadVideo: async (
         fileName: string,
         folder: string = 'properties'
     ): Promise<string> => {
-        const CLOUD_NAME = 'dfyrnocnr';
-        const API_KEY = '448443126664466';
-        const API_SECRET = 'M8lZ0g_OPg4eLH0qh2BC-zMRaxQ';
+        const CLOUD_NAME = CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = CLOUDINARY_UPLOAD_PRESET;
+        if (!CLOUD_NAME || !uploadPreset) {
+            throw new Error('Thiếu cấu hình Cloudinary để upload video');
+        }
         const folderPath = `homeverse/${folder}`;
-        const eager = 'c_pad,h_1280,w_720,f_mp4';
-        const timestamp = Math.floor(Date.now() / 1000);
-
-        // ✅ Dùng SHA1 thuần JS, không cần native module
-        const stringToSign = `eager=${eager}&folder=${folderPath}&timestamp=${timestamp}${API_SECRET}`;
-        const signature = await sha1(stringToSign);
 
         const formData = new FormData();
         formData.append('file', { uri: fileUri, name: fileName, type: 'video/mp4' } as any);
-        formData.append('api_key', API_KEY);
-        formData.append('timestamp', String(timestamp));
+        formData.append('upload_preset', uploadPreset);
         formData.append('folder', folderPath);
-        formData.append('eager', eager);
-        formData.append('signature', signature);
 
         const response = await fetch(
             `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`,
@@ -142,6 +139,6 @@ uploadVideo: async (
         );
         const data = await response.json();
         if (data.error) throw new Error(data.error.message);
-        return data.eager?.[0]?.secure_url ?? data.secure_url;
+        return data.secure_url;
     },
 };

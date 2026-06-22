@@ -294,11 +294,23 @@ export default function PropertyDetailScreen() {
         }
     };
 
-    const handleChat = () => {
-        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
-        safePush(`/chat/${room?.ownerId}` as any);
-    };
+ const handleChat = () => {
+    if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
+    if (!room) return;
 
+    // Navigate sang chat với property info để auto-send
+    safePush({
+        pathname: `/chat/${room.ownerId}`,
+        params: {
+            propertyId: room.id,
+            propertyTitle: room.title,
+            propertyPrice: room.price,
+            propertyAddress: room.address || '',
+            propertyArea: room.area,
+            propertyImage: room.images?.[0] || '',
+        },
+    } as any);
+};
     const handleNavigate = () => {
         if (!room?.latitude || !room?.longitude) return;
         const { latitude, longitude } = room;

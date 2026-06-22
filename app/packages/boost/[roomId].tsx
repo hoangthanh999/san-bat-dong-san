@@ -16,22 +16,18 @@ export default function BoostRoomScreen() {
     const insets = useSafeAreaInsets();
     const { roomId } = useLocalSearchParams<{ roomId: string }>();
     const { boostPackages, isLoading, isPurchasing, fetchPackages, boostRoom } = usePackageStore();
-    const { transactions, fetchTransactions } = useWalletStore();
+    const { wallet, fetchWallet } = useWalletStore();
+
     const [selectedPkg, setSelectedPkg] = useState<ServicePackage | null>(null);
     const [showConfirm, setShowConfirm] = useState(false);
 
     // Tính balance từ transaction history (backend chưa có wallet balance API)
-    const balance = transactions.reduce((sum, tx) => {
-        if (tx.status !== 'SUCCESS') return sum;
-        const amount = Number(tx.amount) || 0;
-        if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amount;
-        return sum - amount;
-    }, 0);
+const balance = wallet?.balance ?? 0;
 
-    useEffect(() => {
-        fetchPackages('ROOM_PROMOTION');
-        fetchTransactions();
-    }, []);;
+useEffect(() => {
+    fetchPackages('ROOM_PROMOTION');
+    fetchWallet();
+}, []);
 
     const handleBoost = () => {
         if (!selectedPkg) {
@@ -58,7 +54,7 @@ export default function BoostRoomScreen() {
         try {
             await boostRoom(parseInt(roomId!, 10), selectedPkg.id);
             setShowConfirm(false);
-            await fetchTransactions();
+            await fetchWallet();
             Alert.alert('Thành công! 🚀', `Tin đăng đã được đẩy lên top trong ${selectedPkg.durationDays} ngày!`, [
                 { text: 'Xem giao dịch', onPress: () => safePush('/wallet/transactions' as any) },
                 { text: 'OK', onPress: () => router.back() },

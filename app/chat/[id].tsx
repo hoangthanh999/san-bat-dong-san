@@ -37,19 +37,32 @@ export default function ChatDetailScreen() {
             message="Đăng nhập để chat với chủ nhà và người thuê"
             icon="chatbubble-ellipses-outline"
         >
+       
             <ChatDetailContent />
         </AuthGuardScreen>
     );
 }
 
 function ChatDetailContent() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+        const { id, propertyId, propertyTitle, propertyPrice, propertyAddress, propertyArea, propertyImage } =
+        useLocalSearchParams<{
+            id: string;
+            propertyId?: string;
+            propertyTitle?: string;
+            propertyPrice?: string;
+            propertyAddress?: string;
+            propertyArea?: string;
+            propertyImage?: string;
+        }>();
+
     const partnerId = Number(id);
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { user } = useAuthStore();
     const { messages, conversations, fetchConversations, fetchHistory, sendMessage, markAsRead, isLoading, connectWebSocket } = useChatStore();
 
+    const autoSentRef = useRef(false); 
+    
     const [inputText, setInputText] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [showQuickActions, setShowQuickActions] = useState(false);
@@ -64,16 +77,40 @@ function ChatDetailContent() {
     const partnerName = conversation?.fullName || 'Người dùng';
     const partnerAvatar = conversation?.avatar;
 
-    useEffect(() => {
-        // Guard: nếu conversations chưa load (vào thẳng detail qua deep link / reload)
-        // thì fetch để có avatar cho header và bubble
-        if (conversations.length === 0) {
-            fetchConversations();
+   // Thay useEffect hiện tại bằng:
+useEffect(() => {
+    if (conversations.length === 0) {
+        fetchConversations();
+    }
+
+    const init = async () => {
+        await fetchHistory(partnerId);
+         const { user } = useAuthStore.getState();
+    if (user?.id === partnerId) {
+        Alert.alert('Thông báo', 'Bạn không thể tự nhắn tin cho chính mình.');
+        router.back(); // ✅ Tự động quay lại
+        return;
+    }
+        
+        // ✅ Kiểm tra autoSentRef TRƯỚC khi gửi
+        if (propertyId && !autoSentRef.current) {
+            autoSentRef.current = true; // ✅ Set TRUE ngay lập tức trước await
+            const content = JSON.stringify({
+                id: Number(propertyId),
+                title: propertyTitle || '',
+                price: Number(propertyPrice) || 0,
+                address: propertyAddress || '',
+                area: Number(propertyArea) || 0,
+                image: propertyImage || '',
+            });
+            await sendMessage(partnerId, content);
         }
-        fetchHistory(partnerId);
-        markAsRead(partnerId);
-        connectWebSocket();
-    }, [partnerId]);
+    };
+
+    init();
+    markAsRead(partnerId);
+    connectWebSocket();
+}, [partnerId]); // ✅ Chỉ chạy khi partnerId thay đổi
 
     const scrollToBottom = () => {
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -208,7 +245,52 @@ function ChatDetailContent() {
             return <Text style={{ color: isMe ? 'white' : '#333' }}>📅 Lịch hẹn</Text>;
         }
     };
+const renderPropertyMessage = (content: string, isMe: boolean) => {
+    try {
+        const prop = JSON.parse(content);
+        // Chỉ render nếu có đủ field của property
+        if (!prop.id || !prop.title || !prop.price) return null;
 
+        return (
+            <TouchableOpacity
+                style={styles.propertyCard}
+                onPress={() => router.push(`/property/${prop.id}` as any)}
+                activeOpacity={0.85}
+            >
+                {prop.image ? (
+                    <Image
+                        source={{ uri: prop.image }}
+                        style={styles.propertyCardImage}
+                        contentFit="cover"
+                    />
+                ) : (
+                    <View style={[styles.propertyCardImage, styles.propertyCardImageFallback]}>
+                        <Text style={{ fontSize: 32 }}>🏠</Text>
+                    </View>
+                )}
+                <View style={styles.propertyCardBody}>
+                    <Text style={styles.propertyCardTitle} numberOfLines={2}>{prop.title}</Text>
+                    <Text style={styles.propertyCardPrice}>
+                        {(prop.price >= 1_000_000_000
+                            ? `${(prop.price / 1_000_000_000).toFixed(1)} tỷ`
+                            : prop.price >= 1_000_000
+                                ? `${(prop.price / 1_000_000).toFixed(0)} triệu`
+                                : prop.price.toLocaleString('vi-VN')
+                        )} đ/tháng
+                    </Text>
+                    {prop.address && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <Ionicons name="location-outline" size={11} color="rgba(255,255,255,0.8)" />
+                            <Text style={styles.propertyCardAddress} numberOfLines={1}>{prop.address}</Text>
+                        </View>
+                    )}
+                </View>
+            </TouchableOpacity>
+        );
+    } catch {
+        return null;
+    }
+};
     const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
         const isMe = item.senderId === user?.id;
         const prevMsg = chatMessages[index - 1];
@@ -235,7 +317,11 @@ function ChatDetailContent() {
                     <View style={[
                         styles.bubble,
                         isMe ? styles.bubbleMe : styles.bubbleThem,
-                        (item.type === 'LOCATION' || item.type === 'APPOINTMENT') && styles.bubbleRich,
+                       (item.type === 'LOCATION' || item.type === 'APPOINTMENT' || 
+ (item.content?.startsWith('{') && (() => { 
+     try { const p = JSON.parse(item.content!); return !!(p.id && p.title); } 
+     catch { return false; } 
+ })())) && styles.bubbleRich,
                     ]}>
                         {item.type === 'IMAGE' ? (
                             <Image source={{ uri: item.content }} style={styles.imageMsg} contentFit="cover" />
@@ -243,10 +329,20 @@ function ChatDetailContent() {
                             renderLocationMessage(item.content || '', isMe)
                         ) : item.type === 'APPOINTMENT' ? (
                             renderAppointmentMessage(item.content || '', isMe)
-                        ) : (
-                            <Text style={[styles.msgText, isMe && styles.msgTextMe]}>{item.content}</Text>
-                        )}
+                  ) : (
+    (() => {
+        if (item.content?.startsWith('{')) {
+            const propertyNode = renderPropertyMessage(item.content, isMe);
+            if (propertyNode) return propertyNode;
+        }
 
+        return (
+            <Text style={[styles.msgText, isMe && styles.msgTextMe]}>
+                {item.content}
+            </Text>
+        );
+    })()
+)}
                         {item.type !== 'LOCATION' && item.type !== 'APPOINTMENT' && (
                             <Text style={[styles.msgTime, isMe && styles.msgTimeMe]}>
                                 {formatMsgTime(item.createdAt)}
@@ -444,6 +540,44 @@ function ChatDetailContent() {
 }
 
 const styles = StyleSheet.create({
+    propertyCard: {
+    width: 240,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a2e',
+},
+propertyCardImage: {
+    width: '100%',
+    height: 140,
+    backgroundColor: '#2a2a3e',
+    justifyContent: 'center',
+    alignItems: 'center',
+},
+propertyCardImageFallback: {
+    justifyContent: 'center',
+    alignItems: 'center',
+},
+propertyCardBody: {
+    padding: 12,
+    backgroundColor: '#0066FF',
+},
+propertyCardTitle: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+},
+propertyCardPrice: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+},
+propertyCardAddress: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    flex: 1,
+},
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

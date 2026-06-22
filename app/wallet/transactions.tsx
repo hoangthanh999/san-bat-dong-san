@@ -24,18 +24,14 @@ const FILTER_TABS: { key: FilterKey; label: string; icon: string }[] = [
 // Map type → filter key
 const TYPE_TO_FILTER: Record<string, FilterKey> = {
     DEPOSIT: 'DEPOSIT',
+    DEBIT: 'SERVICE',
     REFUND: 'REFUND',
-    POST_FEE: 'SERVICE',
-    MEMBERSHIP: 'SERVICE',
-    BOOST: 'SERVICE',
 };
 
 // Map type → label hiển thị
 const TYPE_LABELS: Record<string, string> = {
-    DEPOSIT: 'Nạp tiền VNPay',
-    POST_FEE: 'Phí đăng tin',
-    MEMBERSHIP: 'Mua gói hội viên',
-    BOOST: 'Đẩy tin',
+    DEPOSIT: 'Nạp tiền',
+    DEBIT: 'Chi tiêu dịch vụ',
     REFUND: 'Hoàn tiền',
 };
 

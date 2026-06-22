@@ -5,14 +5,15 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack } from 'expo-router';
 import { userService } from '../services/api/user';
 import { roomService } from '../services/api/rooms';
 import { CustomerPublicResponseDTO, Room } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeRouter } from '../hooks/useSafeRouter';
 
 export default function LandlordProfileScreen() {
-    const router = useRouter();
+    const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { slug, landlordId } = useLocalSearchParams<{ slug?: string; landlordId?: string }>();
     const [profile, setProfile] = useState<CustomerPublicResponseDTO | null>(null);
@@ -182,7 +183,7 @@ export default function LandlordProfileScreen() {
                             <TouchableOpacity
                                 key={room.id}
                                 style={styles.roomCard}
-                                onPress={() => router.push(`/property/${room.id}` as any)}
+                                onPress={() => safePush(`/property/${room.id}` as any)}
                                 activeOpacity={0.7}
                             >
                                 <Image

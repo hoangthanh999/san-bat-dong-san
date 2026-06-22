@@ -52,22 +52,18 @@ export default function PackagesScreen() {
     const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { membershipPackages, boostPackages, isLoading, isPurchasing, fetchPackages, purchaseMembership } = usePackageStore();
-    const { transactions, fetchTransactions } = useWalletStore();
+    const { wallet, fetchWallet } = useWalletStore();
+
     const [activeTab, setActiveTab] = useState<'MEMBERSHIP' | 'ROOM_PROMOTION'>('MEMBERSHIP');
     const [confirmPkg, setConfirmPkg] = useState<ServicePackage | null>(null);
 
     // Tính balance từ transaction history (backend chưa có wallet balance API)
-    const balance = transactions.reduce((sum, tx) => {
-        if (tx.status !== 'SUCCESS') return sum;
-        const amount = Number(tx.amount) || 0;
-        if (tx.type === 'DEPOSIT' || tx.type === 'REFUND') return sum + amount;
-        return sum - amount;
-    }, 0);
+   const balance = wallet?.balance ?? 0;
 
     useEffect(() => {
-        fetchPackages();
-        fetchTransactions();
-    }, []);
+    fetchPackages();
+    fetchWallet();
+}, []);
 
     const packages = activeTab === 'MEMBERSHIP' ? membershipPackages : boostPackages;
 
@@ -92,7 +88,7 @@ export default function PackagesScreen() {
         try {
             await purchaseMembership(confirmPkg.id);
             setConfirmPkg(null);
-            await fetchTransactions();
+            await fetchWallet();
             Alert.alert('Thành công! 🎉', `Bạn đã mua ${confirmPkg.name} thành công!`);
         } catch (e: any) {
             setConfirmPkg(null);

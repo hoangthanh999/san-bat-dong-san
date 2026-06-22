@@ -62,13 +62,23 @@ export const walletService = {
         return (res.data as any).result ?? res.data;
     },
 
-    fetchTransactions: async (_userId?: number): Promise<Transaction[]> => {
-        const res = await apiClient.get<PaginatedResponse<Transaction>>(
-            API_ENDPOINTS.WALLET_TRANSACTIONS,
-            { params: { page: 0, size: 50 } }
-        );
-        return res.data.content ?? [];
-    },
+fetchTransactions: async (_userId?: number): Promise<Transaction[]> => {
+    const res = await apiClient.get<PaginatedResponse<any>>(
+        API_ENDPOINTS.WALLET_TRANSACTIONS,
+        { params: { page: 0, size: 50 } }
+    );
+    
+    return (res.data.content ?? []).map((tx: any): Transaction => ({
+        id: tx.id,
+        userId: tx.userId,
+        amount: Math.abs(Number(tx.amount) || 0),  // luôn dương
+        type: tx.amount >= 0 ? 'DEPOSIT' : 'DEBIT', // dùng dấu amount để phân loại
+        status: tx.status === 'COMPLETED' ? 'SUCCESS' : tx.status, // map COMPLETED → SUCCESS
+        description: tx.description ?? '',
+        vnpayCode: tx.referenceId ?? undefined,
+        createdAt: tx.createdAt,
+    }));
+},
 
     fetchPaymentTransactions: async (userId?: number): Promise<Transaction[]> => {
         const resolvedUserId = userId ?? await getStoredUserId();

@@ -46,6 +46,10 @@ export const chatService = {
      * Body: ChatMessageDTO { senderId, receiverId, content, type }
      */
     sendMessage: async (senderId: number, receiverId: number, content: string, type = 'TEXT'): Promise<ChatMessage> => {
+          // ✅ Chặn tự nhắn cho mình
+    if (senderId === receiverId) {
+        throw new Error('Không thể tự nhắn tin cho chính mình');
+    }
         const response = await apiClient.post<ChatMessage>(API_ENDPOINTS.CHAT_SEND, {
             senderId,
             receiverId,
@@ -67,7 +71,27 @@ export const chatService = {
         });
         return response.data;
     },
-
+sendPropertyMessage: async (
+    senderId: number,
+    receiverId: number,
+    property: { id: number; title: string; price: number; address: string; area: number; image: string }
+): Promise<ChatMessage> => {
+    const content = JSON.stringify({
+        id: property.id,
+        title: property.title,
+        price: property.price,
+        address: property.address,
+        area: property.area,
+        image: property.image,
+    });
+    const response = await apiClient.post<ChatMessage>(API_ENDPOINTS.CHAT_SEND, {
+        senderId,
+        receiverId,
+        content,
+        type: 'TEXT', // Backend dùng TEXT, detect bằng cách parse JSON
+    });
+    return response.data;
+},
     /**
      * Đánh dấu đã đọc tin nhắn với partner
      * PUT /api/chat/read/{partnerId} (JWT)

@@ -188,8 +188,9 @@ export const API_ENDPOINTS = {
     // ============================================================
     // MEDIA
     // ============================================================
-    MEDIA_UPLOAD: '/api/v1/media/upload',
-    MEDIA_UPLOAD_MULTIPLE: '/api/v1/media/upload-multiple',
+ MEDIA_UPLOAD: '/media/api/v1/media/upload',
+MEDIA_UPLOAD_MULTIPLE: '/media/api/v1/media/upload-multiple',
+
 
     // ============================================================
     // NOTIFICATIONS

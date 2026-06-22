@@ -13,9 +13,11 @@ interface ChatState {
     isLoading: boolean;
     isConnected: boolean;
     totalUnread: number;
+    
     /** Cache avatar URL theo partnerId để tránh gọi summary lặp lại */
     avatarCache: Record<number, string>;
     _stompClient: Client | null;
+    _isConnecting: boolean;
 
     fetchConversations: () => Promise<void>;
     fetchHistory: (partnerId: number) => Promise<void>;
@@ -31,6 +33,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     messages: {},
     isLoading: false,
     isConnected: false,
+    _isConnecting: false,
     totalUnread: 0,
     avatarCache: {},
     _stompClient: null,
@@ -99,6 +102,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     sendMessage: async (partnerId: number, content: string, type = 'TEXT', metadata?: any) => {
         const { user } = useAuthStore.getState();
         if (!user) return;
+           // ✅ Chặn tự nhắn cho mình
+   if (user.id === partnerId) {
+        throw new Error('SELF_CHAT');
+    }
 
         const tempMessage: ChatMessage = {
             id: `temp-${Date.now()}`,
@@ -191,72 +198,75 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
     },
 
-    connectWebSocket: async () => {
-        const { token, user } = useAuthStore.getState();
-        if (!token || !user?.id) return;
+connectWebSocket: async () => {
+    const { token, user } = useAuthStore.getState();
+    if (!token || !user?.id) return;
 
-        const existingClient = get()._stompClient;
-        if (existingClient?.active) return;
+    // ✅ Chặn double-connect
+    if (get()._isConnecting || get()._stompClient?.active) return;
+    set({ _isConnecting: true });
 
-        const handleMessage = (message: IMessage) => {
-            try {
-                const chatMessage: ChatMessage = JSON.parse(message.body);
-
-                if (chatMessage.senderId === user.id) {
-                    return;
-                }
-
-                get().receiveMessage(chatMessage);
-            } catch (error) {
-                console.error('[ChatWS] Parse error', error);
-            }
-        };
-
-        const wsUrl = await getChatWebSocketUrl();
-
-        const client = new Client({
-            webSocketFactory: () => new (SockJS as any)(wsUrl),
-            connectHeaders: {
-                Authorization: `Bearer ${token}`,
-            },
-            reconnectDelay: 5000,
-            heartbeatIncoming: 4000,
-            heartbeatOutgoing: 4000,
-
-            onConnect: () => {
-                set({ isConnected: true });
-                client.subscribe('/user/queue/messages', handleMessage);
-                client.subscribe(`/topic/user/${user.id}`, handleMessage);
-            },
-
-            onDisconnect: () => {
-                set({ isConnected: false });
-            },
-
-            onStompError: (frame) => {
-                console.error('[ChatWS] STOMP error:', frame.headers?.message);
-                set({ isConnected: false });
-            },
-
-            onWebSocketClose: () => {
-                set({ isConnected: false });
-            },
-
-            onWebSocketError: (event) => {
-                console.error('[ChatWS] WebSocket error:', event);
-                set({ isConnected: false });
-            },
-        });
-
-        client.activate();
-        set({ _stompClient: client });
-    },
-
-    disconnectWebSocket: () => {
-        const client = get()._stompClient;
-        if (client) {
-            client.deactivate();
-        }
+    // ✅ Deactivate client cũ nếu còn treo
+    const existingClient = get()._stompClient;
+    if (existingClient) {
+        existingClient.deactivate();
         set({ _stompClient: null, isConnected: false });
-    },
+    }
+
+    const wsUrl = await getChatWebSocketUrl();
+
+    const handleMessage = (message: IMessage) => {
+        try {
+            const chatMessage: ChatMessage = JSON.parse(message.body);
+            if (chatMessage.senderId === user.id) return;
+            get().receiveMessage(chatMessage);
+        } catch (error) {
+            console.error('[ChatWS] Parse error', error);
+        }
+    };
+
+    const client = new Client({
+        webSocketFactory: () => new (SockJS as any)(wsUrl),
+        connectHeaders: { Authorization: `Bearer ${token}` },
+        reconnectDelay: 0,        // ✅ tắt auto-reconnect → không loop
+        heartbeatIncoming: 4000,
+        heartbeatOutgoing: 4000,
+
+        onConnect: () => {
+            set({ isConnected: true, _isConnecting: false }); // ✅
+            client.subscribe('/user/queue/messages', handleMessage);
+            client.subscribe(`/topic/user/${user.id}`, handleMessage);
+        },
+
+        onDisconnect: () => {
+            set({ isConnected: false, _isConnecting: false });
+        },
+
+        onStompError: (frame) => {
+            console.error('[ChatWS] STOMP error:', frame.headers?.message);
+            set({ isConnected: false, _isConnecting: false }); // ✅
+            client.deactivate();
+        },
+
+        onWebSocketClose: () => {
+            set({ isConnected: false, _isConnecting: false });
+        },
+
+        onWebSocketError: (event) => {
+            console.error('[ChatWS] WebSocket error:', event);
+            set({ isConnected: false, _isConnecting: false });
+        },
+    });
+
+    client.activate();
+    set({ _stompClient: client });
+},
+
+  disconnectWebSocket: () => {
+    const client = get()._stompClient;
+    if (client) {
+        client.deactivate();
+    }
+    set({ _stompClient: null, isConnected: false, _isConnecting: false }); // ✅ thêm _isConnecting: false
+},
 }));
