@@ -547,6 +547,9 @@ export interface CommentResponse {
     propertyId: number;
     userId?: number | null;          // null nếu là guest
     guestId?: string | null;         // null nếu là user đã login
+    authorId?: number | null;        // frontend-normalized alias = userId
+    displayName?: string;            // frontend-enriched from /customers/{id}/summary
+    displayAvatar?: string | null;   // frontend-enriched from /customers/{id}/summary
     parentId?: number | null;        // null nếu là comment gốc
     replyToUserId?: number | null;
     content: string;

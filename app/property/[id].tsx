@@ -22,7 +22,7 @@ import { useInteractionStore } from '../../store/interactionStore';
 import { roomService } from '../../services/api/rooms';
 import { ImageGallery } from '../../components/property/ImageGallery';
 import { ReviewCard } from '../../components/property/ReviewCard';
-import { Room } from '../../types';
+import { CommentResponse, Room } from '../../types';
 import { formatCompactVND } from '../../utils/formatPrice';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
 
@@ -121,6 +121,17 @@ const getOwnerAvatar = (room: Room): string => {
 const getOwnerPhone = (room: Room): string | undefined =>
     room.ownerPhoneSnapshot || room.ownerPhone;
 
+const getCommentDisplayName = (comment: CommentResponse): string => {
+    const name = comment.displayName?.trim();
+    if (name) return name;
+    return comment.userId ? 'Người dùng' : 'Khách';
+};
+
+const getCommentAvatar = (comment: CommentResponse): string | null => {
+    const avatar = comment.displayAvatar?.trim();
+    return avatar || null;
+};
+
 const getStatusBadge = (status: string) => {
     switch (status) {
         case 'ACTIVE': return { label: '✅ Đang hiển thị', bg: '#E8F5E9', color: '#2E7D32' };
@@ -190,7 +201,7 @@ export default function PropertyDetailScreen() {
 
     // Comment data — keyed by propertyId
     const rawComments = commentsByProperty[roomId];
-    const safeComments = Array.isArray(rawComments) ? rawComments : ([] as import('../../types').CommentResponse[]);
+    const safeComments = Array.isArray(rawComments) ? rawComments : ([] as CommentResponse[]);
     const commentCount = countByProperty[roomId] || 0;
 
     useEffect(() => {
@@ -889,19 +900,19 @@ export default function PropertyDetailScreen() {
                                     <View key={c.id} style={styles.commentCard}>
                                         <View style={styles.commentHeader}>
                                             <Image
-                                                source={{ uri: `https://ui-avatars.com/api/?name=${c.userId ? 'User+' + c.userId : 'Khach'}&background=0066FF&color=fff` }}
+                                                source={{ uri: getCommentAvatar(c) || `https://ui-avatars.com/api/?name=${encodeURIComponent(getCommentDisplayName(c))}&background=EEF4FF&color=0066FF` }}
                                                 style={styles.commentAvatar}
                                             />
                                             <View style={styles.commentMeta}>
                                                 <Text style={styles.commentUser}>
-                                                    {c.userId ? `Người dùng #${c.userId}` : 'Khách'}
+                                                    {getCommentDisplayName(c)}
                                                 </Text>
                                                 <Text style={styles.commentDate}>
                                                     {c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : ''}
                                                 </Text>
                                             </View>
                                             {/* Nút xoá — chỉ hiện nếu là comment của mình */}
-                                            {user && c.userId === user.id && (
+                                            {user && (c.authorId ?? c.userId) === user.id && (
                                                 <TouchableOpacity
                                                     onPress={() => handleDeleteComment(c.id)}
                                                     style={styles.commentDeleteBtn}

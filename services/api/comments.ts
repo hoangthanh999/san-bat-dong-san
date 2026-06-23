@@ -14,6 +14,48 @@ import apiClient from './client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../../constants';
 import { CommentRequest, CommentResponse, PaginatedResponse } from '../../types';
+import { getApiBaseUrl } from './environment';
+import { getUserSummarySilent, type UserSummaryDTO } from './user';
+
+function normalizeMediaUrl(url?: string | null, baseUrl?: string): string | null {
+    const value = url?.trim();
+    if (!value) return null;
+
+    if (/^(https?:|file:|data:)/i.test(value)) {
+        return value;
+    }
+
+    const normalizedBase = (baseUrl || '').replace(/\/+$/, '');
+    const normalizedPath = value.startsWith('/') ? value : `/${value}`;
+    return normalizedBase ? `${normalizedBase}${normalizedPath}` : value;
+}
+
+async function enrichCommentAuthors(comments: CommentResponse[]): Promise<CommentResponse[]> {
+    if (!comments.length) return comments;
+
+    const baseUrl = await getApiBaseUrl();
+
+    return Promise.all(comments.map(async comment => {
+        const authorId = comment.userId ?? null;
+        if (!authorId) {
+            return {
+                ...comment,
+                authorId: null,
+                displayName: comment.guestId ? 'Khách' : comment.displayName,
+                displayAvatar: null,
+            };
+        }
+
+        const summary = await getUserSummarySilent(authorId);
+
+        return {
+            ...comment,
+            authorId,
+            displayName: summary?.fullName?.trim() || comment.displayName || `Người dùng #${authorId}`,
+            displayAvatar: normalizeMediaUrl(summary?.avatarUrl ?? comment.displayAvatar, baseUrl),
+        };
+    }));
+}
 
 // Helper: lấy userId từ storage để gắn X-User-Id header
 async function getUserIdHeader(): Promise<Record<string, string>> {
@@ -87,7 +129,11 @@ export const commentService = {
     ): Promise<PaginatedResponse<CommentResponse>> => {
         try {
             const res = await apiClient.get(`/properties/comments/${propertyId}`, { params: { page, size } });
-            return normalizePage<CommentResponse>(res.data, page, size);
+            const data = normalizePage<CommentResponse>(res.data, page, size);
+            return {
+                ...data,
+                content: await enrichCommentAuthors(data.content),
+            };
         } catch (e: any) {
             console.warn('[commentService] getComments error:', e?.message);
             return { content: [], totalElements: 0, totalPages: 0, size, number: page, first: true, last: true };
@@ -105,7 +151,11 @@ export const commentService = {
     ): Promise<PaginatedResponse<CommentResponse>> => {
         try {
             const res = await apiClient.get(`/properties/comments/replies/${parentId}`, { params: { page, size } });
-            return normalizePage<CommentResponse>(res.data, page, size);
+            const data = normalizePage<CommentResponse>(res.data, page, size);
+            return {
+                ...data,
+                content: await enrichCommentAuthors(data.content),
+            };
         } catch (e: any) {
             console.warn('[commentService] getReplies error:', e?.message);
             return { content: [], totalElements: 0, totalPages: 0, size, number: page, first: true, last: true };
@@ -143,7 +193,8 @@ export const commentService = {
             request,
             { headers: userIdHeader },
         );
-        return res.data;
+        const [comment] = await enrichCommentAuthors([res.data]);
+        return comment;
     },
 
     /**
