@@ -5,6 +5,7 @@ import { getApiBaseUrl } from './environment';
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;
+    _silentError?: boolean;
 }
 
 // Create Axios instance cho gateway (identity, customer, media, notification)
@@ -148,9 +149,13 @@ apiClient.interceptors.response.use(
         const status = error.response?.status;
         const originalRequest = error.config as RetryableRequestConfig | undefined;
         const url = originalRequest?.url || '';
-        console.error('[API Error]', status, error.message, url);
-        if (error.response?.data) {
-            console.error('[API Error Data]', JSON.stringify(error.response.data));
+        const isSilent = originalRequest?._silentError === true;
+
+        if (!isSilent) {
+            console.error('[API Error]', status, error.message, url);
+            if (error.response?.data) {
+                console.error('[API Error Data]', JSON.stringify(error.response.data));
+            }
         }
 
         // ============================================================
@@ -215,7 +220,7 @@ apiClient.interceptors.response.use(
         // Handle 5xx Server Error
         if (status && status >= 500) {
             const msg = 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau.';
-            showToast?.(msg, 'error');
+            if (!isSilent) showToast?.(msg, 'error');
             return Promise.reject({
                 ...error,
                 message: msg,

@@ -9,6 +9,43 @@ export interface UserSummaryDTO {
     avatarUrl?: string;
 }
 
+/**
+ * Cache summary theo userId — lưu cả Promise đang chạy để tránh gọi song song
+ * Nếu đã fail, cache kết quả null để không spam API lỗi lặp lại trong session
+ */
+const _userSummaryCache = new Map<number, Promise<UserSummaryDTO | null>>();
+
+/**
+ * Lấy user summary an toàn, không throw, không log đỏ, không toast.
+ * Dùng cho tất cả nơi gọi summary phụ trợ (comment author, chat avatar, landlord profile).
+ * - Mỗi userId catch riêng.
+ * - Cache kết quả (kể cả fail → null) trong session.
+ * - Dùng _silentError để apiClient interceptor không log console.error / show toast.
+ */
+export async function getUserSummarySilent(userId: number): Promise<UserSummaryDTO | null> {
+    if (!userId || isNaN(userId)) return null;
+
+    if (!_userSummaryCache.has(userId)) {
+        _userSummaryCache.set(
+            userId,
+            apiClient
+                .get<UserSummaryDTO>(API_ENDPOINTS.CUSTOMER_SUMMARY(userId), {
+                    _silentError: true,
+                } as any)
+                .then(res => {
+                    // apiClient interceptor đã unwrap .result nếu có
+                    return res.data ?? null;
+                })
+                .catch(() => {
+                    console.warn(`[UserSummary] Không lấy được summary user ${userId}, dùng fallback`);
+                    return null;
+                }),
+        );
+    }
+
+    return _userSummaryCache.get(userId)!;
+}
+
 export const userService = {
     /**
      * Lấy profile từ customer-service
