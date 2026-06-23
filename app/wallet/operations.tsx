@@ -92,7 +92,13 @@ function WalletOperationsContent() {
                 <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={[
+                    styles.content,
+                    { paddingBottom: Math.max(insets.bottom + 24, 32) },
+                ]}
+            >
                 <View style={styles.balanceCard}>
                     <Text style={styles.balanceLabel}>Số dư khả dụng</Text>
                     <Text style={styles.balanceValue}>{formatVND(balance)} đ</Text>

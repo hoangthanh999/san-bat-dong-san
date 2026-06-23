@@ -68,6 +68,7 @@ export default function VNPayWebViewScreen() {
                 javaScriptEnabled
                 domStorageEnabled
             />
+            <View style={[styles.safeBottom, { height: insets.bottom }]} />
         </View>
     );
 }
@@ -75,6 +76,7 @@ export default function VNPayWebViewScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: 'white' },
     safeTop: { height: 0, backgroundColor: 'white' }, // height set via inline style using useSafeAreaInsets
+    safeBottom: { height: 0, backgroundColor: 'white' }, // height set via inline style using useSafeAreaInsets
     webview: { flex: 1 },
     loading: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
     loadingText: { fontSize: 14, color: '#666' },

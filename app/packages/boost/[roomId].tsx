@@ -80,7 +80,11 @@ useEffect(() => {
                 <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 96, 96) }}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.content}>
 
                     {/* Room info */}
@@ -150,7 +154,7 @@ useEffect(() => {
             {/* Confirm modal */}
             <Modal visible={showConfirm} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalCard}>
+                    <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 24, 24) }]}>
                         <Text style={styles.modalTitle}>Xác nhận boost tin</Text>
                         {selectedPkg && (
                             <>

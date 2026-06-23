@@ -137,7 +137,14 @@ export default function PackagesScreen() {
                     <ActivityIndicator size="large" color="#0066FF" />
                 </View>
             ) : (
-                <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    style={styles.scroll}
+                    contentContainerStyle={[
+                        styles.scrollContent,
+                        { paddingBottom: Math.max(insets.bottom + 24, 40) },
+                    ]}
+                    showsVerticalScrollIndicator={false}
+                >
                     <Text style={styles.subtitle}>
                         {activeTab === 'MEMBERSHIP'
                             ? 'Nâng cấp tài khoản để đăng tin không giới hạn và nhiều ưu đãi hơn'
@@ -157,7 +164,7 @@ export default function PackagesScreen() {
             {/* Confirm Modal */}
             <Modal visible={!!confirmPkg} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalCard}>
+                    <View style={[styles.modalCard, { paddingBottom: Math.max(insets.bottom + 24, 24) }]}>
                         <Text style={styles.modalTitle}>Xác nhận thanh toán</Text>
                         {confirmPkg && (
                             <>

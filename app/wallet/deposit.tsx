@@ -96,7 +96,11 @@ function DepositContent() {
                 <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+            <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + 96, 96) }}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.content}>
                     {/* Current balance */}
                     <View style={styles.balanceRow}>
