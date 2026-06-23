@@ -3,7 +3,7 @@ import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { Conversation, ChatMessage } from '../types';
 import { chatService } from '../services/api/chat';
-import { userService } from '../services/api/user';
+import { getUserSummarySilent } from '../services/api/user';
 import { getChatWebSocketUrl } from '../services/api/environment';
 import { useAuthStore } from './authStore';
 
@@ -57,20 +57,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     const cached = get().avatarCache[partnerId];
                     if (cached) return { ...conv, avatar: cached };
 
-                    // Gọi /customers/{partnerId}/summary (public, không cần JWT)
-                    try {
-                        const summary = await userService.getUserSummary(partnerId);
+                    // Gọi summary an toàn — không throw, không log đỏ, cache per-user
+                    const summary = await getUserSummarySilent(partnerId);
+                    if (summary) {
                         if (summary.avatarUrl) {
-                            // Lưu cache theo partnerId
                             set(state => ({
                                 avatarCache: { ...state.avatarCache, [partnerId]: summary.avatarUrl! },
                             }));
-                            return { ...conv, avatar: summary.avatarUrl };
                         }
-                    } catch {
-                        // Fail silent — nếu summary fail thì giữ nguyên conv, không crash chat
+                        return {
+                            ...conv,
+                            avatar: summary.avatarUrl || conv.avatar,
+                            fullName: summary.fullName?.trim() || conv.fullName || `Người dùng #${partnerId}`,
+                        };
                     }
-                    return conv;
+                    // Summary null (fail) → giữ conv nguyên, fallback tên nếu thiếu
+                    return {
+                        ...conv,
+                        fullName: conv.fullName || `Người dùng #${partnerId}`,
+                    };
                 })
             );
 

@@ -7,6 +7,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { userService } from '../services/api/user';
+import { getUserSummarySilent } from '../services/api/user';
 import { roomService } from '../services/api/rooms';
 import { CustomerPublicResponseDTO, Room } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,11 +43,11 @@ export default function LandlordProfileScreen() {
                     // Banner is optional — fail silently
                 }
             } else if (landlordId) {
-                const summary = await userService.getUserSummary(Number(landlordId));
+                const summary = await getUserSummarySilent(Number(landlordId));
                 setProfile({
-                    id: String(summary.id),
-                    fullName: summary.fullName,
-                    avatarUrl: summary.avatarUrl,
+                    id: String(summary?.id ?? landlordId),
+                    fullName: summary?.fullName || `Chủ nhà #${landlordId}`,
+                    avatarUrl: summary?.avatarUrl,
                 });
             }
             // Load landlord's properties
