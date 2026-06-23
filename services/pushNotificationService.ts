@@ -17,6 +17,20 @@ import { notificationService } from './api/notifications';
 
 const LAST_HANDLED_NOTIFICATION_RESPONSE_KEY = 'last_handled_notification_response_id';
 
+function getReadablePushError(error: unknown): string {
+    const message = String((error as any)?.message ?? error ?? '');
+
+    if (message.includes('SERVICE_NOT_AVAILABLE')) {
+        return 'Dịch vụ push notification chưa khả dụng trên thiết bị/mạng hiện tại.';
+    }
+
+    if (message.toLowerCase().includes('permission')) {
+        return 'Thiết bị chưa cấp quyền thông báo.';
+    }
+
+    return message || 'Không lấy được push token.';
+}
+
 function getNotificationResponseKey(response: Notifications.NotificationResponse): string {
     const identifier = response.notification.request.identifier;
     const action = response.actionIdentifier || 'default';
@@ -139,7 +153,11 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
         return token;
     } catch (error) {
-        console.error('[PushNotif] Lỗi lấy push token:', error);
+        console.warn(
+            '[PushNotif] Không lấy được push token, bỏ qua đăng ký push notification:',
+            getReadablePushError(error)
+        );
+        await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS_ENABLED, 'false');
         return null;
     }
 }

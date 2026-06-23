@@ -233,9 +233,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             const token = await initializePushNotifications();
             if (token) {
                 set({ pushToken: token, isNotificationsEnabled: true });
+            } else {
+                set({ pushToken: null, isNotificationsEnabled: false });
             }
         } catch (error) {
-            console.error('[NotifStore] Lỗi khởi tạo push notifications:', error);
+            console.warn('[NotifStore] Bỏ qua push notifications vì chưa đăng ký được token.');
+            set({ pushToken: null, isNotificationsEnabled: false });
         }
     },
 
