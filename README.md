@@ -483,8 +483,3 @@ Kiểm tra trước khi gửi APK:
 | 4 | 💬 Chat | Danh sách hội thoại |
 | 5 | 👤 Tôi | Hồ sơ cá nhân |
 
-> Bản đồ (`map`) ẩn khỏi tab bar, truy cập từ nút bản đồ trên header trang chủ.
-
----
-
-*README được tạo tự động dựa trên source code thực tế. Không chứa secret, password, token, hoặc API key.*
