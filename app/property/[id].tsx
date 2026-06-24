@@ -806,7 +806,7 @@ export default function PropertyDetailScreen() {
                                     <Text style={styles.sectionTitle}>👤 Thông tin chủ nhà</Text>
                                     <TouchableOpacity
                                         style={styles.landlordCard}
-                                    onPress={() => safePush(`/landlord-profile?landlordId=${room.ownerId}` as any)}
+                                    onPress={() => safePush(`/landlord-profile?landlordId=${room.ownerId}${room.ownerSlugSnapshot ? `&slug=${room.ownerSlugSnapshot}` : ''}` as any)}
                                         activeOpacity={0.7}
                                     >
                                         <Image source={{ uri: ownerAvatar }} style={styles.landlordAvatar} />

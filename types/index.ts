@@ -171,9 +171,12 @@ export interface CustomerProfileDTO {
 
 export interface CustomerPublicResponseDTO {
     id: string;
+    publicId?: string;
     fullName: string;
     avatarUrl?: string;
     kycStatus?: string;
+    identityVerified?: boolean;
+    membershipLevel?: string;
     phone?: string;
     createdAt?: string;
 }
