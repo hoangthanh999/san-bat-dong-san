@@ -28,6 +28,16 @@ interface ChatState {
     disconnectWebSocket: () => void;
 }
 
+function getMessageTime(message: ChatMessage): number {
+    const value = (message as any).createdAt ?? (message as any).sentAt ?? (message as any).timestamp ?? 0;
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) ? time : 0;
+}
+
+function sortMessagesAsc(messages: ChatMessage[]): ChatMessage[] {
+    return [...messages].sort((a, b) => getMessageTime(a) - getMessageTime(b));
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
     conversations: [],
     messages: {},
@@ -96,7 +106,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         try {
             const history = await chatService.getHistory(partnerId);
             set(state => ({
-                messages: { ...state.messages, [partnerId]: history.reverse() },
+                messages: { ...state.messages, [partnerId]: sortMessagesAsc(history) },
                 isLoading: false,
             }));
         } catch (error) {
@@ -126,7 +136,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         set(state => ({
             messages: {
                 ...state.messages,
-                [partnerId]: [...(state.messages[partnerId] || []), tempMessage],
+                [partnerId]: sortMessagesAsc([...(state.messages[partnerId] || []), tempMessage]),
             },
         }));
 
@@ -135,9 +145,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
             set(state => ({
                 messages: {
                     ...state.messages,
-                    [partnerId]: (state.messages[partnerId] || []).map(m =>
+                    [partnerId]: sortMessagesAsc((state.messages[partnerId] || []).map(m =>
                         m.id === tempMessage.id ? sent : m
-                    ),
+                    )),
                 },
             }));
             set(state => ({
@@ -167,7 +177,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             return {
                 messages: {
                     ...state.messages,
-                    [partnerId]: alreadyExists ? currentMessages : [...currentMessages, message],
+                    [partnerId]: alreadyExists ? currentMessages : sortMessagesAsc([...currentMessages, message]),
                 },
                 conversations: state.conversations.map(c =>
                     c.id === partnerId
