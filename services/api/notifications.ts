@@ -42,13 +42,17 @@ export const notificationService = {
 
     // === Push Token management (chưa có backend endpoint) ===
 
-    savePushToken: async (token: string): Promise<void> => {
-        // TODO: Backend chưa có push token endpoint
-        console.warn('[notificationService] savePushToken: API chưa có trong backend');
+    savePushToken: async (_token: string): Promise<boolean> => {
+        if (__DEV__) {
+            console.log('[notificationService] savePushToken: backend chua ho tro dong bo push token');
+        }
+        return false;
     },
 
-    deletePushToken: async (token: string): Promise<void> => {
-        // TODO: Backend chưa có push token endpoint
-        console.warn('[notificationService] deletePushToken: API chưa có trong backend');
+    deletePushToken: async (_token: string): Promise<boolean> => {
+        if (__DEV__) {
+            console.log('[notificationService] deletePushToken: backend chua ho tro dong bo push token');
+        }
+        return false;
     },
 };

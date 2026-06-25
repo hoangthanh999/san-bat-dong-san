@@ -163,13 +163,24 @@ export async function registerForPushNotifications(): Promise<string | null> {
 }
 
 // ─── Gửi token lên server ────────────────────────────────────────────────────
-export async function savePushTokenToServer(token: string): Promise<void> {
+export async function savePushTokenToServer(token: string): Promise<boolean> {
     try {
-        await notificationService.savePushToken(token);
-        console.log('[PushNotif] Đã lưu push token lên server.');
-    } catch (error) {
-        // Silently fail — sẽ retry lần sau
-        console.warn('[PushNotif] Không thể lưu token lên server, sẽ thử lại sau.');
+        const synced = await notificationService.savePushToken(token);
+        if (!synced) {
+            if (__DEV__) {
+                console.log('[PushNotif] Da tao push token tren thiet bi; backend chua ho tro dong bo.');
+            }
+            return false;
+        }
+        if (__DEV__) {
+            console.log('[PushNotif] Da dong bo push token len server.');
+        }
+        return true;
+    } catch {
+        if (__DEV__) {
+            console.warn('[PushNotif] Khong the dong bo push token len server.');
+        }
+        return false;
     }
 }
 
@@ -184,7 +195,9 @@ export async function removePushToken(): Promise<void> {
         await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS_ENABLED, 'false');
         // Xóa badge
         await Notifications.setBadgeCountAsync(0);
-        console.log('[PushNotif] Đã xóa push token.');
+        if (__DEV__) {
+            console.log('[PushNotif] Đã xóa push token.');
+        }
     } catch (error) {
         console.error('[PushNotif] Lỗi xóa token:', error);
     }
@@ -216,7 +229,9 @@ export function setupNotificationHandlers(
     // Listener 1: Foreground – Notification đến khi app đang mở
     const foregroundSubscription = Notifications.addNotificationReceivedListener(
         (notification) => {
-            console.log('[PushNotif] Nhận notification (foreground):', notification);
+            if (__DEV__) {
+                console.log('[PushNotif] Nhận notification (foreground):', notification);
+            }
             // Cập nhật badge/unread count
             onNewNotification?.();
         }
@@ -226,7 +241,9 @@ export function setupNotificationHandlers(
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(
         async (response) => {
             const data = response.notification.request.content.data as any;
-            console.log('[PushNotif] User bấm vào notification:', data);
+            if (__DEV__) {
+                console.log('[PushNotif] User bấm vào notification:', data);
+            }
             await shouldHandleNotificationResponse(response);
             await clearLastNotificationResponse();
             handleNotificationNavigation(router, data);
@@ -298,13 +315,17 @@ export async function handleInitialNotification(router: any): Promise<void> {
         if (lastResponse) {
             const shouldHandle = await shouldHandleNotificationResponse(lastResponse);
             if (!shouldHandle) {
-                console.log('[PushNotif] Skip stale notification response.');
+                if (__DEV__) {
+                    console.log('[PushNotif] Skip stale notification response.');
+                }
                 return;
             }
 
             const data = lastResponse.notification.request.content.data as any;
             await clearLastNotificationResponse();
-            console.log('[PushNotif] App được mở từ notification:', data);
+            if (__DEV__) {
+                console.log('[PushNotif] App được mở từ notification:', data);
+            }
             // Delay nhỏ để router sẵn sàng
             setTimeout(() => handleNotificationNavigation(router, data), 500);
         }
@@ -340,7 +361,9 @@ export async function scheduleAppointmentReminder(params: {
 
         // Nếu thời gian nhắc đã qua thì bỏ qua
         if (reminderDate <= new Date()) {
-            console.log('[PushNotif] Lịch hẹn quá gần, không schedule reminder.');
+            if (__DEV__) {
+                console.log('[PushNotif] Lịch hẹn quá gần, không schedule reminder.');
+            }
             return null;
         }
 
@@ -362,7 +385,9 @@ export async function scheduleAppointmentReminder(params: {
             },
         });
 
-        console.log('[PushNotif] Đã schedule appointment reminder:', notifId);
+        if (__DEV__) {
+            console.log('[PushNotif] Đã schedule appointment reminder:', notifId);
+        }
         return notifId;
     } catch (error) {
         console.error('[PushNotif] Lỗi schedule appointment reminder:', error);
@@ -394,7 +419,9 @@ export async function sendLocalNotification(params: {
  */
 export async function cancelAllScheduledNotifications(): Promise<void> {
     await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('[PushNotif] Đã hủy tất cả scheduled notifications.');
+    if (__DEV__) {
+        console.log('[PushNotif] Đã hủy tất cả scheduled notifications.');
+    }
 }
 
 /**
