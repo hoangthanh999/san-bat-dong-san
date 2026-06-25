@@ -38,7 +38,9 @@ propertyClient.interceptors.request.use(
                 delete (config.headers as any).Authorization;
             }
 
-            console.log(`[Property API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+            if (__DEV__) {
+                console.log(`[Property API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+            }
 
             return config;
         } catch (error) {
@@ -52,7 +54,9 @@ propertyClient.interceptors.request.use(
 // Response Interceptor - Auto-unwrap ApiResponse.result
 propertyClient.interceptors.response.use(
     (response) => {
-        console.log(`[Property API Response] ${response.config.url} - Status: ${response.status}`);
+        if (__DEV__) {
+            console.log(`[Property API Response] ${response.config.url} - Status: ${response.status}`);
+        }
 
         // Backend trả về { code?, message?, result: T }
         if (response.data && response.data.result !== undefined) {

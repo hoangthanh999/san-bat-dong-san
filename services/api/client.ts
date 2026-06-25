@@ -125,7 +125,9 @@ apiClient.interceptors.request.use(
                 config.headers['Content-Type'] = 'application/json';
             }
 
-            console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+            if (__DEV__) {
+                console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+            }
 
             return config;
         } catch (error) {
@@ -141,7 +143,9 @@ apiClient.interceptors.request.use(
 // Response Interceptor - Auto-unwrap backend ApiResponse { code, message, result }
 apiClient.interceptors.response.use(
     (response) => {
-        console.log(`[API Response] ${response.config.url} - Status: ${response.status}`);
+        if (__DEV__) {
+            console.log(`[API Response] ${response.config.url} - Status: ${response.status}`);
+        }
 
         // Backend luôn trả về { code?, message?, result: T }
         // Tự động unwrap result để service layer nhận data trực tiếp
@@ -159,7 +163,7 @@ apiClient.interceptors.response.use(
 
         if (!isSilent) {
             console.error('[API Error]', status, error.message, url);
-            if (error.response?.data) {
+            if (__DEV__ && error.response?.data) {
                 console.error('[API Error Data]', JSON.stringify(error.response.data));
             }
         }

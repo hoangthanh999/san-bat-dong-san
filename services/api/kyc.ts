@@ -52,7 +52,9 @@ async function multipartFetch<T>(endpoint: string, formData: FormData): Promise<
     const token = await getAccessToken();
     const url = `${await getApiBaseUrl()}${endpoint}`;
 
-    console.log(`[KYC] POST ${url}`);
+    if (__DEV__) {
+        console.log(`[KYC] POST ${url}`);
+    }
 
     try {
         const response = await fetch(url, {
@@ -63,7 +65,9 @@ async function multipartFetch<T>(endpoint: string, formData: FormData): Promise<
             body: formData,
         });
 
-        console.log(`[KYC] Status: ${response.status}`);
+        if (__DEV__) {
+            console.log(`[KYC] Status: ${response.status}`);
+        }
 
         // Xử lý response body
         const text = await response.text();

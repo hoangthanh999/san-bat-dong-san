@@ -88,7 +88,9 @@ export const mediaService = {
         folder: string = 'properties'
     ): Promise<string[]> => {
         const formData = new FormData();
-        console.log('[uploadMultiple] files count:', files.length);
+        if (__DEV__) {
+            console.log('[uploadMultiple] files count:', files.length);
+        }
         files.forEach((file) => {
             formData.append('files', {   // Key là "files" (số nhiều) — backend @RequestParam("files")
                 uri: file.uri,
@@ -105,7 +107,9 @@ export const mediaService = {
             body: formData,
         });
         const json = await response.json();
-        console.log('[uploadMultiple] response:', json);
+        if (__DEV__) {
+            console.log('[uploadMultiple] response:', json);
+        }
 
         if (!response.ok) throw new Error(json.message || 'Upload nhiều file thất bại');
         // Unwrap ApiResponse.result → string[]

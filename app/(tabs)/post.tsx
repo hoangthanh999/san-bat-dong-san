@@ -403,7 +403,9 @@ function PostScreenContent() {
                 const data = await res.json();
                 if (data && data.length > 0) {
                     setForm(prev => ({ ...prev, latitude: data[0].lat, longitude: data[0].lon }));
-                    console.log(`[Geocode] ✅ Match: "${parts.join(', ')}" → ${data[0].lat}, ${data[0].lon}`);
+                    if (__DEV__) {
+                        console.log(`[Geocode] ✅ Match: "${parts.join(', ')}" → ${data[0].lat}, ${data[0].lon}`);
+                    }
                     return; // Dừng ngay khi có kết quả
                 }
                 console.warn(`[Geocode] ❌ No result for: "${parts.join(', ')}"`);
@@ -612,8 +614,8 @@ function PostScreenContent() {
 
             if (__DEV__) {
                 console.log('[Post] selected amenities:', selectedAmenities);
+                console.log('[Post] final create property payload:', body);
             }
-            console.log('[Post] final create property payload:', body);
             await roomService.createRoom(body);
             setStep(3);
         } catch (error: any) {

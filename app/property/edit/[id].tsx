@@ -230,8 +230,8 @@ export default function EditPropertyScreen() {
 
             if (__DEV__) {
                 console.log('[EditProperty] selected amenities:', selectedAmenities);
+                console.log('[EditProperty] final update property payload:', body);
             }
-            console.log('[EditProperty] final update property payload:', body);
             await roomService.updateRoom(propertyId, body);
             Alert.alert('Thành công', 'Cập nhật bài đăng thành công!', [
                 { text: 'OK', onPress: () => router.back() }

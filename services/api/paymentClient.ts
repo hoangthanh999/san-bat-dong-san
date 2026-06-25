@@ -32,7 +32,9 @@ paymentClient.interceptors.request.use(
                 delete (config.headers as any).Authorization;
             }
 
-            console.log(`[Payment API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+            if (__DEV__) {
+                console.log(`[Payment API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+            }
 
             return config;
         } catch (error) {
@@ -46,7 +48,9 @@ paymentClient.interceptors.request.use(
 // Response Interceptor - Không unwrap vì payment-service trả ResponseEntity trực tiếp
 paymentClient.interceptors.response.use(
     (response) => {
-        console.log(`[Payment API Response] ${response.config.url} - Status: ${response.status}`);
+        if (__DEV__) {
+            console.log(`[Payment API Response] ${response.config.url} - Status: ${response.status}`);
+        }
 
         // Payment-service dùng ResponseEntity trả data trực tiếp, không wrap trong ApiResponse
         // Nhưng nếu có result thì unwrap cho nhất quán

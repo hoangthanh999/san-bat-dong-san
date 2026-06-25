@@ -136,7 +136,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         // Tránh tạo nhiều connection
         const existing = get()._stompClient;
         if (existing?.connected) {
-            console.log('[NotifWS] Đã kết nối rồi, bỏ qua.');
+            if (__DEV__) {
+                console.log('[NotifWS] Đã kết nối rồi, bỏ qua.');
+            }
             return;
         }
 
@@ -160,7 +162,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
                 heartbeatOutgoing: 4000,
 
                 onConnect: () => {
-                    console.log(`[NotifWS] Kết nối thành công cho user ${userId}`);
+                    if (__DEV__) {
+                        console.log(`[NotifWS] Kết nối thành công cho user ${userId}`);
+                    }
                     set({ wsConnected: true });
 
                     // Subscribe đúng topic backend push:
@@ -171,7 +175,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
                         (message: IMessage) => {
                             try {
                                 const notif: Notification = JSON.parse(message.body);
-                                console.log('[NotifWS] Nhận notification mới:', notif.type, notif.title);
+                                if (__DEV__) {
+                                    console.log('[NotifWS] Nhận notification mới:', notif.type, notif.title);
+                                }
                                 get().addLocalNotification(notif);
                             } catch (err) {
                                 console.error('[NotifWS] Parse lỗi:', err);
@@ -181,7 +187,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
                 },
 
                 onDisconnect: () => {
-                    console.log('[NotifWS] Ngắt kết nối.');
+                    if (__DEV__) {
+                        console.log('[NotifWS] Ngắt kết nối.');
+                    }
                     set({ wsConnected: false });
                 },
 
@@ -223,7 +231,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         const client = get()._stompClient;
         if (client) {
             client.deactivate();
-            console.log('[NotifWS] Đã deactivate STOMP client.');
+            if (__DEV__) {
+                console.log('[NotifWS] Đã deactivate STOMP client.');
+            }
         }
         set({ _stompClient: null, wsConnected: false });
     },
