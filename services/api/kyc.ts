@@ -4,6 +4,7 @@ import { API_ENDPOINTS } from '../../constants';
 import apiClient from './client';
 import { getApiBaseUrl } from './environment';
 import { KycOcrResponseDTO, KYCSubmitData, KYCStatusResponse, CustomerResponseDTO } from '../../types';
+import { getAccessToken } from '../storage/tokenStorage';
 
 /**
  * Map backend error messages → thông báo user-friendly
@@ -48,7 +49,7 @@ function mapErrorMessage(serverMessage: string, statusCode: number): string {
  * Axios trên React Native có bug không gửi được FormData chứa file URI
  */
 async function multipartFetch<T>(endpoint: string, formData: FormData): Promise<T> {
-    const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    const token = await getAccessToken();
     const url = `${await getApiBaseUrl()}${endpoint}`;
 
     console.log(`[KYC] POST ${url}`);

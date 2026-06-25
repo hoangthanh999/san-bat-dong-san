@@ -14,6 +14,7 @@ import {
     DEFAULT_ANALYTICS_PROVINCE,
 } from '../../store/analyticsStore';
 import { PriceTrendItem, WardPriceDTO, RegionTransactionStat } from '../../types';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 // ──────────────────────────────────────────
 // Helpers
@@ -281,6 +282,14 @@ const wardStyles = StyleSheet.create({
 // Main Screen
 // ──────────────────────────────────────────
 export default function AnalyticsScreen() {
+    return (
+        <AuthGuardScreen message="Đăng nhập để xem thống kê" icon="bar-chart-outline">
+            <AnalyticsContent />
+        </AuthGuardScreen>
+    );
+}
+
+function AnalyticsContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [showDistrictPicker, setShowDistrictPicker] = useState(false);

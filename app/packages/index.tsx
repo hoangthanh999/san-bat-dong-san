@@ -10,6 +10,7 @@ import { useWalletStore } from '../../store/walletStore';
 import { ServicePackage } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 
 function PackageCard({ pkg, onBuy }: { pkg: ServicePackage; onBuy: () => void }) {
@@ -49,6 +50,14 @@ function PackageCard({ pkg, onBuy }: { pkg: ServicePackage; onBuy: () => void })
 }
 
 export default function PackagesScreen() {
+    return (
+        <AuthGuardScreen message="Đăng nhập để xem gói dịch vụ" icon="star-outline">
+            <PackagesContent />
+        </AuthGuardScreen>
+    );
+}
+
+function PackagesContent() {
     const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { membershipPackages, boostPackages, isLoading, isPurchasing, fetchPackages, purchaseMembership } = usePackageStore();
@@ -58,12 +67,12 @@ export default function PackagesScreen() {
     const [confirmPkg, setConfirmPkg] = useState<ServicePackage | null>(null);
 
     // Tính balance từ transaction history (backend chưa có wallet balance API)
-   const balance = wallet?.balance ?? 0;
+    const balance = wallet?.balance ?? 0;
 
     useEffect(() => {
-    fetchPackages();
-    fetchWallet();
-}, []);
+        fetchPackages();
+        fetchWallet();
+    }, []);
 
     const packages = activeTab === 'MEMBERSHIP' ? membershipPackages : boostPackages;
 
@@ -220,7 +229,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */, paddingBottom: 12,
+        paddingHorizontal: 16, paddingBottom: 12,
         backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
     },
     backBtn: { width: 40, height: 40, justifyContent: 'center' },
@@ -274,7 +283,7 @@ const styles = StyleSheet.create({
     },
     modalCard: {
         backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-        padding: 24, paddingBottom: 24, // add insets.bottom inline if needed
+        padding: 24,
     },
     modalTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 16 },
     modalInfoRow: {

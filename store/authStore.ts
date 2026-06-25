@@ -4,6 +4,8 @@ import { authService } from '../services/api/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
 import { removePushToken } from '../services/pushNotificationService';
+import { getAccessToken, clearTokens } from '../services/storage/tokenStorage';
+import { jwtDecode } from 'jwt-decode';
 
 interface AuthState {
     user: User | null;
@@ -123,6 +125,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     forceLogout: () => {
         // Gọi từ API interceptor khi nhận 401 — không gọi API backend
+        // Xóa token đồng bộ qua clearTokens (async nhưng fire-and-forget OK ở đây)
+        clearTokens().catch(() => {});
+        AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA).catch(() => {});
         set({
             user: null,
             token: null,
@@ -135,22 +140,48 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     checkAuth: async () => {
         set({ isLoading: true });
         try {
-            const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            const token = await getAccessToken();
             const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
 
             if (token && userData) {
-                set({
-                    token,
-                    user: JSON.parse(userData),
-                    isAuthenticated: true,
-                    isLoading: false
-                });
+                // Kiểm tra JWT expiry để tránh khôi phục token hết hạn
+                let isExpired = false;
+                try {
+                    const decoded: any = jwtDecode(token);
+                    const exp = decoded?.exp;
+                    if (exp && typeof exp === 'number') {
+                        // exp là Unix timestamp (giây), cộng thêm 30s buffer
+                        isExpired = Date.now() / 1000 > exp - 30;
+                    }
+                } catch {
+                    // Nếu không decode được, coi như hết hạn để an toàn
+                    isExpired = true;
+                }
+
+                if (isExpired) {
+                    // Token hết hạn: xóa storage và trả về unauthenticated
+                    await clearTokens();
+                    await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+                    set({
+                        token: null,
+                        user: null,
+                        isAuthenticated: false,
+                        isLoading: false,
+                    });
+                } else {
+                    set({
+                        token,
+                        user: JSON.parse(userData),
+                        isAuthenticated: true,
+                        isLoading: false,
+                    });
+                }
             } else {
                 set({
                     token: null,
                     user: null,
                     isAuthenticated: false,
-                    isLoading: false
+                    isLoading: false,
                 });
             }
         } catch (error) {
@@ -158,7 +189,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 token: null,
                 user: null,
                 isAuthenticated: false,
-                isLoading: false
+                isLoading: false,
             });
         }
     },

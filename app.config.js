@@ -14,6 +14,7 @@ module.exports = ({ config }) => ({
                 color: "#0066FF",
                 androidMode: "default",
             }
-        ]
+        ],
+        "expo-secure-store"
     ],
 });

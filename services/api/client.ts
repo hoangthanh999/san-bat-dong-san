@@ -1,7 +1,11 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, STORAGE_KEYS } from '../../constants';
 import { getApiBaseUrl } from './environment';
+import {
+    getAccessToken,
+    setAccessToken,
+    clearTokens,
+} from '../storage/tokenStorage';
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
     _retry?: boolean;
@@ -43,8 +47,10 @@ function extractToken(data: any): string | null {
 }
 
 async function clearAuthState() {
-    await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    // Xóa token qua abstraction layer
+    await clearTokens();
+    // Xóa user data (không nhạy cảm)
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
     await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
 
     try {
@@ -56,7 +62,7 @@ async function clearAuthState() {
 async function refreshAccessToken(): Promise<string> {
     if (!refreshPromise) {
         refreshPromise = (async () => {
-            const currentToken = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            const currentToken = await getAccessToken();
             if (!currentToken) {
                 throw new Error('Missing access token');
             }
@@ -75,7 +81,7 @@ async function refreshAccessToken(): Promise<string> {
                 throw new Error('Refresh response missing token');
             }
 
-            await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, newToken);
+            await setAccessToken(newToken);
 
             try {
                 const { useAuthStore } = require('../../store/authStore');
@@ -99,7 +105,7 @@ apiClient.interceptors.request.use(
             apiClient.defaults.baseURL = baseURL;
             refreshClient.defaults.baseURL = baseURL;
 
-            const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            const token = await getAccessToken();
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
             } else if (config.headers?.Authorization) {

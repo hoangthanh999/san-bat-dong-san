@@ -8,6 +8,7 @@ import { useRouter, Stack } from 'expo-router';
 import { useWalletStore } from '../../store/walletStore';
 import { Transaction } from '../../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 const FILTER_TABS = [
     { key: '', label: 'Tất cả' },
@@ -71,6 +72,14 @@ function groupByMonth(txs: Transaction[]) {
 }
 
 export default function TransactionHistoryScreen() {
+    return (
+        <AuthGuardScreen message="Đăng nhập để xem lịch sử giao dịch" icon="receipt-outline">
+            <TransactionHistoryContent />
+        </AuthGuardScreen>
+    );
+}
+
+function TransactionHistoryContent() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { transactions, paymentTransactions, isLoading, fetchTransactions, fetchPaymentTransactions } = useWalletStore();

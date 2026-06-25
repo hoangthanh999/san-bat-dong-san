@@ -4,6 +4,7 @@ import {
     CLOUDINARY_UPLOAD_PRESET,
 } from '../../constants';
 import { getApiBaseUrl } from './environment';
+import { getAccessToken } from '../storage/tokenStorage';
 
 
 async function sha1(str: string): Promise<string> {
@@ -58,9 +59,6 @@ export const mediaService = {
         mimeType: string = 'image/jpeg',
         folder: string = 'properties'
     ): Promise<string> => {
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const { STORAGE_KEYS } = await import('../../constants');
-
         const formData = new FormData();
         formData.append('file', {
             uri: fileUri,
@@ -69,7 +67,7 @@ export const mediaService = {
         } as any);
         formData.append('folder', folder);
 
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        const token = await getAccessToken();
         const response = await fetch(`${await getApiBaseUrl()}${API_ENDPOINTS.MEDIA_UPLOAD}`, {
             method: 'POST',
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -89,11 +87,8 @@ export const mediaService = {
         files: { uri: string; name: string; type: string }[],
         folder: string = 'properties'
     ): Promise<string[]> => {
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const { STORAGE_KEYS } = await import('../../constants');
-
         const formData = new FormData();
-          console.log('[uploadMultiple] files count:', files.length);
+        console.log('[uploadMultiple] files count:', files.length);
         files.forEach((file) => {
             formData.append('files', {   // Key là "files" (số nhiều) — backend @RequestParam("files")
                 uri: file.uri,
@@ -103,20 +98,21 @@ export const mediaService = {
         });
         formData.append('folder', folder);
 
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        const token = await getAccessToken();
         const response = await fetch(`${await getApiBaseUrl()}${API_ENDPOINTS.MEDIA_UPLOAD_MULTIPLE}`, {
             method: 'POST',
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
             body: formData,
         });
         const json = await response.json();
-            console.log('[uploadMultiple] response:', json);
+        console.log('[uploadMultiple] response:', json);
 
         if (!response.ok) throw new Error(json.message || 'Upload nhiều file thất bại');
         // Unwrap ApiResponse.result → string[]
         return (json.result !== undefined ? json.result : json) as string[];
     },
-uploadVideo: async (
+
+    uploadVideo: async (
         fileUri: string,
         fileName: string,
         folder: string = 'properties'

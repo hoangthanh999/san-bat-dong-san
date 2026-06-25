@@ -4,6 +4,7 @@ import { AuthResponse, LoginRequest, RegisterRequest, User } from '../../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../../constants';
 import { jwtDecode } from 'jwt-decode';
+import { getAccessToken, setAccessToken, clearTokens } from '../storage/tokenStorage';
 
 export const authService = {
     // Register - trả về UserResponseDTO (đã unwrap result)
@@ -22,9 +23,8 @@ export const authService = {
 
 
         if (authData.token) {
-            // Lưu token
-
-            await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, authData.token);
+            // Lưu token qua tokenStorage (abstraction layer, dễ swap sang SecureStore)
+            await setAccessToken(authData.token);
             // Xây dựng User object từ auth response
             const user: User = {
                 id: authData.id,
@@ -32,6 +32,7 @@ export const authService = {
                 fullName: authData.fullName,
                 role: authData.role as User['role'],
             };
+            // User data (không chứa token/password) → AsyncStorage OK
             await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
         }
 
@@ -47,8 +48,9 @@ export const authService = {
             // Vẫn xóa local dù API lỗi (token có thể đã hết hạn)
             console.warn('[Auth] Logout API failed, clearing local storage anyway');
         }
-        await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-        await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+        // Xóa token qua abstraction layer
+        await clearTokens();
+        // Xóa user data (không nhạy cảm)
         await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
     },
 
@@ -65,7 +67,7 @@ export const authService = {
 
     // Check if user is authenticated
     isAuthenticated: async (): Promise<boolean> => {
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        const token = await getAccessToken();
         return !!token;
     },
 
@@ -89,8 +91,8 @@ export const authService = {
             const userId = decoded.userId || decoded.sub || '';
             const role = decoded.role || 'USER';
 
-            // Gọi backend để lấy thông tin user đầy đủ
-            await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, jwtToken);
+            // Lưu token qua abstraction layer trước khi gọi profile
+            await setAccessToken(jwtToken);
 
             // Lấy user info từ customer-service
             let fullName = decoded.fullName || decoded.name || '';
@@ -119,6 +121,7 @@ export const authService = {
                 fullName: authData.fullName,
                 role: authData.role as User['role'],
             };
+            // User data (không chứa token/password) → AsyncStorage OK
             await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
 
             return authData;
@@ -149,7 +152,7 @@ export const authService = {
             const response = await apiClient.post('/auth/refresh');
             const authData: AuthResponse = response.data;
             if (authData.token) {
-                await AsyncStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, authData.token);
+                await setAccessToken(authData.token);
             }
             return authData;
         } catch (error) {

@@ -8,6 +8,7 @@ import {
 } from '../services/pushNotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
+import { getAccessToken } from '../services/storage/tokenStorage';
 import { Client, IMessage } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { getNotificationWebSocketUrl } from '../services/api/environment';
@@ -140,7 +141,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         }
 
         const getToken = async (): Promise<string> => {
-            const raw = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            const raw = await getAccessToken();
             return raw ?? '';
         };
 

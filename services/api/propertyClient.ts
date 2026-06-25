@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PROPERTY_API_BASE_URL, STORAGE_KEYS } from '../../constants';
 import { getApiBaseUrl } from './environment';
+import { getAccessToken, clearTokens } from '../storage/tokenStorage';
 
 /**
  * propertyClient.ts
@@ -30,7 +30,7 @@ propertyClient.interceptors.request.use(
             config.baseURL = baseURL;
             propertyClient.defaults.baseURL = baseURL;
 
-            const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+            const token = await getAccessToken();
 
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
@@ -65,9 +65,14 @@ propertyClient.interceptors.response.use(
         console.error('[Property API Error]', error.response?.status, error.message);
 
         if (error.response?.status === 401) {
-            await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-            await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+            // Xóa token và clear Zustand state
+            await clearTokens();
+            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
             await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
+            try {
+                const { useAuthStore } = require('../../store/authStore');
+                useAuthStore.getState().forceLogout();
+            } catch (e) { }
 
             return Promise.reject({
                 ...error,

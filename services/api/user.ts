@@ -2,6 +2,7 @@ import apiClient from './client';
 import { API_ENDPOINTS } from '../../constants';
 import { User, CustomerResponseDTO, CustomerProfileDTO, Room, Favorite, PaginatedResponse } from '../../types';
 import { getApiBaseUrl } from './environment';
+import { getAccessToken } from '../storage/tokenStorage';
 
 export interface UserSummaryDTO {
     id: number;
@@ -71,9 +72,7 @@ export const userService = {
      * Dùng fetch thay axios vì axios trên React Native không gửi được FormData chứa file
      */
     updateAvatar: async (formData: FormData): Promise<CustomerResponseDTO> => {
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const { STORAGE_KEYS } = await import('../../constants');
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        const token = await getAccessToken();
         const response = await fetch(`${await getApiBaseUrl()}${API_ENDPOINTS.CUSTOMER_AVATAR}`, {
             method: 'POST',
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -89,9 +88,7 @@ export const userService = {
      * POST /customers/banner — FormData field: "file"
      */
     updateBanner: async (formData: FormData): Promise<CustomerResponseDTO> => {
-        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-        const { STORAGE_KEYS } = await import('../../constants');
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+        const token = await getAccessToken();
         const response = await fetch(`${await getApiBaseUrl()}${API_ENDPOINTS.CUSTOMER_BANNER}`, {
             method: 'POST',
             headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },

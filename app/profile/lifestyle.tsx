@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useUserStore } from '../../store/userStore';
+import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -157,6 +158,14 @@ function SectionTitle({ icon, title }: { icon: string; title: string }) {
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function LifestyleScreen() {
+    return (
+        <AuthGuardScreen message="Đăng nhập để xem phong cách sống" icon="person-outline">
+            <LifestyleContent />
+        </AuthGuardScreen>
+    );
+}
+
+function LifestyleContent() {
     const router = useRouter();
     const { profile, isUpdating, fetchProfile, updateProfile } = useUserStore();
 

@@ -7,6 +7,7 @@ import {
     STORAGE_KEYS,
     WS_AI_URL,
 } from '../../constants';
+import { clearTokens } from '../storage/tokenStorage';
 
 type ApiEnvironmentName = 'production' | 'fallback';
 
@@ -45,8 +46,8 @@ async function pingBaseUrl(baseUrl: string): Promise<void> {
 }
 
 async function clearAuthForEnvironmentChange() {
-    await AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-    await AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    // Xóa token qua SecureStore abstraction
+    await clearTokens();
     await AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA);
 
     try {
