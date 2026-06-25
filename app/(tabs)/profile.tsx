@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     FlatList, RefreshControl, StatusBar, Platform, Alert, Switch, ActivityIndicator,
@@ -167,9 +167,13 @@ function ProfileScreenContent() {
         fetchSavedProperties, loadMoreSaved, toggleSave,
     } = useInteractionStore();
 
-    const [activeTab, setActiveTab] = useState<'myrooms' | 'appointments' | 'saved'>('myrooms');
+    const accountRole = user?.role || profile?.role;
+    const isOwner = accountRole === 'OWNER' || accountRole === 'ADMIN';
+    const isAdmin = accountRole === 'ADMIN';
+    const [activeTab, setActiveTab] = useState<'myrooms' | 'appointments' | 'saved'>(() => isOwner ? 'myrooms' : 'saved');
     const [refreshing, setRefreshing] = useState(false);
     const [togglingNotif, setTogglingNotif] = useState(false);
+    const didApplyRoleDefaultTab = useRef(false);
 
     useEffect(() => {
         if (isAuthenticated) {
@@ -179,6 +183,12 @@ function ProfileScreenContent() {
             fetchSavedProperties(true);
         }
     }, [isAuthenticated]);
+
+    useEffect(() => {
+        if (!accountRole || didApplyRoleDefaultTab.current) return;
+        setActiveTab(isOwner ? 'myrooms' : 'saved');
+        didApplyRoleDefaultTab.current = true;
+    }, [isOwner, accountRole]);
 
     const onRefresh = async () => {
         setRefreshing(true);
@@ -250,6 +260,74 @@ function ProfileScreenContent() {
     };
 
     const displayUser = profile || user;
+    const isVerified = (displayUser as any)?.identityVerified === true || displayUser?.kycStatus === 'VERIFIED';
+    const hasListings = myRooms.length > 0;
+    const activeRooms = myRooms.filter(room => room.status === 'ACTIVE').length;
+    const pendingRooms = myRooms.filter(room => room.status === 'PENDING').length;
+    const roleLabel = isAdmin ? 'Quản trị viên' : isOwner ? 'Chủ nhà' : 'Người dùng';
+    const roleIcon = isAdmin ? 'shield-checkmark-outline' : isOwner ? 'home-outline' : 'person-outline';
+    const primaryContact = displayUser?.email || displayUser?.phone || 'Chưa cập nhật liên hệ';
+    const avatarUrl = displayUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayUser?.fullName || 'User')}&background=0066FF&color=fff&size=200`;
+    const walletBalance = (displayUser as any)?.walletBalance;
+    const dashboardStats = isOwner
+        ? [
+            { label: 'Tổng tin', value: myRooms.length },
+            { label: 'Đang đăng', value: activeRooms },
+            { label: 'Chờ duyệt', value: pendingRooms },
+            { label: 'Lịch hẹn', value: appointments.length },
+        ]
+        : [
+            { label: 'Đã lưu', value: savedProperties.length },
+            { label: 'Lịch hẹn', value: appointments.length },
+            { label: 'Tin đăng', value: myRooms.length },
+        ];
+    const quickActions = isOwner
+        ? [
+            { icon: 'add-circle-outline', label: 'Đăng tin', onPress: () => safePush('/(tabs)/post' as any) },
+            { icon: 'home-outline', label: 'Tin đăng', onPress: () => setActiveTab('myrooms') },
+            { icon: 'calendar-outline', label: 'Lịch hẹn', onPress: () => safePush('/appointments' as any) },
+            { icon: 'wallet-outline', label: 'Ví', onPress: () => safePush('/wallet' as any) },
+        ]
+        : [
+            { icon: 'bookmark-outline', label: 'Đã lưu', onPress: () => setActiveTab('saved') },
+            { icon: 'calendar-outline', label: 'Lịch hẹn', onPress: () => safePush('/appointments' as any) },
+            { icon: 'chatbubbles-outline', label: 'Tin nhắn', onPress: () => safePush('/(tabs)/chat' as any) },
+            { icon: 'wallet-outline', label: 'Ví', onPress: () => safePush('/wallet' as any) },
+        ];
+    const tabItems = isOwner
+        ? [
+            { key: 'myrooms' as const, label: 'Tin đăng', icon: 'home-outline' },
+            { key: 'saved' as const, label: 'Đã lưu', icon: 'bookmark-outline' },
+            { key: 'appointments' as const, label: 'Lịch hẹn', icon: 'calendar-outline' },
+        ]
+        : [
+            { key: 'saved' as const, label: 'Đã lưu', icon: 'bookmark-outline' },
+            { key: 'appointments' as const, label: 'Lịch hẹn', icon: 'calendar-outline' },
+            { key: 'myrooms' as const, label: 'Tin đăng', icon: 'home-outline' },
+        ];
+    const accountSettings = [
+        { icon: 'person-outline', label: 'Thông tin cá nhân', subtitle: 'Tên, ảnh đại diện và liên hệ', onPress: () => safePush('/edit-profile' as any) },
+        { icon: 'card-outline', label: 'Xác minh danh tính', subtitle: 'Tăng độ tin cậy khi giao dịch', onPress: () => safePush('/kyc' as any) },
+        { icon: 'shield-outline', label: 'Bảo mật & mật khẩu', subtitle: 'Quản lý đăng nhập an toàn', onPress: () => safePush('/settings/security' as any) },
+        { icon: 'heart-outline', label: 'Sở thích của tôi', subtitle: 'Cá nhân hoá gợi ý bất động sản', onPress: () => safePush('/profile/lifestyle' as any) },
+    ];
+    const financeSettings = [
+        { icon: 'wallet-outline', label: 'Ví điện tử', subtitle: 'Số dư, nạp/rút và giao dịch', onPress: () => safePush('/wallet' as any) },
+        { icon: 'rocket-outline', label: 'Gói dịch vụ & Boost tin', subtitle: 'Tăng hiển thị tin đăng', onPress: () => safePush('/packages' as any) },
+    ];
+    const managementSettings = [
+        { icon: 'calendar-outline', label: 'Lịch hẹn xem phòng', subtitle: 'Theo dõi các buổi xem nhà', onPress: () => safePush('/appointments' as any) },
+        { icon: 'document-text-outline', label: 'Hợp đồng của tôi', subtitle: 'Quản lý hợp đồng thuê', onPress: () => safePush('/contracts' as any) },
+        ...(isOwner ? [
+            { icon: 'trash-outline', label: 'Thùng rác bài đăng', subtitle: 'Khôi phục hoặc xoá hẳn tin', onPress: () => safePush('/property/trash' as any) },
+            { icon: 'receipt-outline', label: 'Tạo hóa đơn tiền trọ', subtitle: 'Tạo hóa đơn cho người thuê', onPress: () => safePush('/bills/create' as any) },
+        ] : []),
+        { icon: 'bar-chart-outline', label: 'Phân tích thị trường', subtitle: 'Theo dõi xu hướng giá', onPress: () => safePush('/analytics' as any) },
+    ];
+    const supportSettings = [
+        { icon: 'notifications-circle-outline', label: 'Lịch sử thông báo', subtitle: 'Xem lại cập nhật đã nhận', onPress: () => safePush('/notifications' as any) },
+        { icon: 'help-circle-outline', label: 'Hỗ trợ', subtitle: 'Trung tâm trợ giúp HomeSwipe', onPress: () => { } },
+    ];
 
     return (
         <ScrollView
@@ -257,7 +335,7 @@ function ProfileScreenContent() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
             showsVerticalScrollIndicator={false}
         >
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="dark-content" />
 
             {/* Banner + Avatar */}
             <View style={[styles.banner, { paddingTop: insets.top + 8 }]}>
@@ -271,7 +349,7 @@ function ProfileScreenContent() {
                 <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
                     <Text style={styles.screenTitle}>Hồ sơ</Text>
                     <TouchableOpacity onPress={() => safePush('/notifications' as any)}>
-                        <Ionicons name="notifications-outline" size={24} color="white" />
+                        <Ionicons name="notifications-outline" size={24} color="#111827" />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -281,7 +359,7 @@ function ProfileScreenContent() {
                 <View style={styles.avatarRow}>
                     <View style={styles.avatarWrapper}>
                         <Image
-                            source={{ uri: displayUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayUser?.fullName || 'User')}&background=0066FF&color=fff&size=200` }}
+                            source={{ uri: avatarUrl }}
                             style={styles.avatar}
                         />
                         <TouchableOpacity style={styles.editAvatarBtn} onPress={() => safePush('/edit-profile' as any)}>
@@ -294,8 +372,8 @@ function ProfileScreenContent() {
                     </TouchableOpacity>
                 </View>
 
-                <Text style={styles.fullName}>{displayUser?.fullName}</Text>
-                <Text style={styles.email}>{displayUser?.email}</Text>
+                <Text style={styles.fullName} numberOfLines={2}>{displayUser?.fullName || 'Người dùng HomeSwipe'}</Text>
+                <Text style={styles.email} numberOfLines={1}>{primaryContact}</Text>
 
                 {/* Stats Row */}
                 <View style={styles.statsRow}>
@@ -314,9 +392,21 @@ function ProfileScreenContent() {
             {/* Role Badge */}
             <View style={styles.roleBadgeRow}>
                 <View style={styles.roleBadge}>
-                    <Ionicons name={user?.role === 'ADMIN' ? 'shield' : user?.role === 'OWNER' ? 'home' : 'person'} size={14} color="white" />
-                    <Text style={styles.roleText}>{user?.role === 'ADMIN' ? 'Quản trị viên' : user?.role === 'OWNER' ? 'Chủ nhà' : 'Người thuê'}</Text>
+                    <Ionicons name={roleIcon as any} size={14} color="#0066FF" />
+                    <Text style={styles.roleText}>{roleLabel}</Text>
                 </View>
+                {!isOwner && hasListings && (
+                    <View style={styles.listingBadge}>
+                        <Ionicons name="home-outline" size={14} color="#7C3AED" />
+                        <Text style={styles.listingBadgeText}>Có tin đăng</Text>
+                    </View>
+                )}
+                {isVerified && (
+                    <View style={styles.verifiedBadge}>
+                        <Ionicons name="shield-checkmark" size={14} color="#16A34A" />
+                        <Text style={styles.verifiedText}>Đã xác minh</Text>
+                    </View>
+                )}
                 {(displayUser as any)?.walletBalance !== undefined && (
                     <View style={styles.walletBadge}>
                         <Ionicons name="wallet-outline" size={14} color="#0066FF" />
@@ -325,13 +415,46 @@ function ProfileScreenContent() {
                 )}
             </View>
 
+            <View style={styles.quickActionGrid}>
+                {quickActions.map(action => (
+                    <TouchableOpacity key={action.label} style={styles.quickActionCard} onPress={action.onPress} activeOpacity={0.85}>
+                        <View style={styles.quickActionIcon}>
+                            <Ionicons name={action.icon as any} size={22} color="#0066FF" />
+                        </View>
+                        <Text style={styles.quickActionLabel}>{action.label}</Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
+            <View style={styles.dashboardCard}>
+                <Text style={styles.sectionHeading}>{isOwner ? 'Tổng quan chủ nhà' : 'Hoạt động của tôi'}</Text>
+                <View style={styles.dashboardGrid}>
+                    {dashboardStats.map(stat => (
+                        <View key={stat.label} style={styles.dashboardItem}>
+                            <Text style={styles.dashboardValue}>{stat.value}</Text>
+                            <Text style={styles.dashboardLabel}>{stat.label}</Text>
+                        </View>
+                    ))}
+                    {walletBalance !== undefined && (
+                        <View style={styles.dashboardItem}>
+                            <Text style={styles.dashboardValue}>{(walletBalance / 1000).toFixed(0)}K</Text>
+                            <Text style={styles.dashboardLabel}>Ví</Text>
+                        </View>
+                    )}
+                </View>
+            </View>
+
+            {!isVerified && (
+                <TouchableOpacity style={styles.verifyPrompt} onPress={() => safePush('/kyc' as any)} activeOpacity={0.85}>
+                    <Ionicons name="shield-outline" size={18} color="#F59E0B" />
+                    <Text style={styles.verifyPromptText}>Xác minh danh tính để tăng độ tin cậy</Text>
+                    <Ionicons name="chevron-forward" size={16} color="#F59E0B" />
+                </TouchableOpacity>
+            )}
+
             {/* Tabs */}
             <View style={styles.tabBar}>
-                {[
-                    { key: 'myrooms', label: 'Tin của tôi', icon: 'home-outline' },
-                    { key: 'saved', label: 'Đã lưu', icon: 'bookmark-outline' },
-                    { key: 'appointments', label: 'Lịch hẹn', icon: 'calendar-outline' },
-                ].map(({ key, label, icon }) => (
+                {tabItems.map(({ key, label, icon }) => (
                     <TouchableOpacity
                         key={key}
                         style={[styles.tab, activeTab === key && styles.tabActive]}
@@ -456,117 +579,181 @@ function ProfileScreenContent() {
 
             {/* Settings */}
             <View style={styles.settingsSection}>
-                <Text style={styles.settingsTitle}>Cài đặt</Text>
+                <Text style={styles.settingsTitle}>Cài đặt & quản lý</Text>
 
-                {/* Push Notification Toggle */}
-                <View style={styles.settingsItemRow}>
-                    <Ionicons name="notifications-outline" size={20} color="#555" />
-                    <Text style={[styles.settingsLabel, { flex: 1 }]}>Thông báo đẩy</Text>
-                    <Switch
-                        value={isNotificationsEnabled}
-                        onValueChange={handleToggleNotifications}
-                        disabled={togglingNotif}
-                        trackColor={{ false: '#E0E0E0', true: '#BDD7FF' }}
-                        thumbColor={isNotificationsEnabled ? '#0066FF' : '#999'}
-                        ios_backgroundColor="#E0E0E0"
-                    />
+                <View style={styles.settingsCard}>
+                    <View style={styles.settingsItemRow}>
+                        <View style={styles.settingsIconBox}>
+                            <Ionicons name="notifications-outline" size={20} color="#0066FF" />
+                        </View>
+                        <View style={styles.settingsTextBlock}>
+                            <Text style={styles.settingsLabel}>Thông báo đẩy</Text>
+                            <Text style={styles.settingsSubtitle}>Nhận thông báo tin nhắn, lịch hẹn và cập nhật mới</Text>
+                        </View>
+                        <Switch
+                            value={isNotificationsEnabled}
+                            onValueChange={handleToggleNotifications}
+                            disabled={togglingNotif}
+                            trackColor={{ false: '#E5E7EB', true: '#BDD7FF' }}
+                            thumbColor={isNotificationsEnabled ? '#0066FF' : '#9CA3AF'}
+                            ios_backgroundColor="#E5E7EB"
+                        />
+                    </View>
                 </View>
 
-                {/* Account items */}
-                <Text style={styles.settingsGroupLabel}>Tài khoản</Text>
                 {[
-                    { icon: 'person-outline', label: 'Thông tin cá nhân', onPress: () => safePush('/edit-profile' as any) },
-                    { icon: 'heart-outline', label: 'Sở thích của tôi', onPress: () => safePush('/profile/lifestyle' as any) },
-                    { icon: 'heart-circle-outline', label: 'BĐS đã Like', onPress: () => safePush('/liked-properties' as any) },
-                    { icon: 'card-outline', label: 'Xác minh danh tính (KYC)', onPress: () => safePush('/kyc' as any) },
-                    { icon: 'wallet-outline', label: 'Ví điện tử', onPress: () => safePush('/wallet' as any) },
-                ].map(({ icon, label, onPress }) => (
-                    <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
-                        <Ionicons name={icon as any} size={20} color="#555" />
-                        <Text style={styles.settingsLabel}>{label}</Text>
-                        <Ionicons name="chevron-forward" size={18} color="#CCC" />
-                    </TouchableOpacity>
+                    { title: 'Tài khoản', items: accountSettings },
+                    { title: 'Tài chính', items: financeSettings },
+                    { title: 'Quản lý', items: managementSettings },
+                    { title: 'Hỗ trợ', items: supportSettings },
+                ].map(group => (
+                    <View key={group.title}>
+                        <Text style={styles.settingsGroupLabel}>{group.title}</Text>
+                        <View style={styles.settingsCard}>
+                            {group.items.map(({ icon, label, subtitle, onPress }, index) => (
+                                <TouchableOpacity
+                                    key={label}
+                                    style={[styles.settingsItem, index === group.items.length - 1 && styles.settingsItemLast]}
+                                    onPress={onPress}
+                                    activeOpacity={0.82}
+                                >
+                                    <View style={styles.settingsIconBox}>
+                                        <Ionicons name={icon as any} size={20} color="#0066FF" />
+                                    </View>
+                                    <View style={styles.settingsTextBlock}>
+                                        <Text style={styles.settingsLabel}>{label}</Text>
+                                        <Text style={styles.settingsSubtitle}>{subtitle}</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color="#C7CDD7" />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
                 ))}
 
-                {/* Services */}
-                <Text style={styles.settingsGroupLabel}>Dịch vụ</Text>
-                {[
-                    { icon: 'calendar-outline', label: 'Lịch hẹn xem phòng', onPress: () => safePush('/appointments' as any) },
-                    { icon: 'document-text-outline', label: 'Hợp đồng của tôi', onPress: () => safePush('/contracts' as any) },
-                    ...(user?.role === 'OWNER' || user?.role === 'ADMIN' ? [
-                        { icon: 'trash-outline', label: 'Thùng rác bài đăng', onPress: () => safePush('/property/trash' as any) },
-                        { icon: 'receipt-outline', label: 'Tạo hóa đơn tiền trọ', onPress: () => safePush('/bills/create' as any) },
-                    ] : []),
-                    { icon: 'star-outline', label: 'Gói dịch vụ & Boost tin', onPress: () => safePush('/packages' as any) },
-                    { icon: 'bar-chart-outline', label: '📊 Thống kê thị trường', onPress: () => safePush('/analytics' as any) },
-                ].map(({ icon, label, onPress }) => (
-                    <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
-                        <Ionicons name={icon as any} size={20} color="#555" />
-                        <Text style={styles.settingsLabel}>{label}</Text>
-                        <Ionicons name="chevron-forward" size={18} color="#CCC" />
-                    </TouchableOpacity>
-                ))}
-
-                {/* Support */}
-                <Text style={styles.settingsGroupLabel}>Hỗ trợ</Text>
-                {[
-                    { icon: 'notifications-circle-outline', label: 'Lịch sử thông báo', onPress: () => safePush('/notifications' as any) },
-                    { icon: 'shield-outline', label: 'Bảo mật & Mật khẩu', onPress: () => safePush('/settings/security' as any) },
-                    { icon: 'help-circle-outline', label: 'Hỗ trợ', onPress: () => { } },
-                ].map(({ icon, label, onPress }) => (
-                    <TouchableOpacity key={label} style={styles.settingsItem} onPress={onPress}>
-                        <Ionicons name={icon as any} size={20} color="#555" />
-                        <Text style={styles.settingsLabel}>{label}</Text>
-                        <Ionicons name="chevron-forward" size={18} color="#CCC" />
-                    </TouchableOpacity>
-                ))}
-
-                <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+                <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
                     <Ionicons name="log-out-outline" size={20} color="#EF4444" />
                     <Text style={styles.logoutText}>Đăng xuất</Text>
                 </TouchableOpacity>
             </View>
 
-            <View style={{ height: 100 }} />
+            <View style={{ height: insets.bottom + 88 }} />
         </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FA' },
+    container: { flex: 1, backgroundColor: '#F6F8FB' },
     authRequired: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingHorizontal: 40, backgroundColor: 'white' },
     authTitle: { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
     loginBtn: { backgroundColor: '#0066FF', borderRadius: 12, paddingHorizontal: 36, paddingVertical: 14, marginTop: 6 },
     loginBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
     registerLink: { color: '#0066FF', fontSize: 14, marginTop: 4 },
-    banner: { height: 140, position: 'relative' },
-    bannerImg: { ...StyleSheet.absoluteFillObject },
-    bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+    banner: { minHeight: 78, position: 'relative', backgroundColor: '#F6F8FB', paddingBottom: 10 },
+    bannerImg: { ...StyleSheet.absoluteFillObject, display: 'none' },
+    bannerOverlay: { ...StyleSheet.absoluteFillObject, display: 'none' },
     topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */ },
-    screenTitle: { fontSize: 20, fontWeight: '700', color: 'white' },
-    profileSection: { backgroundColor: 'white', paddingBottom: 20, paddingHorizontal: 16 },
-    avatarRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -40 },
+    screenTitle: { fontSize: 24, fontWeight: '800', color: '#111827' },
+    profileSection: {
+        backgroundColor: 'white',
+        marginHorizontal: 16,
+        borderRadius: 18,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    avatarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 0 },
     avatarWrapper: { position: 'relative' },
-    avatar: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, borderColor: 'white', backgroundColor: '#E0E0E0' },
-    editAvatarBtn: { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: '#0066FF', justifyContent: 'center', alignItems: 'center' },
-    editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1.5, borderColor: '#0066FF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+    avatar: { width: 76, height: 76, borderRadius: 38, borderWidth: 3, borderColor: '#E8F0FF', backgroundColor: '#E0E0E0' },
+    editAvatarBtn: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: '#0066FF', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'white' },
+    editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
     editProfileText: { color: '#0066FF', fontWeight: '600', fontSize: 13 },
-    fullName: { fontSize: 22, fontWeight: '800', color: '#1A1A1A', marginTop: 10 },
-    email: { fontSize: 14, color: '#888', marginTop: 2 },
-    statsRow: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: '#F8F9FA', borderRadius: 12, padding: 16, marginTop: 16 },
+    fullName: { fontSize: 22, fontWeight: '800', color: '#111827', marginTop: 12 },
+    email: { fontSize: 14, color: '#6B7280', marginTop: 3 },
+    statsRow: { display: 'none' },
     stat: { alignItems: 'center' },
     statNum: { fontSize: 22, fontWeight: '800', color: '#0066FF' },
     statLbl: { fontSize: 12, color: '#888', marginTop: 2 },
     statDivider: { width: 1, backgroundColor: '#E0E0E0' },
-    roleBadgeRow: { flexDirection: 'row', gap: 10, padding: 12, paddingHorizontal: 16 },
-    roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#0066FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-    roleText: { color: 'white', fontWeight: '600', fontSize: 12 },
+    roleBadgeRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
+    roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#E8F0FF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20 },
+    roleText: { color: '#0066FF', fontWeight: '700', fontSize: 12 },
+    listingBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F5F3FF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20 },
+    listingBadgeText: { color: '#7C3AED', fontWeight: '700', fontSize: 12 },
+    verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F0FDF4', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20 },
+    verifiedText: { color: '#16A34A', fontWeight: '700', fontSize: 12 },
     walletBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8F0FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
     walletText: { color: '#0066FF', fontWeight: '600', fontSize: 12 },
-    tabBar: { flexDirection: 'row', backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0', borderBottomWidth: 1, borderBottomColor: '#F0F0F0', marginTop: 8 },
-    tab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, paddingVertical: 12 },
-    tabActive: { borderBottomWidth: 2, borderBottomColor: '#0066FF' },
-    tabText: { fontSize: 12, color: '#888' },
+    quickActionGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginHorizontal: 16,
+        marginTop: 14,
+    },
+    quickActionCard: {
+        flexGrow: 1,
+        flexBasis: '47%',
+        minHeight: 78,
+        backgroundColor: 'white',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    quickActionIcon: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quickActionLabel: { flex: 1, fontSize: 14, fontWeight: '700', color: '#111827' },
+    dashboardCard: {
+        backgroundColor: 'white',
+        marginHorizontal: 16,
+        marginTop: 14,
+        borderRadius: 18,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    sectionHeading: { fontSize: 16, fontWeight: '800', color: '#111827', marginBottom: 12 },
+    dashboardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    dashboardItem: {
+        flexGrow: 1,
+        flexBasis: '30%',
+        minWidth: 92,
+        backgroundColor: '#F6F8FB',
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 10,
+        alignItems: 'center',
+    },
+    dashboardValue: { fontSize: 19, fontWeight: '800', color: '#0066FF' },
+    dashboardLabel: { fontSize: 12, color: '#6B7280', marginTop: 2, textAlign: 'center' },
+    verifyPrompt: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginHorizontal: 16,
+        marginTop: 12,
+        padding: 13,
+        borderRadius: 14,
+        backgroundColor: '#FFFBEB',
+        borderWidth: 1,
+        borderColor: '#FDE68A',
+    },
+    verifyPromptText: { flex: 1, fontSize: 13, color: '#92400E', fontWeight: '600' },
+    tabBar: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 16, marginHorizontal: 16, marginTop: 14, padding: 4, borderWidth: 1, borderColor: '#E5E7EB' },
+    tab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, paddingVertical: 10, borderRadius: 12 },
+    tabActive: { backgroundColor: '#E8F0FF' },
+    tabText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
     tabTextActive: { color: '#0066FF', fontWeight: '600' },
     tabContent: { minHeight: 200 },
     cardList: { padding: 16, gap: 12 },
@@ -600,16 +787,45 @@ const styles = StyleSheet.create({
     apptTime: { fontSize: 13, color: '#555' },
     apptStatus: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
     apptStatusText: { fontSize: 11, fontWeight: '600' },
-    settingsSection: { backgroundColor: 'white', marginTop: 12, padding: 16 },
-    settingsTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
-    settingsItemRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-    settingsItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-    settingsLabel: { fontSize: 15, color: '#333' },
-    logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, marginTop: 4 },
+    settingsSection: { marginTop: 18, paddingHorizontal: 16 },
+    settingsTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 12 },
+    settingsCard: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        overflow: 'hidden',
+    },
+    settingsItemRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+    settingsItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+    settingsItemLast: { borderBottomWidth: 0 },
+    settingsIconBox: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: '#EFF6FF',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    settingsTextBlock: { flex: 1, minWidth: 0 },
+    settingsLabel: { fontSize: 15, color: '#111827', fontWeight: '700' },
+    settingsSubtitle: { fontSize: 12, color: '#6B7280', marginTop: 2, lineHeight: 16 },
+    logoutBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        marginTop: 14,
+        borderRadius: 16,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
     logoutText: { fontSize: 15, color: '#EF4444', fontWeight: '600' },
     seeAllBtn: { paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' as const },
     seeAllText: { fontSize: 14, color: '#0066FF', fontWeight: '600' as const },
-    settingsGroupLabel: { fontSize: 12, fontWeight: '700' as const, color: '#AAA', textTransform: 'uppercase' as const, letterSpacing: 0.6, paddingHorizontal: 14, paddingTop: 16, paddingBottom: 4 },
+    settingsGroupLabel: { fontSize: 12, fontWeight: '800' as const, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: 0.6, paddingTop: 18, paddingBottom: 8 },
     devBanner: {
         flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
         backgroundColor: '#FFF3E0', paddingHorizontal: 16, paddingVertical: 8,
