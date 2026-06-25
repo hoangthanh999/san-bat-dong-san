@@ -158,7 +158,6 @@ function WalletContent() {
                 showsVerticalScrollIndicator={false}
             >
                 {/* ── Quick actions ── */}
-                {/* ✅ quickActions + nút rút tiền cùng cấp trong 1 View */}
                 <View style={styles.quickActionsCard}>
                     {/* Row 1: 4 nút thông thường */}
                     <View style={styles.quickActionsRow}>
@@ -183,18 +182,6 @@ function WalletContent() {
                             </TouchableOpacity>
                         ))}
                     </View>
-
-                    {/* ✅ Divider + nút Rút tiền — NGOÀI map, cùng cấp */}
-                    <View style={styles.divider} />
-                    <TouchableOpacity
-                        style={styles.withdrawBtn}
-                        onPress={() => safePush('/wallet/withdraw' as any)}
-                        activeOpacity={0.85}
-                    >
-                        <Ionicons name="card-outline" size={20} color="#FF9500" />
-                        <Text style={styles.withdrawBtnText}>Rút tiền - đang phát triển</Text>
-                        <Ionicons name="chevron-forward" size={16} color="#E31837" />
-                    </TouchableOpacity>
                 </View>
 
                 {/* ── Recent transactions ── */}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
     View, Text, FlatList, TouchableOpacity, StyleSheet,
-    RefreshControl, StatusBar, Platform, TextInput, Alert,
+    RefreshControl, StatusBar, Platform, TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,10 +25,9 @@ function formatTime(dateStr?: string) {
     return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 }
 
-function ConversationItem({ item, onPress, onDelete }: {
+function ConversationItem({ item, onPress }: {
     item: Conversation;
     onPress: () => void;
-    onDelete: () => void;
 }) {
     const avatarUri = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.fullName)}&background=0066FF&color=fff&size=100`;
     return (
@@ -105,9 +104,6 @@ export default function ChatListScreen() {
                         <Ionicons name="sparkles" size={18} color="white" />
                         <Text style={styles.aiHeaderBtnText}>AI</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity>
-                        <Ionicons name="create-outline" size={24} color="#0066FF" />
-                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -146,9 +142,6 @@ export default function ChatListScreen() {
     if (!item?.id) return; // ✅ không navigate nếu id undefined
     safePush(`/chat/${item.id}` as any);
 }}
-                            onDelete={() => {
-                                Alert.alert('Xoá cuộc trò chuyện', 'Chức năng đang phát triển.');
-                            }}
                         />
                     )}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}

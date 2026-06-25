@@ -326,7 +326,15 @@ function ProfileScreenContent() {
     ];
     const supportSettings = [
         { icon: 'notifications-circle-outline', label: 'Lịch sử thông báo', subtitle: 'Xem lại cập nhật đã nhận', onPress: () => safePush('/notifications' as any) },
-        { icon: 'help-circle-outline', label: 'Hỗ trợ', subtitle: 'Trung tâm trợ giúp HomeSwipe', onPress: () => { } },
+        {
+            icon: 'help-circle-outline',
+            label: 'Hỗ trợ',
+            subtitle: 'Trung tâm trợ giúp HomeSwipe',
+            onPress: () => Alert.alert(
+                'Hỗ trợ',
+                'Vui lòng liên hệ nhóm phát triển hoặc giảng viên hướng dẫn trong phiên bản demo.'
+            ),
+        },
     ];
 
     return (
