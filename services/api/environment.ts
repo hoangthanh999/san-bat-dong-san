@@ -74,7 +74,9 @@ async function resolveApiEnvironment(): Promise<ApiEnvironment> {
     if (!ENABLE_API_FALLBACK || !FALLBACK_BASE_URL) {
         const environment = { name: 'production' as const, baseUrl: PRODUCTION_BASE_URL };
         await persistSelectedEnvironment(environment);
-        console.log('[API] Using production backend');
+        if (__DEV__) {
+            console.log('[API] Using production backend');
+        }
         return environment;
     }
 
@@ -82,13 +84,17 @@ async function resolveApiEnvironment(): Promise<ApiEnvironment> {
         await pingBaseUrl(PRODUCTION_BASE_URL);
         const environment = { name: 'production' as const, baseUrl: PRODUCTION_BASE_URL };
         await persistSelectedEnvironment(environment);
-        console.log('[API] Using production backend');
+        if (__DEV__) {
+            console.log('[API] Using production backend');
+        }
         return environment;
     } catch (error) {
         if (!shouldTryFallback(error)) {
             const environment = { name: 'production' as const, baseUrl: PRODUCTION_BASE_URL };
             await persistSelectedEnvironment(environment);
-            console.log('[API] Using production backend');
+            if (__DEV__) {
+                console.log('[API] Using production backend');
+            }
             return environment;
         }
 
@@ -96,12 +102,16 @@ async function resolveApiEnvironment(): Promise<ApiEnvironment> {
             await pingBaseUrl(FALLBACK_BASE_URL);
             const environment = { name: 'fallback' as const, baseUrl: FALLBACK_BASE_URL };
             await persistSelectedEnvironment(environment);
-            console.log('[API] Falling back to local backend');
+            if (__DEV__) {
+                console.log('[API] Falling back to local backend');
+            }
             return environment;
         } catch {
             const environment = { name: 'production' as const, baseUrl: PRODUCTION_BASE_URL };
             await persistSelectedEnvironment(environment);
-            console.log('[API] Using production backend');
+            if (__DEV__) {
+                console.log('[API] Using production backend');
+            }
             return environment;
         }
     }
@@ -137,5 +147,7 @@ export async function getNotificationWebSocketUrl(): Promise<string> {
 }
 
 export async function getAiWebSocketUrl(): Promise<string> {
-    return normalizeBaseUrl(WS_AI_URL) || `${await getApiBaseUrl()}/ws-ai`;
+    const configuredUrl = normalizeBaseUrl(WS_AI_URL);
+    const url = configuredUrl || `${await getApiBaseUrl()}/ws-chat`;
+    return url.replace(/\/ws-ai$/, '/ws-chat');
 }

@@ -1,14 +1,12 @@
 import { create } from 'zustand';
-import { Client, IMessage } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
+import { IMessage } from '@stomp/stompjs';
+import { jwtDecode } from 'jwt-decode';
 import { useAuthStore } from './authStore';
-import { getAiWebSocketUrl } from '../services/api/environment';
+import { useChatStore } from './chatStore';
+import { getAccessToken } from '../services/storage/tokenStorage';
 import { searchService } from '../services/api/search';
 import { PropertySearchItem } from '../types';
 
-// ============================
-// Types khớp với backend
-// ============================
 export interface PropertyCardDTO {
     propertyId: number;
     title: string;
@@ -26,6 +24,8 @@ export interface AiChatMessage {
     createdAt: string;
 }
 
+export type AiConnectionState = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
+
 interface AiChatRequest {
     conversationId: string;
     userMessage: string;
@@ -37,6 +37,37 @@ interface AiChatResponse {
     aiReply: string;
     status: string;
     items?: PropertyCardDTO[];
+}
+
+interface AiChatState {
+    messages: AiChatMessage[];
+    conversationId: string;
+    isConnected: boolean;
+    connectionState: AiConnectionState;
+    connectionError: string | null;
+    isThinking: boolean;
+    _unsubscribeAi: (() => void) | null;
+
+    connectAiWebSocket: () => Promise<void>;
+    disconnectAiWebSocket: () => void;
+    sendAiMessage: (userMessage: string) => Promise<void>;
+    clearMessages: () => void;
+}
+
+let aiConnectPromise: Promise<void> | null = null;
+
+function generateConversationId(userId: string | number): string {
+    return `conv-${userId}-ai`;
+}
+
+function isJwtExpired(token: string): boolean {
+    try {
+        const decoded = jwtDecode<{ exp?: number }>(token);
+        if (!decoded.exp) return false;
+        return decoded.exp * 1000 <= Date.now();
+    } catch {
+        return true;
+    }
 }
 
 function mapSearchItemToPropertyCard(item: PropertySearchItem): PropertyCardDTO {
@@ -70,149 +101,140 @@ async function hydratePropertyCards(items: PropertyCardDTO[] = []): Promise<Prop
             ...mapSearchItemToPropertyCard(property),
         }));
     } catch (error) {
-        console.warn('[AI-WS] Không hydrate được danh sách BĐS từ /search/properties/by-ids:', error);
+        console.warn('[AI-WS] Could not hydrate AI property cards:', error);
         return items;
     }
-}
-
-interface AiChatState {
-    messages: AiChatMessage[];
-    conversationId: string;
-    isConnected: boolean;
-    isThinking: boolean;
-    _client: Client | null;
-
-    // Actions
-    connectAiWebSocket: () => void;
-    disconnectAiWebSocket: () => void;
-    sendAiMessage: (userMessage: string) => void;
-    clearMessages: () => void;
-}
-
-function generateConversationId(userId: string | number): string {
-    return `conv-${userId}-ai`;
 }
 
 export const useAiChatStore = create<AiChatState>((set, get) => ({
     messages: [],
     conversationId: '',
     isConnected: false,
+    connectionState: 'idle',
+    connectionError: null,
     isThinking: false,
-    _client: null,
+    _unsubscribeAi: null,
 
     clearMessages: () => set({ messages: [] }),
 
     connectAiWebSocket: async () => {
-        const { token, user } = useAuthStore.getState();
-        if (!token || !user) {
-            console.warn('[AI-WS] Chưa đăng nhập, bỏ qua kết nối');
+        const { user } = useAuthStore.getState();
+        const token = await getAccessToken();
+
+        if (!token || !user?.id) {
+            set({
+                isConnected: false,
+                isThinking: false,
+                connectionState: 'disconnected',
+                connectionError: 'Chua dang nhap',
+            });
             return;
         }
 
-        // Nếu đã có client đang active thì bỏ qua
-        const existing = get()._client;
-        if (existing?.active) {
-            console.log('[AI-WS] Client đã active, bỏ qua');
+        if (isJwtExpired(token)) {
+            set({
+                isConnected: false,
+                isThinking: false,
+                connectionState: 'error',
+                connectionError: 'Phien dang nhap da het han',
+            });
+            throw new Error('Phien dang nhap da het han');
+        }
+
+        if (get()._unsubscribeAi && get().connectionState === 'connected') {
+            set({ isConnected: true, connectionError: null });
             return;
         }
 
-        const conversationId = generateConversationId(user.id);
-        set({ conversationId });
+        if (aiConnectPromise && get().connectionState === 'connecting') {
+            return aiConnectPromise;
+        }
 
-        const wsUrl = await getAiWebSocketUrl();
-
-        const client = new Client({
-            // ✅ SockJS factory - dùng http:// (không phải ws://)
-            webSocketFactory: () => new (SockJS as any)(wsUrl),
-
-            // ✅ Token trong STOMP CONNECT headers
-            connectHeaders: {
-                Authorization: `Bearer ${token}`,
-            },
-
-            // Tự reconnect sau 5s nếu mất kết nối
-            reconnectDelay: 5000,
-
-            onConnect: () => {
-                console.log('[AI-WS] Kết nối STOMP thành công!');
-                set({ isConnected: true });
-
-                // ✅ Subscribe nhận phản hồi AI
-                client.subscribe(`/topic/user/${user.id}/ai`, async (message: IMessage) => {
-                    try {
-                        const response: AiChatResponse = JSON.parse(message.body);
-                        console.log('[AI-WS] Nhận phản hồi AI:', response);
-
-                        if (response.aiReply) {
-                            const hydratedItems = await hydratePropertyCards(response.items);
-                            const aiMessage: AiChatMessage = {
-                                id: `ai-${Date.now()}`,
-                                role: 'ai',
-                                content: response.aiReply,
-                                items: hydratedItems,
-                                status: response.status,
-                                createdAt: new Date().toISOString(),
-                            };
-                            set(state => ({
-                                messages: [...state.messages, aiMessage],
-                                isThinking: false,
-                            }));
-                        }
-                    } catch (e) {
-                        console.warn('[AI-WS] Parse error:', e);
-                        set({ isThinking: false });
-                    }
-                });
-            },
-
-            onDisconnect: () => {
-                console.log('[AI-WS] Mất kết nối STOMP');
-                set({ isConnected: false, isThinking: false });
-            },
-
-            onStompError: (frame) => {
-                console.error('[AI-WS] STOMP Error:', frame.headers['message']);
-                set({ isConnected: false, isThinking: false });
-            },
-
-            onWebSocketError: (event) => {
-                console.error('[AI-WS] WebSocket Error:', event);
-                set({ isConnected: false, isThinking: false });
-            },
+        set({
+            conversationId: generateConversationId(user.id),
+            isConnected: false,
+            isThinking: false,
+            connectionState: 'connecting',
+            connectionError: null,
         });
 
-        client.activate();
-        set({ _client: client });
-        console.log('[AI-WS] Đang kết nối tới', wsUrl);
+        aiConnectPromise = useChatStore.getState().subscribeAiResponse(async (message: IMessage) => {
+            try {
+                const response: AiChatResponse = JSON.parse(message.body);
+                if (__DEV__) {
+                    console.log('[AI-WS] response received');
+                }
+
+                if (!response.aiReply) return;
+
+                const hydratedItems = await hydratePropertyCards(response.items);
+                const aiMessage: AiChatMessage = {
+                    id: `ai-${Date.now()}`,
+                    role: 'ai',
+                    content: response.aiReply,
+                    items: hydratedItems,
+                    status: response.status,
+                    createdAt: new Date().toISOString(),
+                };
+                set(state => ({
+                    messages: [...state.messages, aiMessage],
+                    isThinking: false,
+                }));
+            } catch (error) {
+                console.warn('[AI-WS] Parse error:', error);
+                set({
+                    isThinking: false,
+                    connectionError: 'Khong doc duoc phan hoi AI',
+                });
+            }
+        }).then(unsubscribe => {
+            set({
+                _unsubscribeAi: unsubscribe,
+                isConnected: true,
+                connectionState: 'connected',
+                connectionError: null,
+            });
+            if (__DEV__) {
+                console.log('[AI-WS] subscribed on shared chat socket');
+            }
+        }).catch(error => {
+            set({
+                isConnected: false,
+                isThinking: false,
+                connectionState: 'error',
+                connectionError: error?.message || 'Khong the ket noi AI Chat',
+            });
+            throw error;
+        }).finally(() => {
+            aiConnectPromise = null;
+        });
+
+        return aiConnectPromise;
     },
 
     disconnectAiWebSocket: () => {
-        const client = get()._client;
-        if (client?.active) {
-            client.deactivate();
-            console.log('[AI-WS] Đã ngắt kết nối');
+        const unsubscribe = get()._unsubscribeAi;
+        if (unsubscribe) {
+            unsubscribe();
         }
+        aiConnectPromise = null;
         set({
-            _client: null,
+            _unsubscribeAi: null,
             isConnected: false,
             isThinking: false,
+            connectionState: 'disconnected',
+            connectionError: null,
         });
     },
 
-    sendAiMessage: (userMessage: string) => {
-        const { _client, isConnected, conversationId } = get();
+    sendAiMessage: async (userMessage: string) => {
         const { user } = useAuthStore.getState();
-
-        if (!user) {
-            console.error('[AI-WS] Chưa đăng nhập');
-            return;
-        }
-        if (!_client || !isConnected) {
-            console.error('[AI-WS] WebSocket chưa kết nối');
-            return;
+        if (!user?.id) {
+            throw new Error('Chua dang nhap');
         }
 
-        // Thêm tin nhắn user ngay lập tức (optimistic)
+        await get().connectAiWebSocket();
+
         const userMsg: AiChatMessage = {
             id: `user-${Date.now()}`,
             role: 'user',
@@ -225,17 +247,14 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
         }));
 
         const request: AiChatRequest = {
-            conversationId: conversationId || generateConversationId(user.id),
+            conversationId: get().conversationId || generateConversationId(user.id),
             userMessage,
         };
 
-        // ✅ Gửi qua STOMP publish
-        _client.publish({
-            destination: '/app/ai-chat',
-            body: JSON.stringify(request),
-            headers: { 'content-type': 'application/json' },
-        });
+        await useChatStore.getState().publishAiMessage(request);
 
-        console.log('[AI-WS] Đã gửi tin nhắn:', request);
+        if (__DEV__) {
+            console.log('[AI-WS] message sent on shared chat socket');
+        }
     },
 }));

@@ -98,17 +98,27 @@ function AiChatContent() {
     const insets = useSafeAreaInsets();
     const { user } = useAuthStore();
     const {
-        messages, isConnected, isThinking,
+        messages, isConnected, connectionState, connectionError, isThinking,
         connectAiWebSocket, disconnectAiWebSocket, sendAiMessage, clearMessages,
     } = useAiChatStore();
 
     const [inputText, setInputText] = useState('');
     const [isSending, setIsSending] = useState(false);
     const flatListRef = useRef<FlatList>(null);
+    const isConnecting = connectionState === 'idle' || connectionState === 'connecting';
+    const isConnectionError = connectionState === 'error' || connectionState === 'disconnected';
+    const isAiReady = connectionState === 'connected' && isConnected;
+    const statusText = isAiReady
+        ? 'Dang hoat dong'
+        : isConnectionError
+            ? 'Mat ket noi, thu lai'
+            : 'Dang ket noi...';
+    const statusColor = isAiReady ? '#22C55E' : isConnectionError ? '#EF4444' : '#FF9500';
 
     useEffect(() => {
-        connectAiWebSocket();
+        connectAiWebSocket().catch(() => undefined);
         return () => {
+            disconnectAiWebSocket();
             // Không disconnect khi unmount để giữ kết nối giữa các lần quay lại
         };
     }, []);
@@ -202,13 +212,22 @@ function AiChatContent() {
                     <View>
                         <Text style={styles.headerName}>HomeVerse AI</Text>
                         <View style={styles.headerStatusRow}>
-                            <View style={[styles.statusDot, { backgroundColor: isConnected ? '#22C55E' : '#FF9500' }]} />
+                            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                             <Text style={styles.headerStatus}>
                                 {isConnected ? 'Đang hoạt động' : 'Đang kết nối...'}
                             </Text>
                         </View>
                     </View>
                 </View>
+                {isConnectionError && (
+                    <TouchableOpacity
+                        onPress={() => connectAiWebSocket().catch(() => undefined)}
+                        style={styles.retryIconBtn}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="refresh" size={20} color="#0066FF" />
+                    </TouchableOpacity>
+                )}
                 <TouchableOpacity
                     onPress={() => {
                         Alert.alert('Làm mới cuộc trò chuyện', 'Xoá toàn bộ lịch sử chat AI?', [
@@ -237,11 +256,33 @@ function AiChatContent() {
 
                     {/* Suggestions */}
                     <Text style={styles.suggestTitle}>Bạn có thể hỏi tôi:</Text>
+                    {!isAiReady && (
+                        <View style={styles.connectionNotice}>
+                            {isConnecting ? (
+                                <ActivityIndicator size="small" color="#0066FF" />
+                            ) : (
+                                <Ionicons name="cloud-offline-outline" size={18} color="#EF4444" />
+                            )}
+                            <Text style={styles.connectionNoticeText}>
+                                {isConnecting ? 'Dang ket noi AI Chat...' : connectionError || 'Mat ket noi AI Chat.'}
+                            </Text>
+                            {isConnectionError && (
+                                <TouchableOpacity
+                                    style={styles.retryBtn}
+                                    onPress={() => connectAiWebSocket().catch(() => undefined)}
+                                    activeOpacity={0.85}
+                                >
+                                    <Text style={styles.retryBtnText}>Thu lai</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
                     {AI_SUGGESTIONS.map((s, i) => (
                         <TouchableOpacity
                             key={i}
-                            style={styles.suggestChip}
+                            style={[styles.suggestChip, (!isAiReady || isSending) && styles.suggestChipDisabled]}
                             onPress={() => handleSend(s)}
+                            disabled={!isAiReady || isSending}
                         >
                             <Ionicons name="search-outline" size={16} color="#0066FF" />
                             <Text style={styles.suggestText}>{s}</Text>
@@ -279,10 +320,10 @@ function AiChatContent() {
                 <TouchableOpacity
                     style={[
                         styles.sendBtn,
-                        (!inputText.trim() || isSending || !isConnected) && styles.sendBtnDisabled,
+                        (!inputText.trim() || isSending || !isAiReady) && styles.sendBtnDisabled,
                     ]}
                     onPress={() => handleSend()}
-                    disabled={!inputText.trim() || isSending || !isConnected}
+                    disabled={!inputText.trim() || isSending || !isAiReady}
                 >
                     {isSending
                         ? <ActivityIndicator size="small" color="white" />
@@ -322,6 +363,14 @@ const styles = StyleSheet.create({
     headerStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
     statusDot: { width: 8, height: 8, borderRadius: 4 },
     headerStatus: { fontSize: 12, color: '#666' },
+    retryIconBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#E8F0FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
 
     // Welcome screen
     welcomeContainer: { flex: 1, paddingHorizontal: 20, paddingTop: 24, gap: 12 },
@@ -341,6 +390,26 @@ const styles = StyleSheet.create({
         shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
     },
+    suggestChipDisabled: { opacity: 0.55 },
+    connectionNotice: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'white',
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderColor: '#E8F0FF',
+    },
+    connectionNoticeText: { flex: 1, fontSize: 13, color: '#555', lineHeight: 18 },
+    retryBtn: {
+        backgroundColor: '#E8F0FF',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    retryBtnText: { color: '#0066FF', fontSize: 12, fontWeight: '700' },
     suggestText: { flex: 1, fontSize: 13, color: '#333', lineHeight: 18 },
 
     // Messages

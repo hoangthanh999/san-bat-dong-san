@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Client, IMessage } from '@stomp/stompjs';
+import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { Conversation, ChatMessage } from '../types';
 import { chatService } from '../services/api/chat';
@@ -24,8 +24,10 @@ interface ChatState {
     sendMessage: (partnerId: number, content: string, type?: string, metadata?: any) => Promise<void>;
     receiveMessage: (message: ChatMessage) => void;
     markAsRead: (partnerId: number) => Promise<void>;
-    connectWebSocket: () => void;
+    connectWebSocket: () => Promise<void>;
     disconnectWebSocket: () => void;
+    subscribeAiResponse: (handler: (message: IMessage) => void) => Promise<() => void>;
+    publishAiMessage: (body: unknown) => Promise<void>;
 }
 
 function getMessageTime(message: ChatMessage): number {
@@ -36,6 +38,25 @@ function getMessageTime(message: ChatMessage): number {
 
 function sortMessagesAsc(messages: ChatMessage[]): ChatMessage[] {
     return [...messages].sort((a, b) => getMessageTime(a) - getMessageTime(b));
+}
+
+function waitForConnected(getState: () => ChatState, timeoutMs = 10000): Promise<Client> {
+    return new Promise((resolve, reject) => {
+        const startedAt = Date.now();
+        const timer = setInterval(() => {
+            const client = getState()._stompClient;
+            if (client?.connected) {
+                clearInterval(timer);
+                resolve(client);
+                return;
+            }
+
+            if (Date.now() - startedAt >= timeoutMs) {
+                clearInterval(timer);
+                reject(new Error('Khong the ket noi WebSocket chat'));
+            }
+        }, 100);
+    });
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -218,7 +239,7 @@ connectWebSocket: async () => {
     if (!token || !user?.id) return;
 
     // ✅ Chặn double-connect
-    if (get()._isConnecting || get()._stompClient?.active) return;
+    if (get()._isConnecting || get()._stompClient?.connected) return;
     set({ _isConnecting: true });
 
     // ✅ Deactivate client cũ nếu còn treo
@@ -258,12 +279,26 @@ connectWebSocket: async () => {
         },
 
         onStompError: (frame) => {
-            console.error('[ChatWS] STOMP error:', frame.headers?.message);
+            if (__DEV__) {
+                console.warn('[ChatWS] broker error:', {
+                    message: frame.headers?.message,
+                    body: frame.body,
+                });
+            } else {
+                console.error('[ChatWS] STOMP error:', frame.headers?.message);
+            }
             set({ isConnected: false, _isConnecting: false }); // ✅
             client.deactivate();
         },
 
-        onWebSocketClose: () => {
+        onWebSocketClose: (event) => {
+            if (__DEV__) {
+                console.warn('[ChatWS] closed', {
+                    code: (event as any)?.code,
+                    reason: (event as any)?.reason,
+                    wasClean: (event as any)?.wasClean,
+                });
+            }
             set({ isConnected: false, _isConnecting: false });
         },
 
@@ -275,6 +310,32 @@ connectWebSocket: async () => {
 
     client.activate();
     set({ _stompClient: client });
+},
+
+  subscribeAiResponse: async (handler: (message: IMessage) => void) => {
+    const { user } = useAuthStore.getState();
+    if (!user?.id) {
+        throw new Error('Chua dang nhap');
+    }
+
+    await get().connectWebSocket();
+    const client = await waitForConnected(get);
+    const subscription: StompSubscription = client.subscribe(`/topic/user/${user.id}/ai`, handler);
+
+    return () => {
+        subscription.unsubscribe();
+    };
+},
+
+  publishAiMessage: async (body: unknown) => {
+    await get().connectWebSocket();
+    const client = await waitForConnected(get);
+
+    client.publish({
+        destination: '/app/ai-chat',
+        body: JSON.stringify(body),
+        headers: { 'content-type': 'application/json' },
+    });
 },
 
   disconnectWebSocket: () => {

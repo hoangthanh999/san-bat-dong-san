@@ -19,7 +19,7 @@ export const WS_CHAT_URL = process.env.EXPO_PUBLIC_WS_CHAT_URL
 
 // ✅ WebSocket AI Chat (STOMP/SockJS — ai-worker-service) - THÊM MỚI
 export const WS_AI_URL = process.env.EXPO_PUBLIC_WS_AI_URL
-    || 'https://homeverse-bds.duckdns.org/ws-ai';
+    || 'https://homeverse-bds.duckdns.org/ws-chat';
 
 // Google Maps
 export const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
