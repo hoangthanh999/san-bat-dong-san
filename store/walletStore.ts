@@ -29,6 +29,19 @@ async function getUserId(): Promise<number> {
     return parsed.id ?? parsed.userId;
 }
 
+function getTransactionTime(transaction: Transaction): number {
+    const time = new Date(transaction.createdAt).getTime();
+    return Number.isFinite(time) ? time : 0;
+}
+
+function sortTransactionsNewestFirst(transactions: Transaction[]): Transaction[] {
+    return [...transactions].sort((a, b) => {
+        const timeDiff = getTransactionTime(b) - getTransactionTime(a);
+        if (timeDiff !== 0) return timeDiff;
+        return Number(b.id ?? 0) - Number(a.id ?? 0);
+    });
+}
+
 export const useWalletStore = create<WalletState>((set, get) => ({
     wallet: null,
     transactions: [],
@@ -71,7 +84,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         try {
             const userId = await getUserId();
             const transactions = await walletService.fetchTransactions(userId);
-            set({ transactions, isLoading: false });
+            set({ transactions: sortTransactionsNewestFirst(transactions), isLoading: false });
         } catch (err: any) {
             set({
                 isLoading: false,
@@ -85,7 +98,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         try {
             const userId = await getUserId();
             const paymentTransactions = await walletService.fetchPaymentTransactions(userId);
-            set({ paymentTransactions, isLoading: false });
+            set({ paymentTransactions: sortTransactionsNewestFirst(paymentTransactions), isLoading: false });
         } catch (err: any) {
             set({
                 isLoading: false,
