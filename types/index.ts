@@ -340,6 +340,9 @@ export interface Notification {
     content: string;    // backend dùng "content" không phải "message"
     isRead: boolean;
     createdAt: string;
+    referenceId?: string | number; // Added for navigation
+    data?: any;                    // Added for navigation
+    route?: string;                // Added for navigation
 }
 
 // ============================
@@ -396,7 +399,11 @@ export interface RoomFilters {
     maxPrice?: number;
     minArea?: number;
     maxArea?: number;
+    bedroomMode?: 'exact' | 'min';
+    bedroomValue?: number;
     bedroomList?: number[];
+    bathroomMode?: 'exact' | 'min';
+    bathroomValue?: number;
     minBathrooms?: number;
     projectId?: number;
     sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'nearest';

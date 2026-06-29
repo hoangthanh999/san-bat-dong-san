@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch, ActivityIndicator, TextInput,
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch, ActivityIndicator, TextInput, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { useProjectStore } from '../store/projectStore';
 import { searchService } from '../services/api/search';
 import { amenityService } from '../services/api/amenities';
 import { RoomFilters, Amenity } from '../types';
+import { formatCompactVND } from '../utils/formatPrice';
 
 // ─── Constants ────────────────────────────────────────────────
 const PRICE_RANGES_RENT = [
@@ -36,8 +37,8 @@ const AREA_RANGES = [
     { label: 'Trên 200 m²', min: 200, max: undefined },
 ];
 
-const BEDROOM_OPTIONS = [0, 1, 2, 3, 4];
-const BATHROOM_OPTIONS = [1, 2, 3, 4];
+const BEDROOM_OPTIONS = [0, 1, 2, 3, 4, 5];
+const BATHROOM_OPTIONS = [1, 2, 3, 4, 5];
 
 const FURNISHING_OPTIONS = [
     { val: 'UNFURNISHED', label: 'Không có' },
@@ -71,6 +72,33 @@ function SectionHeader({ title }: { title: string }) {
     return <Text style={styles.sectionLabel}>{title}</Text>;
 }
 
+type CountMode = 'exact' | 'min';
+
+const parsePriceInput = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.startsWith('-')) return 0;
+
+    const digits = trimmed.replace(/[^\d]/g, '');
+    if (!digits) return undefined;
+
+    const value = Number(digits);
+    return Number.isFinite(value) ? Math.max(0, value) : undefined;
+};
+
+const sanitizePrice = (value?: number) => {
+    if (value == null || !Number.isFinite(value)) return undefined;
+    return Math.max(0, value);
+};
+
+const getCountLabel = (value: number | undefined, unit: 'PN' | 'WC', mode: CountMode = 'min') => {
+    if (value == null) return 'Tất cả';
+    if (unit === 'PN' && value === 0) return 'Studio';
+    return mode === 'exact'
+        ? `Chính xác ${value} ${unit}`
+        : `Từ ${value} ${unit} trở lên`;
+};
+
 // ─── Extended local filter type ───────────────────────────────
 interface LocalFilters extends RoomFilters {
     priceIndex?: number;
@@ -94,15 +122,29 @@ interface LocalFilters extends RoomFilters {
 export default function FilterScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { filters, setFilters, setSearchResults, resetFilters, clearSearchResults } = usePropertyStore();
+    const { filters, rooms, searchResults, setFilters, setSearchResults, resetFilters, clearSearchResults } = usePropertyStore();
     const { projects, fetchProjects } = useProjectStore();
 
-    const [local, setLocal] = useState<LocalFilters>({ ...filters });
+    const [local, setLocal] = useState<LocalFilters>(() => ({
+        ...filters,
+        bedroomMode: filters.bedroomMode ?? 'min',
+        bedroomValue: filters.bedroomValue ?? filters.bedroomList?.[0],
+        minBedrooms: filters.bedroomValue ?? filters.bedroomList?.[0],
+        bathroomMode: filters.bathroomMode ?? 'min',
+        bathroomValue: filters.bathroomValue ?? filters.minBathrooms,
+        minBathrooms: filters.bathroomValue ?? filters.minBathrooms,
+    }));
     const [amenityList, setAmenityList] = useState<Amenity[]>([]);
     const [isApplying, setIsApplying] = useState(false);
 
     const isSale = local.transactionType === 'FOR_SALE';
     const priceRanges = isSale ? PRICE_RANGES_SALE : PRICE_RANGES_RENT;
+    const priceSourceRooms = searchResults ?? rooms;
+    const dynamicMaxPrice = useMemo(() => (
+        priceSourceRooms.reduce((max, room) => Math.max(max, Number(room.price ?? 0)), 0)
+    ), [priceSourceRooms]);
+    const fallbackMaxPrice = isSale ? 10_000_000_000 : 100_000_000;
+    const priceCeiling = dynamicMaxPrice > 0 ? dynamicMaxPrice : fallbackMaxPrice;
 
     useEffect(() => {
         amenityService.getAll()
@@ -121,6 +163,40 @@ export default function FilterScreen() {
             priceIndex: p.priceIndex === index ? undefined : index,
             minPrice: p.priceIndex === index ? undefined : range.min,
             maxPrice: p.priceIndex === index ? undefined : range.max,
+        }));
+    };
+
+    const updatePriceInput = (key: 'minPrice' | 'maxPrice', text: string) => {
+        const value = parsePriceInput(text);
+        setLocal(p => ({
+            ...p,
+            priceIndex: undefined,
+            [key]: value,
+        }));
+    };
+
+    const updateBedroomMode = (mode: CountMode) => {
+        setLocal(p => ({ ...p, bedroomMode: mode }));
+    };
+
+    const updateBedroomValue = (value?: number) => {
+        setLocal(p => ({
+            ...p,
+            bedroomValue: value,
+            minBedrooms: value,
+            bedroomList: value != null ? [value] : [],
+        }));
+    };
+
+    const updateBathroomMode = (mode: CountMode) => {
+        setLocal(p => ({ ...p, bathroomMode: mode }));
+    };
+
+    const updateBathroomValue = (value?: number) => {
+        setLocal(p => ({
+            ...p,
+            bathroomValue: value,
+            minBathrooms: value,
         }));
     };
 
@@ -143,6 +219,17 @@ export default function FilterScreen() {
         const keyword = local.keyword?.trim() || undefined;
         const province = local.province?.trim() || undefined;
         const ward = local.ward?.trim() || undefined;
+        const minPrice = sanitizePrice(local.minPrice);
+        const maxPrice = sanitizePrice(local.maxPrice);
+        const bedroomMode = local.bedroomMode ?? 'min';
+        const bedroomValue = local.bedroomValue ?? local.minBedrooms;
+        const bathroomMode = local.bathroomMode ?? 'min';
+        const bathroomValue = local.bathroomValue ?? local.minBathrooms;
+
+        if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
+            Alert.alert('Khoảng giá chưa hợp lệ', 'Giá tối thiểu không được lớn hơn giá tối đa.');
+            return;
+        }
 
         // Persist basic filters to store (for backward compat with non-search screens)
         setFilters({
@@ -151,13 +238,17 @@ export default function FilterScreen() {
             propertyType: local.propertyTypes?.[0], // simple compat
             province,
             ward,
-            minPrice: local.minPrice,
-            maxPrice: local.maxPrice,
+            minPrice,
+            maxPrice,
             minArea: local.minArea,
             maxArea: local.maxArea,
             sortBy: local.sortBy,
-            bedroomList: local.minBedrooms != null ? [local.minBedrooms] : [],
-            minBathrooms: local.minBathrooms,
+            bedroomMode: bedroomValue != null ? bedroomMode : undefined,
+            bedroomValue,
+            bedroomList: bedroomValue != null ? [bedroomValue] : [],
+            bathroomMode: bathroomValue != null ? bathroomMode : undefined,
+            bathroomValue,
+            minBathrooms: bathroomValue,
             projectId: local.projectId,
         });
 
@@ -168,10 +259,10 @@ export default function FilterScreen() {
             ward ||
             local.transactionType ||
             (local.propertyTypes?.length ?? 0) > 0 ||
-            local.minPrice != null || local.maxPrice != null ||
+            minPrice != null || maxPrice != null ||
             local.minArea != null || local.maxArea != null ||
-            local.minBedrooms != null ||
-            local.minBathrooms != null ||
+            bedroomValue != null ||
+            bathroomValue != null ||
             local.projectId != null ||
             (local.furnishingStatuses?.length ?? 0) > 0 ||
             (local.availabilityStatuses?.length ?? 0) > 0 ||
@@ -195,12 +286,12 @@ export default function FilterScreen() {
                     ward,
                     transactionTypes: local.transactionType ? [local.transactionType] : undefined,
                     propertyTypes: local.propertyTypes?.length ? local.propertyTypes : undefined,
-                    minPrice: local.minPrice,
-                    maxPrice: local.maxPrice,
+                    minPrice,
+                    maxPrice,
                     minArea: local.minArea,
                     maxArea: local.maxArea,
-                    minBedrooms: local.minBedrooms,
-                    minBathrooms: local.minBathrooms,
+                    minBedrooms: bedroomValue,
+                    minBathrooms: bathroomValue,
                     projectId: local.projectId,
                     furnishingStatuses: local.furnishingStatuses?.length ? local.furnishingStatuses : undefined,
                     availabilityStatuses: local.availabilityStatuses?.length ? local.availabilityStatuses : undefined,
@@ -209,7 +300,7 @@ export default function FilterScreen() {
                     sortBy,
                     sortDir,
                     page: 0,
-                    size: 20,
+                    size: bedroomMode === 'exact' || bathroomMode === 'exact' ? 100 : 20,
                 });
                 setSearchResults(results);
             } catch (err) {
@@ -341,6 +432,9 @@ export default function FilterScreen() {
                 {/* Khoảng giá */}
                 <View style={styles.section}>
                     <SectionHeader title={isSale ? 'Khoảng giá bán' : 'Khoảng giá thuê'} />
+                    <Text style={styles.helperText}>
+                        Giá cao nhất trong dữ liệu hiện có: {formatCompactVND(priceCeiling)}
+                    </Text>
                     <View style={styles.chipRow}>
                         {priceRanges.map((r, i) => (
                             <Chip
@@ -351,6 +445,35 @@ export default function FilterScreen() {
                             />
                         ))}
                     </View>
+                    <View style={styles.priceInputsRow}>
+                        <View style={styles.priceInputGroup}>
+                            <Text style={styles.inputLabel}>Giá tối thiểu</Text>
+                            <TextInput
+                                style={styles.priceInput}
+                                value={local.minPrice != null ? String(local.minPrice) : ''}
+                                onChangeText={text => updatePriceInput('minPrice', text)}
+                                placeholder="0"
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={styles.priceInputGroup}>
+                            <Text style={styles.inputLabel}>Giá tối đa</Text>
+                            <TextInput
+                                style={styles.priceInput}
+                                value={local.maxPrice != null ? String(local.maxPrice) : ''}
+                                onChangeText={text => updatePriceInput('maxPrice', text)}
+                                placeholder={String(priceCeiling)}
+                                placeholderTextColor="#999"
+                                keyboardType="numeric"
+                            />
+                        </View>
+                    </View>
+                    {(local.minPrice != null || local.maxPrice != null) && (
+                        <Text style={styles.helperText}>
+                            Đang chọn: {local.minPrice != null ? formatCompactVND(Math.max(0, local.minPrice)) : '0'} - {local.maxPrice != null ? formatCompactVND(Math.max(0, local.maxPrice)) : 'không giới hạn'}
+                        </Text>
+                    )}
                 </View>
 
                 {/* Diện tích */}
@@ -368,40 +491,74 @@ export default function FilterScreen() {
                     </View>
                 </View>
 
-                {/* Số phòng ngủ tối thiểu */}
+                {/* Phòng ngủ */}
                 <View style={styles.section}>
-                    <SectionHeader title="Số phòng ngủ tối thiểu" />
+                    <SectionHeader title="Phòng ngủ" />
+                    <View style={styles.modeToggle}>
+                        <TouchableOpacity
+                            style={[styles.modeOption, (local.bedroomMode ?? 'min') === 'exact' && styles.modeOptionActive]}
+                            onPress={() => updateBedroomMode('exact')}
+                        >
+                            <Text style={[styles.modeText, (local.bedroomMode ?? 'min') === 'exact' && styles.modeTextActive]}>Chính xác</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.modeOption, (local.bedroomMode ?? 'min') === 'min' && styles.modeOptionActive]}
+                            onPress={() => updateBedroomMode('min')}
+                        >
+                            <Text style={[styles.modeText, (local.bedroomMode ?? 'min') === 'min' && styles.modeTextActive]}>Tối thiểu</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.helperText}>
+                        {getCountLabel(local.bedroomValue ?? local.minBedrooms, 'PN', local.bedroomMode ?? 'min')}
+                    </Text>
                     <View style={styles.chipRow}>
                         <Chip
                             label="Tất cả"
-                            selected={local.minBedrooms == null}
-                            onPress={() => updateLocal('minBedrooms', undefined)}
+                            selected={(local.bedroomValue ?? local.minBedrooms) == null}
+                            onPress={() => updateBedroomValue(undefined)}
                         />
                         {BEDROOM_OPTIONS.map(n => (
                             <Chip
                                 key={n}
-                                label={n === 0 ? 'Studio' : `${n}+ PN`}
-                                selected={local.minBedrooms === n}
-                                onPress={() => updateLocal('minBedrooms', n)}
+                                label={n === 0 ? 'Studio' : `${n} PN`}
+                                selected={(local.bedroomValue ?? local.minBedrooms) === n}
+                                onPress={() => updateBedroomValue((local.bedroomValue ?? local.minBedrooms) === n ? undefined : n)}
                             />
                         ))}
                     </View>
                 </View>
 
                 <View style={styles.section}>
-                    <SectionHeader title="Số phòng tắm tối thiểu" />
+                    <SectionHeader title="Nhà vệ sinh" />
+                    <View style={styles.modeToggle}>
+                        <TouchableOpacity
+                            style={[styles.modeOption, (local.bathroomMode ?? 'min') === 'exact' && styles.modeOptionActive]}
+                            onPress={() => updateBathroomMode('exact')}
+                        >
+                            <Text style={[styles.modeText, (local.bathroomMode ?? 'min') === 'exact' && styles.modeTextActive]}>Chính xác</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.modeOption, (local.bathroomMode ?? 'min') === 'min' && styles.modeOptionActive]}
+                            onPress={() => updateBathroomMode('min')}
+                        >
+                            <Text style={[styles.modeText, (local.bathroomMode ?? 'min') === 'min' && styles.modeTextActive]}>Tối thiểu</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={styles.helperText}>
+                        {getCountLabel(local.bathroomValue ?? local.minBathrooms, 'WC', local.bathroomMode ?? 'min')}
+                    </Text>
                     <View style={styles.chipRow}>
                         <Chip
                             label="Tất cả"
-                            selected={local.minBathrooms == null}
-                            onPress={() => updateLocal('minBathrooms', undefined)}
+                            selected={(local.bathroomValue ?? local.minBathrooms) == null}
+                            onPress={() => updateBathroomValue(undefined)}
                         />
                         {BATHROOM_OPTIONS.map(n => (
                             <Chip
                                 key={n}
-                                label={`${n}+ WC`}
-                                selected={local.minBathrooms === n}
-                                onPress={() => updateLocal('minBathrooms', n)}
+                                label={`${n} WC`}
+                                selected={(local.bathroomValue ?? local.minBathrooms) === n}
+                                onPress={() => updateBathroomValue((local.bathroomValue ?? local.minBathrooms) === n ? undefined : n)}
                             />
                         ))}
                     </View>
@@ -522,6 +679,7 @@ const styles = StyleSheet.create({
     scrollView: { flex: 1 },
     section: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 4 },
     sectionLabel: { fontSize: 15, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
+    helperText: { fontSize: 12, color: '#777', marginBottom: 10, lineHeight: 17 },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     input: {
         borderWidth: 1.5,
@@ -534,6 +692,36 @@ const styles = StyleSheet.create({
         backgroundColor: '#FAFAFA',
     },
     inputSpacing: { marginTop: 10 },
+    inputLabel: { fontSize: 12, fontWeight: '700', color: '#555', marginBottom: 6 },
+    priceInputsRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+    priceInputGroup: { flex: 1 },
+    priceInput: {
+        borderWidth: 1.5,
+        borderColor: '#E0E0E0',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 11,
+        fontSize: 13,
+        color: '#1A1A1A',
+        backgroundColor: '#FAFAFA',
+    },
+    modeToggle: {
+        flexDirection: 'row',
+        backgroundColor: '#F1F5F9',
+        borderRadius: 14,
+        padding: 4,
+        marginBottom: 8,
+    },
+    modeOption: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 11,
+        paddingVertical: 9,
+    },
+    modeOptionActive: { backgroundColor: '#0066FF' },
+    modeText: { fontSize: 13, fontWeight: '700', color: '#64748B' },
+    modeTextActive: { color: 'white' },
     chip: {
         paddingHorizontal: 14,
         paddingVertical: 8,
