@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
     View, StyleSheet, Dimensions, StatusBar,
     TouchableOpacity, Text, ScrollView, Animated, Alert, ActivityIndicator,
+    FlatList,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Image } from 'expo-image';
@@ -14,9 +15,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatCompactVND } from '../../utils/formatPrice';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
 
-const { width } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 const CARD_HEIGHT = 130;
-const NEAR_ME_RADIUS_KM = 5; // Tìm kiếm trong bán kính 5km
+const RESULTS_PANEL_MAX_HEIGHT = Math.round(height * 0.42);
+const DEFAULT_RADIUS_KM = 5;
+const RADIUS_OPTIONS_KM = [1, 3, 5, 10];
 
 const FILTER_CHIPS = [
     { id: 'all', label: 'Tất cả' },
@@ -62,8 +65,52 @@ const hasValidCoords = (room: Room) =>
     room.latitude !== 0 &&
     room.longitude !== 0;
 
+const getDistanceKm = (
+    a: { latitude: number; longitude: number },
+    b: { latitude: number; longitude: number },
+) => {
+    const R = 6371;
+    const dLat = ((b.latitude - a.latitude) * Math.PI) / 180;
+    const dLng = ((b.longitude - a.longitude) * Math.PI) / 180;
+    const lat1 = (a.latitude * Math.PI) / 180;
+    const lat2 = (b.latitude * Math.PI) / 180;
+    const x =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+
+    return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+};
+
+const getRoomDistanceKm = (room: Room, center: { lat: number; lng: number } | null) => {
+    if (!center || !hasValidCoords(room)) return Number.POSITIVE_INFINITY;
+    return getDistanceKm(
+        { latitude: center.lat, longitude: center.lng },
+        { latitude: room.latitude, longitude: room.longitude },
+    );
+};
+
+const formatDistanceKm = (distanceKm: number) => {
+    if (!Number.isFinite(distanceKm)) return null;
+    return `${distanceKm < 10 ? distanceKm.toFixed(1) : Math.round(distanceKm)} km`;
+};
+
+const getLocationText = (room: Room) =>
+    [room.ward, room.district, room.province].filter(Boolean).join(', ') || room.address;
+
+const getTransactionLabel = (transactionType?: string) => {
+    if (transactionType === 'FOR_RENT') return 'Cho thuê';
+    if (transactionType === 'FOR_SALE') return 'Bán';
+    return 'BĐS';
+};
+
 // ─── Tạo HTML Leaflet map ──────────────────────────────────────────────────
-const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, radiusKm?: number) => {
+const buildLeafletHTML = (
+    rooms: Room[],
+    userLat?: number,
+    userLng?: number,
+    radiusKm?: number,
+    isPickCenterMode = false,
+) => {
     const markers = rooms.map(r => ({
         id: r.id,
         lat: r.latitude,
@@ -107,6 +154,7 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, rad
       border-radius: 50%;
       box-shadow: 0 0 0 4px rgba(0,102,255,0.25);
     }
+    ${isPickCenterMode ? '#map { cursor: crosshair; }' : ''}
   </style>
 </head>
 <body>
@@ -168,13 +216,17 @@ const buildLeafletHTML = (rooms: Room[], userLat?: number, userLng?: number, rad
       }
     `}
 
-    map.on('click', function() {
+    map.on('click', function(e) {
       if (selectedId !== null) {
         var prev = document.getElementById('m' + selectedId);
         if (prev) prev.classList.remove('selected');
         selectedId = null;
       }
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapPress' }));
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'mapPress',
+        lat: e && e.latlng ? e.latlng.lat : null,
+        lng: e && e.latlng ? e.latlng.lng : null
+      }));
     });
 
     // Nhận lệnh từ React Native
@@ -203,6 +255,8 @@ export default function MapScreen() {
     const [activeFilter, setActiveFilter] = useState('all');
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [nearbyRooms, setNearbyRooms] = useState<Room[] | null>(null); // null = chưa search Near Me
+    const [searchRadiusKm, setSearchRadiusKm] = useState(DEFAULT_RADIUS_KM);
+    const [isPickingCenter, setIsPickingCenter] = useState(false);
     const [isLoadingMap, setIsLoadingMap] = useState(false);
     const [isSearchingNearby, setIsSearchingNearby] = useState(false);
     const [mapError, setMapError] = useState<string | null>(null);
@@ -247,6 +301,11 @@ export default function MapScreen() {
         }
     });
 
+    const isNearMeMode = nearbyRooms !== null;
+    const resultRooms = isNearMeMode
+        ? [...filteredRooms].sort((a, b) => getRoomDistanceKm(a, userLocation) - getRoomDistanceKm(b, userLocation))
+        : [];
+
     const pulseNearMe = () => {
         Animated.loop(
             Animated.sequence([
@@ -254,6 +313,31 @@ export default function MapScreen() {
                 Animated.timing(nearMeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
             ])
         ).start();
+    };
+
+    const searchAroundPoint = async (lat: number, lng: number, radiusKm = searchRadiusKm) => {
+        setUserLocation({ lat, lng });
+        setNearbyRooms([]);
+        setSelectedRoom(null);
+        setMapError(null);
+        webViewRef.current?.postMessage(JSON.stringify({ type: 'goToUser', lat, lng }));
+
+        setIsSearchingNearby(true);
+        try {
+            const results = await searchService.searchProperties({
+                latitude: lat,
+                longitude: lng,
+                radiusKm,
+                page: 0,
+                size: 50,
+            });
+            setNearbyRooms((results.content || []).map(searchItemToRoom));
+        } catch (err) {
+            console.warn('[Map] Radius search failed:', err);
+            Alert.alert('Lỗi', 'Không thể tìm bất động sản quanh vị trí đã chọn. Vui lòng thử lại.');
+        } finally {
+            setIsSearchingNearby(false);
+        }
     };
 
     const handleNearMe = async () => {
@@ -265,29 +349,9 @@ export default function MapScreen() {
         }
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         const { latitude: lat, longitude: lng } = loc.coords;
-        setUserLocation({ lat, lng });
-        webViewRef.current?.postMessage(JSON.stringify({ type: 'goToUser', lat, lng }));
         pulseNearMe();
-
-        // Gọi backend search theo tọa độ thực + bán kính
-        setIsSearchingNearby(true);
-        try {
-            const results = await searchService.searchProperties({
-                latitude: lat,
-                longitude: lng,
-                radiusKm: NEAR_ME_RADIUS_KM,
-                page: 0,
-                size: 50,
-            });
-            const mapped = (results.content || []).map(searchItemToRoom);
-            setNearbyRooms(mapped);
-            setSelectedRoom(null);
-        } catch (err) {
-            console.warn('[Map] Near me search failed:', err);
-            Alert.alert('Lỗi', 'Không thể tìm bất động sản gần bạn. Vui lòng thử lại.');
-        } finally {
-            setIsSearchingNearby(false);
-        }
+        setIsPickingCenter(false);
+        await searchAroundPoint(lat, lng);
     };
 
     const handleWebViewMessage = (event: any) => {
@@ -298,7 +362,17 @@ export default function MapScreen() {
                 const room = filteredRooms.find(r => r.id === msg.id) || null;
                 setSelectedRoom(room);
             } else if (msg.type === 'mapPress') {
-                setSelectedRoom(null);
+                if (
+                    isPickingCenter &&
+                    Number.isFinite(Number(msg.lat)) &&
+                    Number.isFinite(Number(msg.lng))
+                ) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setIsPickingCenter(false);
+                    searchAroundPoint(Number(msg.lat), Number(msg.lng));
+                } else {
+                    setSelectedRoom(null);
+                }
             }
         } catch (e) { }
     };
@@ -307,10 +381,55 @@ export default function MapScreen() {
         filteredRooms,
         userLocation?.lat,
         userLocation?.lng,
-        NEAR_ME_RADIUS_KM,
+        searchRadiusKm,
+        isPickingCenter,
     );
 
-    const isNearMeMode = nearbyRooms !== null;
+    const bottomInset = Math.max(insets.bottom, 16);
+    const floatingBottom = isNearMeMode
+        ? bottomInset + RESULTS_PANEL_MAX_HEIGHT + 16
+        : bottomInset + 144;
+
+    const renderResultItem = ({ item }: { item: Room }) => {
+        const distanceText = formatDistanceKm(getRoomDistanceKm(item, userLocation));
+
+        return (
+            <TouchableOpacity
+                style={styles.resultItem}
+                onPress={() => safePush(`/property/${item.id}` as any)}
+                activeOpacity={0.88}
+            >
+                <Image
+                    source={{ uri: item.images[0] || 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400' }}
+                    style={styles.resultImage}
+                    contentFit="cover"
+                />
+                <View style={styles.resultInfo}>
+                    <View style={styles.resultTopRow}>
+                        <Text style={styles.resultPrice}>{formatCompactVND(item.price)}</Text>
+                        {distanceText && (
+                            <View style={styles.distanceBadge}>
+                                <Ionicons name="navigate-outline" size={11} color="#0066FF" />
+                                <Text style={styles.distanceText}>{distanceText}</Text>
+                            </View>
+                        )}
+                    </View>
+                    <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.resultAddress} numberOfLines={1}>{getLocationText(item)}</Text>
+                    <View style={styles.resultMetaRow}>
+                        <View style={styles.resultTag}>
+                            <Text style={styles.resultTagText}>{getTransactionLabel(item.transactionType)}</Text>
+                        </View>
+                        <Text style={styles.resultMetaText}>{item.area}m²</Text>
+                        {item.bedrooms !== undefined && (
+                            <Text style={styles.resultMetaText}>{item.bedrooms} PN</Text>
+                        )}
+                    </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#A0AEC0" />
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -319,7 +438,7 @@ export default function MapScreen() {
             {/* Bản đồ Leaflet */}
             <WebView
                 ref={webViewRef}
-                key={`map-${activeFilter}-${isNearMeMode ? 'near' : 'all'}-${filteredRooms.length}-${userLocation?.lat ?? 'x'}-${userLocation?.lng ?? 'x'}`}
+                key={`map-${activeFilter}-${isNearMeMode ? 'near' : 'all'}-${filteredRooms.length}-${userLocation?.lat ?? 'x'}-${userLocation?.lng ?? 'x'}-${searchRadiusKm}-${isPickingCenter ? 'pick' : 'view'}`}
                 style={styles.map}
                 source={{ html: leafletHTML }}
                 onMessage={handleWebViewMessage}
@@ -335,7 +454,7 @@ export default function MapScreen() {
                     <View style={styles.loadingCard}>
                         <ActivityIndicator size="small" color="#0066FF" />
                         <Text style={styles.loadingText}>
-                            {isSearchingNearby ? `Đang tìm BĐS trong ${NEAR_ME_RADIUS_KM}km...` : 'Đang tải bản đồ...'}
+                            {isSearchingNearby ? `Đang tìm BĐS trong ${searchRadiusKm}km...` : 'Đang tải bản đồ...'}
                         </Text>
                     </View>
                 </View>
@@ -371,6 +490,7 @@ export default function MapScreen() {
                                 setUserLocation(null);
                                 setSelectedRoom(null);
                                 setMapError(null);
+                                setIsPickingCenter(false);
                             }}
                         >
                             <Ionicons name="close" size={12} color="white" />
@@ -394,10 +514,54 @@ export default function MapScreen() {
                 </ScrollView>
             </View>
 
+            {/* Radius controls */}
+            <View style={[styles.radiusContainer, { top: insets.top + 112 }]}>
+                <View style={styles.radiusPill}>
+                    <Text style={styles.radiusLabel}>Bán kính</Text>
+                    {RADIUS_OPTIONS_KM.map(radius => (
+                        <TouchableOpacity
+                            key={radius}
+                            style={[styles.radiusChip, searchRadiusKm === radius && styles.radiusChipActive]}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                setSearchRadiusKm(radius);
+                                if (userLocation && nearbyRooms !== null && radius !== searchRadiusKm) {
+                                    searchAroundPoint(userLocation.lat, userLocation.lng, radius);
+                                }
+                            }}
+                            disabled={isSearchingNearby}
+                        >
+                            <Text style={[styles.radiusChipText, searchRadiusKm === radius && styles.radiusChipTextActive]}>
+                                {radius}km
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+                <TouchableOpacity
+                    style={[styles.pickCenterBtn, isPickingCenter && styles.pickCenterBtnActive]}
+                    onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSelectedRoom(null);
+                        setIsPickingCenter(prev => !prev);
+                    }}
+                    activeOpacity={0.85}
+                    disabled={isSearchingNearby}
+                >
+                    <Ionicons
+                        name={isPickingCenter ? 'radio-button-on' : 'pin-outline'}
+                        size={15}
+                        color={isPickingCenter ? 'white' : '#0066FF'}
+                    />
+                    <Text style={[styles.pickCenterText, isPickingCenter && styles.pickCenterTextActive]}>
+                        {isPickingCenter ? 'Chạm bản đồ' : 'Chọn điểm'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
+
             {/* Near Me Button */}
             <Animated.View style={[
                 styles.nearMeBtn,
-                { bottom: Math.max(insets.bottom, 16) + 144, transform: [{ scale: nearMeAnim }] }
+                { bottom: floatingBottom, transform: [{ scale: nearMeAnim }] }
             ]}>
                 <TouchableOpacity
                     style={[styles.nearMeBtnInner, isNearMeMode && styles.nearMeBtnActive]}
@@ -411,30 +575,73 @@ export default function MapScreen() {
             </Animated.View>
 
             {/* Room count badge */}
-            <View style={[styles.countBadge, { bottom: Math.max(insets.bottom, 16) + 144 }]}>
-                {isNearMeMode
-                    ? <Text style={styles.countText}>📍 {filteredRooms.length} BĐS trong {NEAR_ME_RADIUS_KM}km</Text>
-                    : <Text style={styles.countText}>{filteredRooms.length} bất động sản</Text>
-                }
-            </View>
+            {!isNearMeMode && (
+                <View style={[styles.countBadge, { bottom: floatingBottom }]}>
+                    <Text style={styles.countText}>{filteredRooms.length} bất động sản</Text>
+                </View>
+            )}
 
             {/* Empty state khi không có dữ liệu thật (không dùng mock nữa) */}
-            {!isLoadingMap && !isSearchingNearby && filteredRooms.length === 0 && (
-                <View style={[styles.emptyBadge, { bottom: Math.max(insets.bottom, 16) + 170 }]}>
+            {!isNearMeMode && !isLoadingMap && !isSearchingNearby && filteredRooms.length === 0 && (
+                <View style={[styles.emptyBadge, { bottom: bottomInset + 170 }]}>
                     <Ionicons name="location-outline" size={16} color="#888" />
                     <Text style={styles.emptyText}>
                         {mapError
                             ? mapError
                             : isNearMeMode
-                            ? 'Không có BĐS nào trong bán kính gần bạn'
+                            ? `Không có BĐS nào trong bán kính ${searchRadiusKm}km`
                             : 'Chưa có bất động sản có tọa độ để hiển thị trên bản đồ'
                         }
                     </Text>
                 </View>
             )}
 
+            {/* Radius search results */}
+            {isNearMeMode && (
+                <View style={[styles.resultsPanel, { bottom: bottomInset + 4, maxHeight: RESULTS_PANEL_MAX_HEIGHT }]}>
+                    <View style={styles.resultsHandle} />
+                    <View style={styles.resultsHeader}>
+                        <View style={styles.resultsHeaderText}>
+                            <Text style={styles.resultsTitle}>Kết quả gần đây</Text>
+                            <Text style={styles.resultsSubtitle}>
+                                {resultRooms.length} BĐS trong bán kính {searchRadiusKm}km
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.resultsCloseBtn}
+                            onPress={() => {
+                                setNearbyRooms(null);
+                                setUserLocation(null);
+                                setSelectedRoom(null);
+                                setMapError(null);
+                                setIsPickingCenter(false);
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                            <Ionicons name="close" size={18} color="#64748B" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {resultRooms.length > 0 ? (
+                        <FlatList
+                            data={resultRooms}
+                            keyExtractor={(item) => String(item.id)}
+                            renderItem={renderResultItem}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={styles.resultsListContent}
+                        />
+                    ) : (
+                        <View style={styles.resultsEmpty}>
+                            <Ionicons name="search-outline" size={24} color="#94A3B8" />
+                            <Text style={styles.resultsEmptyTitle}>Không tìm thấy bất động sản trong bán kính này.</Text>
+                            <Text style={styles.resultsEmptyText}>Thử tăng bán kính hoặc chọn điểm khác.</Text>
+                        </View>
+                    )}
+                </View>
+            )}
+
             {/* Selected Room Bottom Card */}
-            {selectedRoom && (
+            {selectedRoom && !isNearMeMode && (
                 <TouchableOpacity
                     style={[styles.bottomCard, { bottom: Math.max(insets.bottom, 16) + 4 }]}
                     onPress={() => safePush(`/property/${selectedRoom.id}` as any)}
@@ -537,6 +744,60 @@ const styles = StyleSheet.create({
     chipText: { fontSize: 13, fontWeight: '600', color: '#555' },
     chipTextActive: { color: 'white' },
 
+    // ── Radius controls ──
+    radiusContainer: {
+        position: 'absolute',
+        left: 16,
+        right: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    radiusPill: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.96)',
+        borderRadius: 18,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    radiusLabel: { fontSize: 12, fontWeight: '700', color: '#555' },
+    radiusChip: {
+        minWidth: 40,
+        alignItems: 'center',
+        borderRadius: 14,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        backgroundColor: '#F2F6FF',
+    },
+    radiusChipActive: { backgroundColor: '#0066FF' },
+    radiusChipText: { fontSize: 12, fontWeight: '700', color: '#0066FF' },
+    radiusChipTextActive: { color: 'white' },
+    pickCenterBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(255,255,255,0.96)',
+        borderRadius: 18,
+        paddingHorizontal: 11,
+        paddingVertical: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    pickCenterBtnActive: { backgroundColor: '#0066FF' },
+    pickCenterText: { fontSize: 12, fontWeight: '700', color: '#0066FF' },
+    pickCenterTextActive: { color: 'white' },
+
     // ── Near Me button ──
     nearMeBtn: { position: 'absolute', right: 16 },
     nearMeBtnInner: {
@@ -557,6 +818,101 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
     },
     countText: { fontSize: 12, fontWeight: '600', color: '#333' },
+
+    // ── Results panel ──
+    resultsPanel: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        backgroundColor: 'white',
+        borderRadius: 18,
+        paddingTop: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 16,
+        elevation: 12,
+    },
+    resultsHandle: {
+        alignSelf: 'center',
+        width: 42,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#CBD5E1',
+        marginBottom: 8,
+    },
+    resultsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 14,
+        paddingBottom: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#E2E8F0',
+    },
+    resultsHeaderText: { flex: 1, paddingRight: 12 },
+    resultsTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+    resultsSubtitle: { marginTop: 2, fontSize: 12, fontWeight: '600', color: '#64748B' },
+    resultsCloseBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    resultsListContent: { paddingHorizontal: 12, paddingVertical: 10, gap: 10 },
+    resultItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        borderRadius: 14,
+        padding: 8,
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    resultImage: { width: 72, height: 72, borderRadius: 10, backgroundColor: '#E2E8F0' },
+    resultInfo: { flex: 1, minWidth: 0 },
+    resultTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        marginBottom: 3,
+    },
+    resultPrice: { flex: 1, fontSize: 14, fontWeight: '800', color: '#FF6B35' },
+    distanceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 3,
+        backgroundColor: '#EAF2FF',
+        borderRadius: 10,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+    },
+    distanceText: { fontSize: 11, fontWeight: '800', color: '#0066FF' },
+    resultTitle: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 3 },
+    resultAddress: { fontSize: 12, color: '#64748B', marginBottom: 7 },
+    resultMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    resultTag: {
+        backgroundColor: '#EEF6FF',
+        borderRadius: 8,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+    },
+    resultTagText: { fontSize: 11, fontWeight: '800', color: '#0066FF' },
+    resultMetaText: { fontSize: 11, fontWeight: '700', color: '#64748B' },
+    resultsEmpty: {
+        minHeight: 145,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingBottom: 22,
+        gap: 6,
+    },
+    resultsEmptyTitle: { fontSize: 14, fontWeight: '800', color: '#334155', textAlign: 'center' },
+    resultsEmptyText: { fontSize: 12, fontWeight: '600', color: '#64748B', textAlign: 'center' },
 
     // ── Bottom Card ──
     bottomCard: {
