@@ -60,15 +60,25 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     // ── Fetch danh sách notifications ────────────────────────────────────────
     fetchNotifications: async (reset = false) => {
+        if (get().isLoading) return;
         if (!reset && !get().hasMore) return;
         const page = reset ? 0 : get().page;
         set({ isLoading: true });
         try {
             const data = await notificationService.getNotifications(page);
+            const normalizedData = data.content.map((n: any) => ({
+                ...n,
+                isRead: Boolean(n.isRead ?? n.read ?? false),
+                type: n.type,
+                referenceId: n.referenceId ?? n.refId ?? n.targetId,
+                data: n.data ?? n.metadata ?? {},
+                route: n.route ?? n.data?.route ?? n.metadata?.route,
+            }));
+            
             set(state => ({
                 notifications: reset
-                    ? data.content
-                    : [...state.notifications, ...data.content],
+                    ? normalizedData
+                    : [...state.notifications, ...normalizedData],
                 hasMore: !data.last,
                 page: data.number + 1,
                 isLoading: false,
@@ -81,16 +91,32 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     // ── Mark as read ─────────────────────────────────────────────────────────
     markAsRead: async (id: number) => {
         try {
-            await notificationService.markAsRead(id);
-            set(state => ({
-                notifications: state.notifications.map(n =>
-                    n.id === id ? { ...n, isRead: true } : n
-                ),
-                unreadCount: Math.max(0, state.unreadCount - 1),
-            }));
-            await setBadgeCount(Math.max(0, get().unreadCount));
+            const state = get();
+            const target = state.notifications.find(n => n.id === id);
+            const wasUnread = target ? !target.isRead : false;
+
+            if (wasUnread) {
+                // Optimistic update
+                const newUnreadCount = Math.max(0, state.unreadCount - 1);
+                set(state => ({
+                    notifications: state.notifications.map(n =>
+                        n.id === id ? { ...n, isRead: true } : n
+                    ),
+                    unreadCount: newUnreadCount,
+                }));
+                setBadgeCount(newUnreadCount).catch(() => {});
+                
+                // Gọi API background
+                await notificationService.markAsRead(id);
+            } else {
+                // Đã đọc thì không cần gọi API (hoặc cứ gọi ngầm cũng được, tuỳ logic,
+                // nhưng tránh trừ unreadCount sai)
+                await notificationService.markAsRead(id);
+            }
         } catch (error) {
             console.error('[NotifStore] markAsRead error:', error);
+            // Nếu API lỗi, fallback về backend count để đồng bộ lại
+            get().fetchUnreadCount();
         }
     },
 
@@ -112,8 +138,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     fetchUnreadCount: async () => {
         try {
             const count = await notificationService.getUnreadCount();
-            set({ unreadCount: count });
-            await setBadgeCount(count);
+            const normalizedCount = Math.max(0, Number(count) || 0);
+            set({ unreadCount: normalizedCount });
+            await setBadgeCount(normalizedCount);
         } catch {
             // Silently fail
         }
@@ -121,13 +148,26 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     // ── Thêm notification mới vào đầu list (gọi từ WS handler) ──────────────
     addLocalNotification: (notif: Notification) => {
-        set(state => ({
-            // Tránh duplicate nếu cùng id đã tồn tại
-            notifications: state.notifications.some(n => n.id === notif.id)
-                ? state.notifications
-                : [notif, ...state.notifications],
-            unreadCount: state.unreadCount + 1,
-        }));
+        set(state => {
+            const exists = state.notifications.some(n => n.id === notif.id);
+            if (exists) {
+                return { notifications: state.notifications };
+            }
+
+            const normalizedNotif = {
+                ...notif,
+                isRead: Boolean(notif.isRead ?? (notif as any).read ?? false),
+                type: notif.type,
+                referenceId: notif.referenceId ?? (notif as any).refId ?? (notif as any).targetId,
+                data: notif.data ?? (notif as any).metadata ?? {},
+                route: notif.route ?? notif.data?.route ?? (notif as any).metadata?.route,
+            };
+
+            return {
+                notifications: [normalizedNotif, ...state.notifications],
+                unreadCount: normalizedNotif.isRead ? state.unreadCount : state.unreadCount + 1,
+            };
+        });
         setBadgeCount(get().unreadCount);
     },
 

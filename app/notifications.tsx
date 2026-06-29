@@ -65,6 +65,11 @@ function getSectionTitle(dateStr: string): string {
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+const WALLET_HISTORY_TYPES = new Set([
+    'PAYMENT_SUCCESS',
+    'WALLET_DEPOSIT',
+]);
+
 export default function NotificationsScreen() {
     return (
         <AuthGuardScreen
@@ -79,11 +84,12 @@ export default function NotificationsScreen() {
 function NotificationsContent() {
     const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
-    const { notifications, fetchNotifications, markAsRead, markAllAsRead, isLoading, unreadCount } = useNotificationStore();
+    const { notifications, fetchNotifications, markAsRead, markAllAsRead, fetchUnreadCount, isLoading, unreadCount } = useNotificationStore();
 
     useEffect(() => {
         fetchNotifications(true);
-    }, []);
+        // Bỏ fetchUnreadCount() để tránh duplicate với app/_layout.tsx
+    }, []); 
 
     const sections = useMemo(() => {
         const groups: Record<string, Notification[]> = {};
@@ -96,26 +102,80 @@ function NotificationsContent() {
     }, [notifications]);
 
     const handleNotifPress = (notif: Notification) => {
-        markAsRead(notif.id);
-        // Navigate based on notification type (backend chỉ có type, không có data field)
-        switch (notif.type) {
+        const notifAny = notif as any;
+        const normalizedType = String(notif.type ?? '').trim().toUpperCase();
+
+        if (__DEV__) {
+            console.log('[NotificationTap]', {
+                id: notif.id,
+                type: notif.type,
+                normalizedType,
+                title: notif.title,
+                referenceId: notifAny.referenceId,
+                route: notifAny.route,
+                dataKeys:
+                    notifAny.data && typeof notifAny.data === 'object'
+                        ? Object.keys(notifAny.data)
+                        : [],
+            });
+        }
+
+        if (!notif.isRead) {
+            // Không block navigation, gọi API chạy ngầm
+            markAsRead(notif.id).catch(() => {});
+        }
+
+        if (notifAny.route) {
+            safePush(notifAny.route as any);
+            return;
+        }
+
+        if (WALLET_HISTORY_TYPES.has(normalizedType)) {
+            safePush('/wallet/history' as any);
+            return;
+        }
+
+        // Ưu tiên referenceId thật, nếu không có thì dò trong data
+        const refId = notifAny.referenceId ?? notifAny.data?.partnerId ?? notifAny.data?.senderId ?? notifAny.data?.userId ?? notifAny.data?.appointmentId ?? notifAny.data?.propertyId ?? notifAny.data?.roomId ?? notifAny.data?.contractId;
+
+        switch (normalizedType) {
+            case 'CHAT':
+            case 'CHAT_MESSAGE':
+            case 'MESSAGE':
+            case 'NEW_MESSAGE':
+            case 'CHAT_NEW':
+                safePush(refId ? `/chat/${refId}` as any : '/(tabs)/chat' as any);
+                break;
+            case 'PAYMENT':
+            case 'WALLET':
+            case 'DEPOSIT':
+            case 'TRANSACTION':
+            case 'PURCHASE_PACKAGE':
+            case 'DEDUCTION':
+            case 'BILL_NEW':
+            case 'BILL':
+                safePush('/wallet/history' as any);
+                break;
             case 'APPOINTMENT':
-                safePush('/appointments' as any);
+            case 'APPOINTMENT_CREATED':
+            case 'APPOINTMENT_CONFIRMED':
+            case 'APPOINTMENT_CANCELLED':
+            case 'APPOINTMENT_SUGGESTION':
+                safePush(refId ? `/appointments/${refId}` as any : '/appointments' as any);
+                break;
+            case 'PROPERTY':
+            case 'PROPERTY_APPROVED':
+            case 'PROPERTY_REJECTED':
+            case 'ROOM_APPROVED':
+            case 'ROOM_EXPIRING':
+                safePush(refId ? `/property/${refId}` as any : '/notifications' as any);
                 break;
             case 'CONTRACT':
-                safePush('/contracts' as any);
-                break;
-            case 'BILL':
-                safePush('/wallet' as any);
-                break;
-            case 'ROOM_APPROVED':
-                // Quay về danh sách BĐS của tôi
-                safePush('/(tabs)/profile' as any);
-                break;
-            case 'CHAT':
-                safePush('/(tabs)/chat' as any);
+            case 'CONTRACT_SIGN':
+                safePush(refId ? `/contracts/${refId}` as any : '/contracts' as any);
                 break;
             default:
+                // Unknown type -> stay here
                 break;
         }
     };
@@ -131,7 +191,7 @@ function NotificationsContent() {
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Thông báo</Text>
                 {unreadCount > 0 && (
-                    <TouchableOpacity onPress={markAllAsRead}>
+                    <TouchableOpacity onPress={() => { markAllAsRead(); }}>
                         <Text style={styles.markAllBtn}>Đọc tất cả</Text>
                     </TouchableOpacity>
                 )}
