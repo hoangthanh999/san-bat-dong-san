@@ -26,6 +26,7 @@ interface ReelsState {
     loading: boolean;
     refreshing: boolean;
     activeIndex: number;
+    error: string | null;
 
     // Actions
     fetchReels: () => Promise<void>;
@@ -43,11 +44,12 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
     loading: false,
     refreshing: false,
     activeIndex: 0,
+    error: null,
 
     // ── Fetch lần đầu ────────────────────────────────────────
     fetchReels: async () => {
         if (get().loading) return;
-        set({ loading: true });
+        set({ loading: true, error: null });
         try {
             const data = await reelsApi.getFeed(10);
             syncInteractions(data.items); // ✅ thêm dòng này
@@ -58,6 +60,7 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
             });
         } catch (e) {
             console.error('[ReelsStore] fetchReels error:', e);
+            set({ error: 'Không tải được video bất động sản.' });
         } finally {
             set({ loading: false });
         }
@@ -66,7 +69,7 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
     loadMore: async () => {
         const { hasNext, loading, nextCursor, reels } = get();
         if (!hasNext || loading || !nextCursor) return;
-        set({ loading: true });
+        set({ loading: true, error: null });
         try {
             const data = await reelsApi.loadMore(nextCursor, 10);
             syncInteractions(data.items); // ✅ thêm dòng này
@@ -77,13 +80,14 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
             });
         } catch (e) {
             console.error('[ReelsStore] loadMore error:', e);
+            set({ error: 'Không tải thêm được Reels.' });
         } finally {
             set({ loading: false });
         }
     },
 
     refresh: async () => {
-        set({ refreshing: true });
+        set({ refreshing: true, error: null });
         try {
             const data = await reelsApi.getFeed(10);
             syncInteractions(data.items); // ✅ thêm dòng này
@@ -95,6 +99,7 @@ export const useReelsStore = create<ReelsState>((set, get) => ({
             });
         } catch (e) {
             console.error('[ReelsStore] refresh error:', e);
+            set({ error: 'Không làm mới được Reels.' });
         } finally {
             set({ refreshing: false });
         }
