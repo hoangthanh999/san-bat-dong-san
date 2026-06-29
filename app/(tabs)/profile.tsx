@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     FlatList, RefreshControl, StatusBar, Platform, Alert, Switch, ActivityIndicator,
@@ -17,6 +17,7 @@ import { AuthGuardScreen } from '../../components/auth/AuthGuardScreen';
 import { Room, Appointment } from '../../types';
 import { InteractionPropertyDTO } from '../../services/api/interaction';
 import { roomService } from '../../services/api/rooms';
+import { useFocusEffect } from 'expo-router';
 
 function MiniRoomCard({ room, onPress, onEdit, onDelete }: {
     room: Room;
@@ -173,16 +174,34 @@ function ProfileScreenContent() {
     const [activeTab, setActiveTab] = useState<'myrooms' | 'appointments' | 'saved'>(() => isOwner ? 'myrooms' : 'saved');
     const [refreshing, setRefreshing] = useState(false);
     const [togglingNotif, setTogglingNotif] = useState(false);
+    const [hasLoadedMyRooms, setHasLoadedMyRooms] = useState(false);
     const didApplyRoleDefaultTab = useRef(false);
 
-    useEffect(() => {
-        if (isAuthenticated) {
-            fetchProfile();
-            fetchMyRooms(true);
-            fetchAppointments(true).catch(() => undefined);
-            fetchSavedProperties(true);
+    const loadProfileData = useCallback(async () => {
+        if (!isAuthenticated) {
+            setHasLoadedMyRooms(false);
+            return;
         }
-    }, [isAuthenticated]);
+
+        await fetchProfile();
+
+        const latestProfile = useUserStore.getState().profile;
+        if (latestProfile) {
+            await fetchMyRooms(true);
+            setHasLoadedMyRooms(true);
+        }
+
+        await Promise.all([
+            fetchAppointments(true).catch(() => undefined),
+            fetchSavedProperties(true),
+        ]);
+    }, [fetchAppointments, fetchMyRooms, fetchProfile, fetchSavedProperties, isAuthenticated]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadProfileData();
+        }, [loadProfileData])
+    );
 
     useEffect(() => {
         if (!accountRole || didApplyRoleDefaultTab.current) return;
@@ -193,12 +212,7 @@ function ProfileScreenContent() {
     const onRefresh = async () => {
         setRefreshing(true);
         try {
-            await Promise.all([
-                fetchProfile(),
-                fetchMyRooms(true),
-                fetchAppointments(true).catch(() => undefined),
-                fetchSavedProperties(true),
-            ]);
+            await loadProfileData();
         } finally {
             setRefreshing(false);
         }
@@ -224,7 +238,8 @@ function ProfileScreenContent() {
                         try {
                             await roomService.deleteRoom(room.id);
                             Alert.alert('Đã xóa', 'Tin đăng đã được chuyển vào thùng rác.');
-                            fetchMyRooms(true);
+                            await fetchMyRooms(true);
+                            setHasLoadedMyRooms(true);
                         } catch (err: any) {
                             Alert.alert('Lỗi', err?.message || 'Không thể xóa tin đăng');
                         }
@@ -261,9 +276,12 @@ function ProfileScreenContent() {
 
     const displayUser = profile || user;
     const isVerified = (displayUser as any)?.identityVerified === true || displayUser?.kycStatus === 'VERIFIED';
-    const hasListings = myRooms.length > 0;
+    const hasListings = hasLoadedMyRooms && myRooms.length > 0;
     const activeRooms = myRooms.filter(room => room.status === 'ACTIVE').length;
     const pendingRooms = myRooms.filter(room => room.status === 'PENDING').length;
+    const listingCountValue = hasLoadedMyRooms ? myRooms.length : '—';
+    const activeRoomsValue = hasLoadedMyRooms ? activeRooms : '—';
+    const pendingRoomsValue = hasLoadedMyRooms ? pendingRooms : '—';
     const roleLabel = isAdmin ? 'Quản trị viên' : isOwner ? 'Chủ nhà' : 'Người dùng';
     const roleIcon = isAdmin ? 'shield-checkmark-outline' : isOwner ? 'home-outline' : 'person-outline';
     const primaryContact = displayUser?.email || displayUser?.phone || 'Chưa cập nhật liên hệ';
@@ -271,15 +289,15 @@ function ProfileScreenContent() {
     const walletBalance = (displayUser as any)?.walletBalance;
     const dashboardStats = isOwner
         ? [
-            { label: 'Tổng tin', value: myRooms.length },
-            { label: 'Đang đăng', value: activeRooms },
-            { label: 'Chờ duyệt', value: pendingRooms },
+            { label: 'Tổng tin', value: listingCountValue },
+            { label: 'Đang đăng', value: activeRoomsValue },
+            { label: 'Chờ duyệt', value: pendingRoomsValue },
             { label: 'Lịch hẹn', value: appointments.length },
         ]
         : [
             { label: 'Đã lưu', value: savedProperties.length },
             { label: 'Lịch hẹn', value: appointments.length },
-            { label: 'Tin đăng', value: myRooms.length },
+            { label: 'Tin đăng', value: listingCountValue },
         ];
     const quickActions = isOwner
         ? [
@@ -386,7 +404,7 @@ function ProfileScreenContent() {
                 {/* Stats Row */}
                 <View style={styles.statsRow}>
                     <View style={styles.stat}>
-                        <Text style={styles.statNum}>{myRooms.length}</Text>
+                        <Text style={styles.statNum}>{listingCountValue}</Text>
                         <Text style={styles.statLbl}>Tin đăng</Text>
                     </View>
                     <View style={styles.statDivider} />
@@ -477,7 +495,7 @@ function ProfileScreenContent() {
             {/* Tab Content */}
             <View style={styles.tabContent}>
                 {activeTab === 'myrooms' && (
-                    isLoading ? (
+                    (!hasLoadedMyRooms || isLoading) ? (
                         <View style={{ gap: 12, padding: 16 }}>
                             {[1, 2].map(i => <Skeleton key={i} width="100%" height={100} borderRadius={12} />)}
                         </View>
