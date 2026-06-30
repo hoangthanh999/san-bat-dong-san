@@ -153,7 +153,7 @@ export default function ProfileScreen() {
 }
 
 function ProfileScreenContent() {
-    const { safePush } = useSafeRouter();
+    const { safePush, safeReplace } = useSafeRouter();
     const insets = useSafeAreaInsets();
     const { user, isAuthenticated, logout } = useAuthStore();
     const { profile, myRooms, fetchProfile, fetchMyRooms, isLoading } = useUserStore();
@@ -224,6 +224,10 @@ function ProfileScreenContent() {
             { text: 'Đăng xuất', style: 'destructive', onPress: logout },
         ]);
     };
+
+    const goToListingsHome = useCallback(() => {
+        safeReplace('/(tabs)' as any);
+    }, [safeReplace]);
 
     const handleDeleteRoom = (room: Room) => {
         Alert.alert(
@@ -302,7 +306,7 @@ function ProfileScreenContent() {
     const quickActions = isOwner
         ? [
             { icon: 'add-circle-outline', label: 'Đăng tin', onPress: () => safePush('/(tabs)/post' as any) },
-            { icon: 'home-outline', label: 'Tin đăng', onPress: () => setActiveTab('myrooms') },
+            { icon: 'home-outline', label: 'Tin đăng', onPress: goToListingsHome },
             { icon: 'calendar-outline', label: 'Lịch hẹn', onPress: () => safePush('/appointments' as any) },
             { icon: 'wallet-outline', label: 'Ví', onPress: () => safePush('/wallet' as any) },
         ]

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch, ActivityIndicator, TextInput, Alert,
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Switch, ActivityIndicator, TextInput, Alert, PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -74,6 +74,50 @@ function SectionHeader({ title }: { title: string }) {
 
 type CountMode = 'exact' | 'min';
 
+const RENT_PRICE_STEP = 500_000;
+const SALE_PRICE_STEP = 100_000_000;
+
+const getPriceStep = (transactionType?: string) => (
+    transactionType === 'FOR_RENT' ? RENT_PRICE_STEP : SALE_PRICE_STEP
+);
+
+const getFallbackMaxPrice = (transactionType?: string) => (
+    transactionType === 'FOR_RENT' ? 100_000_000 : 10_000_000_000
+);
+
+const clampNumber = (value: number, min: number, max: number) => {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(Math.max(value, min), max);
+};
+
+const snapPriceToStep = (value: number, step: number) => Math.round(value / step) * step;
+
+const niceCeilPrice = (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return 0;
+
+    if (value <= 100_000_000) {
+        return Math.ceil(value / 10_000_000) * 10_000_000;
+    }
+
+    if (value <= 1_000_000_000) {
+        return Math.ceil(value / 100_000_000) * 100_000_000;
+    }
+
+    if (value <= 5_000_000_000) {
+        return Math.ceil(value / 1_000_000_000) * 1_000_000_000;
+    }
+
+    if (value <= 10_000_000_000) {
+        return 10_000_000_000;
+    }
+
+    if (value <= 50_000_000_000) {
+        return Math.ceil(value / 5_000_000_000) * 5_000_000_000;
+    }
+
+    return Math.ceil(value / 10_000_000_000) * 10_000_000_000;
+};
+
 const parsePriceInput = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return undefined;
@@ -98,6 +142,100 @@ const getCountLabel = (value: number | undefined, unit: 'PN' | 'WC', mode: Count
         ? `Chính xác ${value} ${unit}`
         : `Từ ${value} ${unit} trở lên`;
 };
+
+function PriceRangeSlider({
+    min,
+    max,
+    ceiling,
+    step,
+    onChange,
+}: {
+    min: number;
+    max: number;
+    ceiling: number;
+    step: number;
+    onChange: (min: number, max: number) => void;
+}) {
+    const [trackWidth, setTrackWidth] = useState(0);
+    const valuesRef = useRef({ min, max });
+    const dragStartRef = useRef({ min, max });
+
+    useEffect(() => {
+        valuesRef.current = { min, max };
+    }, [min, max]);
+
+    const valueToPercent = useCallback((value: number) => {
+        if (ceiling <= 0) return 0;
+        return clampNumber(value / ceiling, 0, 1) * 100;
+    }, [ceiling]);
+
+    const moveThumb = useCallback((thumb: 'min' | 'max', dx: number) => {
+        if (trackWidth <= 0 || ceiling <= 0) return;
+
+        const delta = (dx / trackWidth) * ceiling;
+        const start = dragStartRef.current;
+
+        if (thumb === 'min') {
+            const nextMin = clampNumber(snapPriceToStep(start.min + delta, step), 0, valuesRef.current.max);
+            onChange(nextMin, valuesRef.current.max);
+            return;
+        }
+
+        const nextMax = clampNumber(snapPriceToStep(start.max + delta, step), valuesRef.current.min, ceiling);
+        onChange(valuesRef.current.min, nextMax);
+    }, [ceiling, onChange, step, trackWidth]);
+
+    const minResponder = useMemo(() => PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+            dragStartRef.current = valuesRef.current;
+        },
+        onPanResponderMove: (_, gestureState) => moveThumb('min', gestureState.dx),
+    }), [moveThumb]);
+
+    const maxResponder = useMemo(() => PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+            dragStartRef.current = valuesRef.current;
+        },
+        onPanResponderMove: (_, gestureState) => moveThumb('max', gestureState.dx),
+    }), [moveThumb]);
+
+    const minPercent = valueToPercent(min);
+    const maxPercent = valueToPercent(max);
+
+    return (
+        <View style={styles.rangeSlider}>
+            <View style={styles.rangeValueRow}>
+                <Text style={styles.rangeValueText}>{formatCompactVND(min)}</Text>
+                <Text style={styles.rangeValueText}>{formatCompactVND(max)}</Text>
+            </View>
+            <View style={styles.rangeTrackWrap} onLayout={event => setTrackWidth(event.nativeEvent.layout.width)}>
+                <View style={styles.rangeTrack} />
+                <View
+                    style={[
+                        styles.rangeTrackActive,
+                        { left: `${minPercent}%`, right: `${100 - maxPercent}%` },
+                    ]}
+                />
+                <View
+                    style={[styles.rangeThumb, styles.rangeThumbMin, { left: `${minPercent}%` }]}
+                    {...minResponder.panHandlers}
+                />
+                <View
+                    style={[styles.rangeThumb, styles.rangeThumbMax, { left: `${maxPercent}%` }]}
+                    {...maxResponder.panHandlers}
+                />
+            </View>
+            <View style={styles.rangeLimitRow}>
+                <Text style={styles.rangeLimitText}>0</Text>
+                <Text style={styles.rangeLimitText}>{formatCompactVND(ceiling)}</Text>
+            </View>
+        </View>
+    );
+}
 
 // ─── Extended local filter type ───────────────────────────────
 interface LocalFilters extends RoomFilters {
@@ -139,12 +277,29 @@ export default function FilterScreen() {
 
     const isSale = local.transactionType === 'FOR_SALE';
     const priceRanges = isSale ? PRICE_RANGES_SALE : PRICE_RANGES_RENT;
+    const priceStep = getPriceStep(local.transactionType);
     const priceSourceRooms = searchResults ?? rooms;
     const dynamicMaxPrice = useMemo(() => (
         priceSourceRooms.reduce((max, room) => Math.max(max, Number(room.price ?? 0)), 0)
     ), [priceSourceRooms]);
-    const fallbackMaxPrice = isSale ? 10_000_000_000 : 100_000_000;
-    const priceCeiling = dynamicMaxPrice > 0 ? dynamicMaxPrice : fallbackMaxPrice;
+    const currentMinPrice = sanitizePrice(local.minPrice);
+    const currentMaxPrice = sanitizePrice(local.maxPrice);
+    const fallbackMaxPrice = getFallbackMaxPrice(local.transactionType);
+    const rawPriceCeiling = Math.max(
+        dynamicMaxPrice,
+        currentMinPrice ?? 0,
+        currentMaxPrice ?? 0,
+        fallbackMaxPrice
+    );
+    const priceCeiling = Math.max(priceStep, niceCeilPrice(rawPriceCeiling));
+    const minPriceForSlider = Math.min(currentMinPrice ?? 0, priceCeiling);
+    const maxPriceForSlider = Math.max(
+        minPriceForSlider,
+        Math.min(currentMaxPrice ?? priceCeiling, priceCeiling)
+    );
+    const priceError = local.minPrice != null && local.maxPrice != null && local.minPrice > local.maxPrice
+        ? 'Giá tối thiểu không được lớn hơn giá tối đa.'
+        : undefined;
 
     useEffect(() => {
         amenityService.getAll()
@@ -161,8 +316,8 @@ export default function FilterScreen() {
         setLocal(p => ({
             ...p,
             priceIndex: p.priceIndex === index ? undefined : index,
-            minPrice: p.priceIndex === index ? undefined : range.min,
-            maxPrice: p.priceIndex === index ? undefined : range.max,
+            minPrice: p.priceIndex === index ? undefined : Math.min(range.min, priceCeiling),
+            maxPrice: p.priceIndex === index || range.max == null ? undefined : Math.min(range.max, priceCeiling),
         }));
     };
 
@@ -174,6 +329,23 @@ export default function FilterScreen() {
             [key]: value,
         }));
     };
+
+    const normalizePriceInputs = useCallback(() => {
+        setLocal(p => ({
+            ...p,
+            minPrice: sanitizePrice(p.minPrice) != null ? Math.min(sanitizePrice(p.minPrice)!, priceCeiling) : undefined,
+            maxPrice: sanitizePrice(p.maxPrice) != null ? Math.min(sanitizePrice(p.maxPrice)!, priceCeiling) : undefined,
+        }));
+    }, [priceCeiling]);
+
+    const updatePriceSlider = useCallback((minPrice: number, maxPrice: number) => {
+        setLocal(p => ({
+            ...p,
+            priceIndex: undefined,
+            minPrice,
+            maxPrice,
+        }));
+    }, []);
 
     const updateBedroomMode = (mode: CountMode) => {
         setLocal(p => ({ ...p, bedroomMode: mode }));
@@ -219,14 +391,16 @@ export default function FilterScreen() {
         const keyword = local.keyword?.trim() || undefined;
         const province = local.province?.trim() || undefined;
         const ward = local.ward?.trim() || undefined;
-        const minPrice = sanitizePrice(local.minPrice);
-        const maxPrice = sanitizePrice(local.maxPrice);
+        const sanitizedMinPrice = sanitizePrice(local.minPrice);
+        const sanitizedMaxPrice = sanitizePrice(local.maxPrice);
+        const minPrice = sanitizedMinPrice != null ? Math.min(sanitizedMinPrice, priceCeiling) : undefined;
+        const maxPrice = sanitizedMaxPrice != null ? Math.min(sanitizedMaxPrice, priceCeiling) : undefined;
         const bedroomMode = local.bedroomMode ?? 'min';
         const bedroomValue = local.bedroomValue ?? local.minBedrooms;
         const bathroomMode = local.bathroomMode ?? 'min';
         const bathroomValue = local.bathroomValue ?? local.minBathrooms;
 
-        if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
+        if (sanitizedMinPrice != null && sanitizedMaxPrice != null && sanitizedMinPrice > sanitizedMaxPrice) {
             Alert.alert('Khoảng giá chưa hợp lệ', 'Giá tối thiểu không được lớn hơn giá tối đa.');
             return;
         }
@@ -433,7 +607,7 @@ export default function FilterScreen() {
                 <View style={styles.section}>
                     <SectionHeader title={isSale ? 'Khoảng giá bán' : 'Khoảng giá thuê'} />
                     <Text style={styles.helperText}>
-                        Giá cao nhất trong dữ liệu hiện có: {formatCompactVND(priceCeiling)}
+                        Mức giá tối đa có thể chọn: {formatCompactVND(priceCeiling)}
                     </Text>
                     <View style={styles.chipRow}>
                         {priceRanges.map((r, i) => (
@@ -452,6 +626,7 @@ export default function FilterScreen() {
                                 style={styles.priceInput}
                                 value={local.minPrice != null ? String(local.minPrice) : ''}
                                 onChangeText={text => updatePriceInput('minPrice', text)}
+                                onBlur={normalizePriceInputs}
                                 placeholder="0"
                                 placeholderTextColor="#999"
                                 keyboardType="numeric"
@@ -463,12 +638,23 @@ export default function FilterScreen() {
                                 style={styles.priceInput}
                                 value={local.maxPrice != null ? String(local.maxPrice) : ''}
                                 onChangeText={text => updatePriceInput('maxPrice', text)}
+                                onBlur={normalizePriceInputs}
                                 placeholder={String(priceCeiling)}
                                 placeholderTextColor="#999"
                                 keyboardType="numeric"
                             />
                         </View>
                     </View>
+                    {priceError && (
+                        <Text style={styles.priceErrorText}>{priceError}</Text>
+                    )}
+                    <PriceRangeSlider
+                        min={minPriceForSlider}
+                        max={maxPriceForSlider}
+                        ceiling={priceCeiling}
+                        step={priceStep}
+                        onChange={updatePriceSlider}
+                    />
                     {(local.minPrice != null || local.maxPrice != null) && (
                         <Text style={styles.helperText}>
                             Đang chọn: {local.minPrice != null ? formatCompactVND(Math.max(0, local.minPrice)) : '0'} - {local.maxPrice != null ? formatCompactVND(Math.max(0, local.maxPrice)) : 'không giới hạn'}
@@ -704,6 +890,69 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#1A1A1A',
         backgroundColor: '#FAFAFA',
+    },
+    priceErrorText: {
+        color: '#DC2626',
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: 8,
+        marginBottom: 2,
+    },
+    rangeSlider: {
+        marginTop: 16,
+        marginBottom: 12,
+    },
+    rangeValueRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    rangeValueText: {
+        color: '#0066FF',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    rangeTrackWrap: {
+        height: 34,
+        justifyContent: 'center',
+        marginHorizontal: 14,
+    },
+    rangeTrack: {
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#E5E7EB',
+    },
+    rangeTrackActive: {
+        position: 'absolute',
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#0066FF',
+    },
+    rangeThumb: {
+        position: 'absolute',
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 3,
+        borderColor: '#0066FF',
+        backgroundColor: 'white',
+        transform: [{ translateX: -14 }],
+        shadowColor: '#000',
+        shadowOpacity: 0.14,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 4,
+    },
+    rangeThumbMin: { zIndex: 2 },
+    rangeThumbMax: { zIndex: 3 },
+    rangeLimitRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 6,
+    },
+    rangeLimitText: {
+        color: '#777',
+        fontSize: 11,
     },
     modeToggle: {
         flexDirection: 'row',
