@@ -8,6 +8,7 @@ import { useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';   // ✅ Thay react-native-maps
 import { Image } from 'expo-image';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -20,6 +21,7 @@ import { useCommentStore } from '../../store/commentStore';
 import { useAppointmentStore } from '../../store/appointmentStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { roomService } from '../../services/api/rooms';
+import { reelsApi, PropertyReel } from '../../services/api/reels';
 import { ImageGallery } from '../../components/property/ImageGallery';
 import { ReviewCard } from '../../components/property/ReviewCard';
 import { CommentResponse, Room } from '../../types';
@@ -27,6 +29,7 @@ import { formatCompactVND } from '../../utils/formatPrice';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const { width } = Dimensions.get('window');
+const FALLBACK_PROPERTY_IMAGE = 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800';
 
 // ✅ Tạo HTML cho Leaflet map (OpenStreetMap - miễn phí, không cần API Key)
 const buildLeafletHtml = (
@@ -100,14 +103,6 @@ const getAmenityIcon = (name: string): string => {
     return 'checkmark-circle';
 };
 
-const NEARBY_POIS = [
-    { icon: '🏫', label: 'Trường quốc tế', distance: '500m' },
-    { icon: '🏥', label: 'Bệnh viện Đa khoa', distance: '1.2km' },
-    { icon: '🚇', label: 'Metro Tân Cảng', distance: '800m' },
-    { icon: '🏪', label: 'VinMart / Co.op', distance: '300m' },
-    { icon: '☕', label: 'Coffee & Café', distance: '150m' },
-];
-
 const getOwnerName = (room: Room): string =>
     room.ownerNameSnapshot || room.ownerFullName || 'Chủ nhà';
 
@@ -144,11 +139,109 @@ const getStatusBadge = (status: string) => {
     }
 };
 
+// ✅ Label maps tiếng Việt cho enum
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+    ROOM: 'Phòng trọ', APARTMENT: 'Căn hộ', HOUSE: 'Nhà nguyên căn',
+    VILLA: 'Biệt thự', COMMERCIAL: 'Mặt bằng kinh doanh',
+    LAND: 'Đất nền', OFFICE: 'Văn phòng',
+};
+const TRANSACTION_TYPE_LABELS: Record<string, string> = {
+    FOR_RENT: 'Cho thuê', FOR_SALE: 'Bán',
+};
+const FURNISHING_LABELS: Record<string, string> = {
+    UNFURNISHED: 'Không nội thất', PARTIALLY_FURNISHED: 'Nội thất cơ bản',
+    FULLY_FURNISHED: 'Đầy đủ nội thất',
+};
+const AVAILABILITY_LABELS: Record<string, string> = {
+    IMMEDIATELY: 'Vào ở ngay', THIS_MONTH: 'Trong tháng này',
+    NEXT_MONTH: 'Tháng sau', NEGOTIABLE: 'Thỏa thuận',
+};
+const UTILITY_PRICE_LABELS: Record<string, string> = {
+    FREE: 'Miễn phí', STATE_PRICE: 'Giá nhà nước',
+    LANDLORD_PRICE: 'Theo chủ nhà', SHARED: 'Chia đều',
+    NEGOTIABLE: 'Thỏa thuận',
+};
+const LEGAL_DOC_LABELS: Record<string, string> = {
+    NONE: 'Không có', CERTIFICATE_OF_OWNERSHIP: 'Sổ đỏ / Sổ hồng',
+    LEASE_CONTRACT: 'Hợp đồng thuê', AUTHORIZATION_LETTER: 'Giấy uỷ quyền',
+};
+const getLabel = (map: Record<string, string>, value?: string | null): string =>
+    (value && map[value]) || 'Chưa cập nhật';
+
+const formatCreatedAt = (iso?: string): string => {
+    if (!iso) return 'Chưa cập nhật';
+    try {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return 'Chưa cập nhật';
+        const dd = d.getDate().toString().padStart(2, '0');
+        const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+        return `${dd}/${mm}/${d.getFullYear()}`;
+    } catch { return 'Chưa cập nhật'; }
+};
+
+const getRoomListFromResponse = (res: any): Room[] => {
+    const candidates = [
+        res?.content,
+        res?.data?.content,
+        res?.items,
+        res?.result?.content,
+        res?.result,
+    ];
+    const list = candidates.find(Array.isArray);
+    return Array.isArray(list) ? list : [];
+};
+
+const normalizeText = (value?: string | null) => (value || '').trim().toLowerCase();
+
+const scoreSimilarRoom = (candidate: Room, current: Room) => {
+    let score = 0;
+    if (current.projectId && candidate.projectId === current.projectId) score += 80;
+    if (candidate.propertyType && candidate.propertyType === current.propertyType) score += 24;
+    if (candidate.transactionType && candidate.transactionType === current.transactionType) score += 24;
+    if (normalizeText(candidate.ward) && normalizeText(candidate.ward) === normalizeText(current.ward)) score += 18;
+    if (normalizeText(candidate.district) && normalizeText(candidate.district) === normalizeText(current.district)) score += 14;
+    if (normalizeText(candidate.province) && normalizeText(candidate.province) === normalizeText(current.province)) score += 10;
+    if (candidate.isPromoted) score += 2;
+    return score;
+};
+
+const pickSimilarRooms = (items: Room[], current: Room, limit = 6) => {
+    const candidates = items.filter(item => item?.id && item.id !== current.id);
+    const sorted = candidates
+        .map(item => ({ item, score: scoreSimilarRoom(item, current) }))
+        .sort((a, b) => b.score - a.score)
+        .map(({ item }) => item);
+    return sorted.slice(0, limit);
+};
+
+const scoreRelatedReel = (candidate: PropertyReel, current: Room) => {
+    const raw = candidate as any;
+    let score = 0;
+    if (current.projectId && raw.projectId === current.projectId) score += 80;
+    if (normalizeText(raw.ward) && normalizeText(raw.ward) === normalizeText(current.ward)) score += 18;
+    if (normalizeText(raw.district) && normalizeText(raw.district) === normalizeText(current.district)) score += 14;
+    if (normalizeText(raw.province) && normalizeText(raw.province) === normalizeText(current.province)) score += 10;
+    if (raw.propertyType && raw.propertyType === current.propertyType) score += 20;
+    if (raw.transactionType && raw.transactionType === current.transactionType) score += 20;
+    if (raw.listingType && (raw.listingType === current.transactionType || (raw.listingType === 'RENT' && current.transactionType === 'FOR_RENT') || (raw.listingType === 'SALE' && current.transactionType === 'FOR_SALE'))) score += 18;
+    if (candidate.isPromoted) score += 2;
+    return score;
+};
+
+const pickRelatedReels = (items: PropertyReel[], current: Room, limit = 6) => (
+    items
+        .filter(item => item?.id && item.id !== current.id && !!item.videoUrl)
+        .map(item => ({ item, score: scoreRelatedReel(item, current) }))
+        .sort((a, b) => b.score - a.score)
+        .map(({ item }) => item)
+        .slice(0, limit)
+);
+
 export default function PropertyDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const { router, safePush } = useSafeRouter();
     const insets = useSafeAreaInsets();
-    const { currentRoom, fetchRoomDetail, isLoading } = usePropertyStore();
+    const { currentRoom, fetchRoomDetail, isLoading, error: storeError } = usePropertyStore();
     const { user, isAuthenticated } = useAuthStore();
     const {
         reviewsByOwner, summaryByOwner,
@@ -182,9 +275,20 @@ export default function PropertyDetailScreen() {
     const [userDistance, setUserDistance] = useState<string | null>(null);
     const [descExpanded, setDescExpanded] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [showVideoModal, setShowVideoModal] = useState(false);
+    const [similarRooms, setSimilarRooms] = useState<Room[]>([]);
+    const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
+    const [relatedReels, setRelatedReels] = useState<PropertyReel[]>([]);
+    const [isLoadingRelatedReels, setIsLoadingRelatedReels] = useState(false);
 
     const roomId = Number(id);
     const room = currentRoom?.id === roomId ? currentRoom : null;
+    const videoUrl = room?.videoUrl?.trim() || null;
+
+    const videoPlayer = useVideoPlayer(videoUrl, player => {
+        player.loop = false;
+        player.muted = false;
+    });
 
     // Owner review data — keyed by ownerId
     const ownerId = room?.ownerId || 0;
@@ -229,6 +333,66 @@ export default function PropertyDetailScreen() {
         setIsSavedLocal(isPropertySaved(roomId));
         setIsLikedLocal(isLiked(roomId));
     }, [roomId, isPropertySaved, isLiked]);
+
+    useEffect(() => {
+        if (!room?.id) return;
+        let cancelled = false;
+
+        const fetchSimilarRooms = async () => {
+            setIsLoadingSimilar(true);
+            try {
+                const res = await roomService.getRooms({ page: 0, size: 20 });
+                const rooms = getRoomListFromResponse(res);
+                const nextRooms = pickSimilarRooms(rooms, room, 6);
+                if (!cancelled) setSimilarRooms(nextRooms);
+            } catch {
+                if (!cancelled) setSimilarRooms([]);
+            } finally {
+                if (!cancelled) setIsLoadingSimilar(false);
+            }
+        };
+
+        fetchSimilarRooms();
+        return () => { cancelled = true; };
+    }, [room?.id]);
+
+    useEffect(() => {
+        if (!room?.id) return;
+        let cancelled = false;
+
+        const fetchRelatedReels = async () => {
+            setIsLoadingRelatedReels(true);
+            try {
+                const res = await reelsApi.getFeed(12);
+                const nextReels = pickRelatedReels(res.items || [], room, 6);
+                if (!cancelled) setRelatedReels(nextReels);
+            } catch {
+                if (!cancelled) setRelatedReels([]);
+            } finally {
+                if (!cancelled) setIsLoadingRelatedReels(false);
+            }
+        };
+
+        fetchRelatedReels();
+        return () => { cancelled = true; };
+    }, [room?.id]);
+
+    useEffect(() => {
+        try {
+            if (showVideoModal && videoUrl) {
+                videoPlayer.play();
+            } else {
+                videoPlayer.pause();
+            }
+        } catch { }
+    }, [showVideoModal, videoPlayer, videoUrl]);
+
+    useEffect(() => {
+        if (!videoUrl && showVideoModal) setShowVideoModal(false);
+        return () => {
+            try { videoPlayer.pause(); } catch { }
+        };
+    }, [showVideoModal, videoPlayer, videoUrl]);
 
     const getFullAddress = (r: Room) => r.address || '';
 
@@ -287,11 +451,25 @@ export default function PropertyDetailScreen() {
 
     const handleShare = async () => {
         try {
+            const sharePriceText = room
+                ? `${formatCompactVND(room.price)}${room.transactionType === 'FOR_SALE' ? ' đ' : ' đ/tháng'}`
+                : 'Thỏa thuận';
             await Share.share({
-                message: `${room?.title}\n${room ? getFullAddress(room) : ''}\nGiá: ${formatCompactVND(room?.price)}/tháng\n\nXem thêm trên HomeSwipe`,
+                message: `${room?.title}\n${room ? getFullAddress(room) : ''}\nGiá: ${sharePriceText}\n\nXem thêm trên HomeVerse`,
                 title: room?.title,
             });
         } catch { }
+    };
+
+    const openVideoModal = () => {
+        if (!videoUrl) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowVideoModal(true);
+    };
+
+    const closeVideoModal = () => {
+        try { videoPlayer.pause(); } catch { }
+        setShowVideoModal(false);
     };
 
     const handleCall = () => {
@@ -407,7 +585,7 @@ export default function PropertyDetailScreen() {
 
     const pickReviewImages = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsMultipleSelection: true, quality: 0.8,
             selectionLimit: 5 - reviewImages.length,
         });
@@ -535,12 +713,33 @@ export default function PropertyDetailScreen() {
         );
     };
 
-    if (isLoading || !room) {
+    if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
                 <Stack.Screen options={{ headerShown: false }} />
                 <ActivityIndicator size="large" color="#0066FF" />
                 <Text style={styles.loadingText}>Đang tải thông tin...</Text>
+            </View>
+        );
+    }
+
+    if (!room) {
+        return (
+            <View style={styles.errorContainer}>
+                <Stack.Screen options={{ headerShown: false }} />
+                <Ionicons name="alert-circle-outline" size={64} color="#FF4D6D" />
+                <Text style={styles.errorTitle}>Không thể tải bất động sản</Text>
+                <Text style={styles.errorMessage}>
+                    {storeError || 'Tin đăng không tồn tại hoặc đã bị gỡ.'}
+                </Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={() => fetchRoomDetail(roomId)}>
+                    <Ionicons name="refresh" size={18} color="white" />
+                    <Text style={styles.retryBtnText}>Thử lại</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+                    <Ionicons name="arrow-back" size={18} color="#0066FF" />
+                    <Text style={styles.backBtnText}>Quay lại</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -551,6 +750,9 @@ export default function PropertyDetailScreen() {
     const statusBadge = getStatusBadge(room.status);
     const ownerName = getOwnerName(room);
     const ownerAvatar = getOwnerAvatar(room);
+    const galleryImages = room.images?.length > 0 ? room.images : [FALLBACK_PROPERTY_IMAGE];
+    const previewImage = room.images?.[0] || FALLBACK_PROPERTY_IMAGE;
+    const hasVideo = !!videoUrl;
 
     return (
         <View style={styles.wrapper}>
@@ -558,12 +760,40 @@ export default function PropertyDetailScreen() {
             <StatusBar barStyle="light-content" />
 
             <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-                {/* Image Gallery */}
+                {/* Header media */}
                 <View style={{ position: 'relative' }}>
-                    <ImageGallery
-                        images={room.images?.length > 0 ? room.images : ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800']}
-                        compact
-                    />
+                    {hasVideo ? (
+                        <TouchableOpacity
+                            style={styles.videoPreview}
+                            activeOpacity={0.92}
+                            onPress={openVideoModal}
+                        >
+                            <Image
+                                source={{ uri: previewImage }}
+                                style={styles.videoPreviewImage}
+                                contentFit="cover"
+                            />
+                            <View style={styles.videoPreviewScrim} />
+                            <View style={styles.videoBadge}>
+                                <Ionicons name="videocam" size={13} color="white" />
+                                <Text style={styles.videoBadgeText}>Video thực tế</Text>
+                            </View>
+                            {room.images?.length > 0 && (
+                                <View style={styles.mediaCountBadge}>
+                                    <Ionicons name="images-outline" size={13} color="white" />
+                                    <Text style={styles.mediaCountText}>{room.images.length} ảnh</Text>
+                                </View>
+                            )}
+                            <View style={styles.videoPlayButton}>
+                                <Ionicons name="play" size={34} color="white" style={{ marginLeft: 4 }} />
+                            </View>
+                        </TouchableOpacity>
+                    ) : (
+                        <ImageGallery
+                            images={galleryImages}
+                            compact
+                        />
+                    )}
                     <View style={[styles.galleryOverlayTop, { top: insets.top + 8 }]}>
                         <TouchableOpacity style={styles.overlayBtn} onPress={() => router.back()}>
                             <Ionicons name="arrow-back" size={22} color="white" />
@@ -582,19 +812,49 @@ export default function PropertyDetailScreen() {
                     </View>
                 </View>
 
+                {hasVideo && room.images?.length > 0 && (
+                    <ImageGallery
+                        images={galleryImages}
+                        compact
+                    />
+                )}
+
                 <View style={styles.content}>
+                    <View style={styles.heroCard}>
                     {/* Price & Status */}
                     <View style={styles.priceRow}>
                         <View>
                             <Text style={styles.price}>{formatCompactVND(room.price)}</Text>
-                            <Text style={styles.priceUnit}>đồng / {room.transactionType === 'FOR_SALE' ? 'căn' : 'tháng'}</Text>
+                            <Text style={styles.priceUnit}>{room.transactionType === 'FOR_SALE' ? 'Giá bán' : 'đồng / tháng'}</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: statusBadge.bg }]}>
                             <Text style={[styles.statusText, { color: statusBadge.color }]}>{statusBadge.label}</Text>
                         </View>
                     </View>
 
-                    <Text style={styles.title}>{room.title}</Text>
+                    <Text style={styles.title} numberOfLines={3}>{room.title}</Text>
+                    <View style={styles.metaRow}>
+                        <Ionicons name="time-outline" size={13} color="#8A94A6" />
+                        <Text style={styles.metaText}>Đăng ngày {formatCreatedAt(room.createdAt)}</Text>
+                    </View>
+
+                    {/* Badges — loại giao dịch / Tin nổi bật / Dự án */}
+                    <View style={styles.badgeRow}>
+                        <View style={styles.transactionBadge}>
+                            <Text style={styles.transactionBadgeText}>{getLabel(TRANSACTION_TYPE_LABELS, room.transactionType)}</Text>
+                        </View>
+                        {room.isPromoted && (
+                            <View style={styles.promotedBadge}>
+                                <Text style={styles.promotedBadgeText}>Tin nổi bật</Text>
+                            </View>
+                        )}
+                        {!!room.projectNameSnapshot && (
+                            <View style={styles.projectBadge}>
+                                <Ionicons name="business-outline" size={12} color="#0066FF" />
+                                <Text style={styles.projectBadgeText} numberOfLines={1}>{room.projectNameSnapshot}</Text>
+                            </View>
+                        )}
+                    </View>
 
                     {/* Address */}
                     <TouchableOpacity style={styles.addressRow} onPress={handleNavigate} activeOpacity={0.7}>
@@ -621,6 +881,8 @@ export default function PropertyDetailScreen() {
                             ))}
                         </View>
                         <Text style={styles.ratingText}>{reviewAvg.toFixed(1)} ({reviewTotal} đánh giá)</Text>
+                    </View>
+
                     </View>
 
                     {/* Quick Stats */}
@@ -651,6 +913,13 @@ export default function PropertyDetailScreen() {
                                 <Ionicons name="people-outline" size={22} color="#0066FF" />
                                 <Text style={styles.statValue}>{room.capacity}</Text>
                                 <Text style={styles.statLabel}>Sức chứa</Text>
+                            </View>
+                        )}
+                        {room.hasBalcony !== undefined && (
+                            <View style={styles.statItem}>
+                                <Ionicons name="home-outline" size={22} color="#0066FF" />
+                                <Text style={styles.statValue}>{room.hasBalcony ? 'Có' : 'Không'}</Text>
+                                <Text style={styles.statLabel}>Ban công</Text>
                             </View>
                         )}
                     </View>
@@ -704,30 +973,27 @@ export default function PropertyDetailScreen() {
                             <View style={styles.section}>
                                 <Text style={styles.sectionTitle}>🏷️ Chi tiết</Text>
                                 <View style={styles.detailsGrid}>
-                                    <DetailRow label="Loại BĐS" value={
-                                        room.propertyType === 'ROOM' ? 'Phòng trọ'
-                                            : room.propertyType === 'APARTMENT' ? 'Căn hộ'
-                                                : room.propertyType === 'HOUSE' ? 'Nhà'
-                                                    : room.propertyType || 'Phòng'
-                                    } />
-                                    <DetailRow label="Giao dịch" value={room.transactionType === 'FOR_RENT' ? 'Cho thuê' : 'Bán'} />
-                                    {!!room.furnishingStatus && <DetailRow label="Nội thất" value={
-                                        room.furnishingStatus === 'UNFURNISHED' ? 'Không có'
-                                            : room.furnishingStatus === 'PARTIALLY_FURNISHED' ? 'Cơ bản'
-                                                : room.furnishingStatus === 'FULLY_FURNISHED' ? 'Đầy đủ'
-                                                    : room.furnishingStatus
-                                    } />}
-                                    {!!room.availabilityStatus && <DetailRow label="Tình trạng" value={
-                                        room.availabilityStatus === 'IMMEDIATELY' ? 'Vào ngay'
-                                            : room.availabilityStatus === 'THIS_MONTH' ? 'Tháng này'
-                                                : room.availabilityStatus === 'NEXT_MONTH' ? 'Tháng sau'
-                                                    : room.availabilityStatus === 'NEGOTIABLE' ? 'Thỏa thuận'
-                                                        : room.availabilityStatus
-                                    } />}
-                                    {!!room.electricityPrice && <DetailRow label="Tiền điện" value={room.electricityPrice === 'STATE_PRICE' ? 'Giá nhà nước' : 'Miễn phí'} />}
-                                    {!!room.waterPrice && <DetailRow label="Tiền nước" value={room.waterPrice === 'STATE_PRICE' ? 'Giá nhà nước' : 'Miễn phí'} />}
-                                    {!!room.internetPrice && <DetailRow label="Internet" value={room.internetPrice === 'FREE' ? 'Miễn phí' : 'Có phí'} />}
+                                    <Text style={styles.detailGroupTitle}>Thông tin BĐS</Text>
+                                    <DetailRow label="Loại BĐS" value={getLabel(PROPERTY_TYPE_LABELS, room.propertyType)} />
+                                    <DetailRow label="Giao dịch" value={getLabel(TRANSACTION_TYPE_LABELS, room.transactionType)} />
+                                    {!!room.area && <DetailRow label="Diện tích" value={`${room.area} m²`} />}
+                                    {room.bedrooms !== undefined && room.bedrooms !== null && <DetailRow label="Phòng ngủ" value={`${room.bedrooms}`} />}
+                                    {room.bathrooms !== undefined && room.bathrooms !== null && <DetailRow label="Phòng tắm" value={`${room.bathrooms}`} />}
+                                    {room.capacity !== undefined && room.capacity !== null && <DetailRow label="Sức chứa" value={`${room.capacity} người`} />}
                                     {room.hasBalcony !== undefined && <DetailRow label="Ban công" value={room.hasBalcony ? 'Có' : 'Không'} />}
+                                    {!!room.furnishingStatus && <DetailRow label="Nội thất" value={getLabel(FURNISHING_LABELS, room.furnishingStatus)} />}
+                                    {!!room.availabilityStatus && <DetailRow label="Tình trạng vào ở" value={getLabel(AVAILABILITY_LABELS, room.availabilityStatus)} />}
+                                    {(room.electricityPrice || room.waterPrice || room.internetPrice) && (
+                                        <Text style={styles.detailGroupTitle}>Chi phí tiện ích</Text>
+                                    )}
+                                    {!!room.electricityPrice && <DetailRow label="Tiền điện" value={getLabel(UTILITY_PRICE_LABELS, room.electricityPrice)} />}
+                                    {!!room.waterPrice && <DetailRow label="Tiền nước" value={getLabel(UTILITY_PRICE_LABELS, room.waterPrice)} />}
+                                    {!!room.internetPrice && <DetailRow label="Internet" value={getLabel(UTILITY_PRICE_LABELS, room.internetPrice)} />}
+                                    {(room.legalDocumentType || room.createdAt) && (
+                                        <Text style={styles.detailGroupTitle}>Pháp lý & thời gian</Text>
+                                    )}
+                                    {!!room.legalDocumentType && <DetailRow label="Giấy tờ pháp lý" value={getLabel(LEGAL_DOC_LABELS, room.legalDocumentType)} />}
+                                    <DetailRow label="Ngày đăng" value={formatCreatedAt(room.createdAt)} />
                                 </View>
                             </View>
 
@@ -749,7 +1015,7 @@ export default function PropertyDetailScreen() {
                             {/* ✅ Map - Leaflet WebView (thay MapView Google) */}
                             {!!(room.latitude && room.longitude) && (
                                 <View style={styles.section}>
-                                    <Text style={styles.sectionTitle}>📍 Vị trí</Text>
+                                    <Text style={styles.sectionTitle}>Vị trí bất động sản</Text>
                                     <TouchableOpacity
                                         style={styles.mapContainer}
                                         onPress={() => setShowFullMap(true)}
@@ -787,15 +1053,18 @@ export default function PropertyDetailScreen() {
                                         </View>
                                     </TouchableOpacity>
 
-                                    <View style={styles.poiSection}>
-                                        <Text style={styles.poiTitle}>Tiện ích gần đó</Text>
-                                        {NEARBY_POIS.map((poi, i) => (
-                                            <View key={i} style={styles.poiItem}>
-                                                <Text style={styles.poiIcon}>{poi.icon}</Text>
-                                                <Text style={styles.poiLabel}>{poi.label}</Text>
-                                                <Text style={styles.poiDistance}>{poi.distance}</Text>
-                                            </View>
-                                        ))}
+                                </View>
+                            )}
+
+                            {!(room.latitude && room.longitude) && (
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>Vị trí bất động sản</Text>
+                                    <View style={styles.mapFallbackCard}>
+                                        <Ionicons name="location-outline" size={24} color="#0066FF" />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.mapFallbackTitle}>Chưa có tọa độ bản đồ</Text>
+                                            <Text style={styles.mapFallbackText} numberOfLines={2}>{getFullAddress(room) || 'Địa chỉ đang được cập nhật.'}</Text>
+                                        </View>
                                     </View>
                                 </View>
                             )}
@@ -825,8 +1094,64 @@ export default function PropertyDetailScreen() {
                                             <TouchableOpacity style={styles.landlordChatBtn} onPress={handleChat}>
                                                 <Ionicons name="chatbubble-ellipses" size={18} color="#0066FF" />
                                             </TouchableOpacity>
+                                            {!isOwner && (
+                                                <TouchableOpacity style={styles.landlordScheduleBtn} onPress={() => {
+                                                    if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
+                                                    openBookingModal();
+                                                }}>
+                                                    <Ionicons name="calendar-outline" size={18} color="#FF6B35" />
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
                                     </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {(isLoadingSimilar || similarRooms.length > 0) && (
+                                <View style={styles.section}>
+                                    <SectionHeader
+                                        title="Có thể bạn quan tâm"
+                                        subtitle="Các tin cùng loại với bài đang xem"
+                                    />
+                                    {isLoadingSimilar ? (
+                                        <View style={styles.relatedLoading}>
+                                            <ActivityIndicator size="small" color="#0066FF" />
+                                        </View>
+                                    ) : (
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedList}>
+                                            {similarRooms.map(item => (
+                                                <SimilarRoomCard
+                                                    key={item.id}
+                                                    item={item}
+                                                    onPress={() => safePush(`/property/${item.id}` as any)}
+                                                />
+                                            ))}
+                                        </ScrollView>
+                                    )}
+                                </View>
+                            )}
+
+                            {(isLoadingRelatedReels || relatedReels.length > 0) && (
+                                <View style={styles.section}>
+                                    <SectionHeader
+                                        title="Video thực tế liên quan"
+                                        subtitle="Xem nhanh các tin có video"
+                                    />
+                                    {isLoadingRelatedReels ? (
+                                        <View style={styles.relatedLoading}>
+                                            <ActivityIndicator size="small" color="#0066FF" />
+                                        </View>
+                                    ) : (
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedList}>
+                                            {relatedReels.map(item => (
+                                                <RelatedReelCard
+                                                    key={item.id}
+                                                    item={item}
+                                                    onPress={() => safePush(`/property/${item.id}` as any)}
+                                                />
+                                            ))}
+                                        </ScrollView>
+                                    )}
                                 </View>
                             )}
 
@@ -984,7 +1309,7 @@ export default function PropertyDetailScreen() {
             <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
                 <View style={styles.bottomPriceInfo}>
                     <Text style={styles.bottomPrice}>{formatCompactVND(room.price)}</Text>
-                    <Text style={styles.bottomUnit}>/{room.transactionType === 'FOR_SALE' ? 'căn' : 'tháng'}</Text>
+                    <Text style={styles.bottomUnit}>{room.transactionType === 'FOR_SALE' ? 'Giá bán' : '/tháng'}</Text>
                 </View>
                 {user?.id === room.ownerId ? (
                     <View style={styles.bottomBtns}>
@@ -999,6 +1324,9 @@ export default function PropertyDetailScreen() {
                     </View>
                 ) : (
                     <View style={styles.bottomBtns}>
+                        <TouchableOpacity style={styles.bottomCallBtn} onPress={handleCall}>
+                            <Ionicons name="call" size={18} color="#0066FF" />
+                        </TouchableOpacity>
                         <TouchableOpacity style={styles.scheduleBtn} onPress={() => {
                             if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
                             openBookingModal();
@@ -1008,11 +1336,36 @@ export default function PropertyDetailScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
                             <Ionicons name="chatbubble-ellipses" size={18} color="white" />
-                            <Text style={styles.chatBtnText}>Chat ngay</Text>
+                            <Text style={styles.chatBtnText}>Chat</Text>
                         </TouchableOpacity>
                     </View>
                 )}
             </View>
+
+            {/* ===== VIDEO MODAL ===== */}
+            <Modal
+                visible={showVideoModal}
+                animationType="fade"
+                onRequestClose={closeVideoModal}
+                supportedOrientations={['portrait', 'landscape']}
+            >
+                <View style={styles.videoModalContainer}>
+                    <StatusBar hidden />
+                    <VideoView
+                        player={videoPlayer}
+                        style={styles.videoModalPlayer}
+                        nativeControls
+                        contentFit="contain"
+                    />
+                    <TouchableOpacity
+                        style={[styles.videoModalClose, { top: insets.top + 12 }]}
+                        onPress={closeVideoModal}
+                        activeOpacity={0.85}
+                    >
+                        <Ionicons name="close" size={28} color="white" />
+                    </TouchableOpacity>
+                </View>
+            </Modal>
 
             {/* ===== FULL MAP MODAL - Leaflet WebView ===== */}
             <Modal visible={showFullMap} animationType="slide" onRequestClose={() => setShowFullMap(false)}>
@@ -1137,19 +1490,19 @@ export default function PropertyDetailScreen() {
                         />
                         <View style={styles.bookingQuickRow}>
                             <TouchableOpacity style={styles.bookingQuickBtn} onPress={() => adjustBookingDay(-1)}>
-                                <Text style={styles.bookingQuickText}>-1 ngay</Text>
+                                <Text style={styles.bookingQuickText}>-1 ngày</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.bookingQuickBtn} onPress={() => setBookingDate(formatBookingInput(getDefaultBookingDate()))}>
-                                <Text style={styles.bookingQuickText}>Hom nay</Text>
+                                <Text style={styles.bookingQuickText}>Hôm nay</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.bookingQuickBtn} onPress={setTomorrowBooking}>
-                                <Text style={styles.bookingQuickText}>Ngay mai</Text>
+                                <Text style={styles.bookingQuickText}>Ngày mai</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.bookingQuickBtn} onPress={() => adjustBookingDay(1)}>
-                                <Text style={styles.bookingQuickText}>+1 ngay</Text>
+                                <Text style={styles.bookingQuickText}>+1 ngày</Text>
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.bookingHint}>Mac dinh la khung gio gan nhat trong tuong lai. Khong the dat lich qua khu.</Text>
+                        <Text style={styles.bookingHint}>Mặc định là khung giờ gần nhất trong tương lai. Không thể đặt lịch quá khứ.</Text>
                         <Text style={styles.modalLabel}>Ghi chú (tuỳ chọn)</Text>
                         <TextInput
                             style={styles.reviewTextInput}
@@ -1171,6 +1524,15 @@ export default function PropertyDetailScreen() {
     );
 }
 
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+    return (
+        <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{title}</Text>
+            {!!subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+        </View>
+    );
+}
+
 function DetailRow({ label, value }: { label: string; value: string }) {
     return (
         <View style={styles.detailRow}>
@@ -1180,67 +1542,149 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     );
 }
 
+function SimilarRoomCard({ item, onPress }: { item: Room; onPress: () => void }) {
+    const thumbnail = item.images?.[0] || FALLBACK_PROPERTY_IMAGE;
+    return (
+        <TouchableOpacity style={styles.relatedCard} activeOpacity={0.86} onPress={onPress}>
+            <View style={styles.relatedImageWrap}>
+                <Image source={{ uri: thumbnail }} style={styles.relatedImage} contentFit="cover" />
+                <View style={styles.relatedBadgeRow}>
+                    {item.isPromoted && (
+                        <View style={styles.relatedBadge}>
+                            <Text style={styles.relatedBadgeText}>Nổi bật</Text>
+                        </View>
+                    )}
+                    {!!item.videoUrl && (
+                        <View style={styles.relatedBadge}>
+                            <Ionicons name="videocam" size={10} color="white" />
+                            <Text style={styles.relatedBadgeText}>Video</Text>
+                        </View>
+                    )}
+                </View>
+            </View>
+            <View style={styles.relatedCardBody}>
+                <Text style={styles.relatedCardTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.relatedCardPrice}>{formatCompactVND(item.price)}</Text>
+                <View style={styles.relatedAddressRow}>
+                    <Ionicons name="location-outline" size={12} color="#6B7280" />
+                    <Text style={styles.relatedAddressText} numberOfLines={1}>{item.address}</Text>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+}
+
+function RelatedReelCard({ item, onPress }: { item: PropertyReel; onPress: () => void }) {
+    const thumbnail = item.thumbnailUrl || FALLBACK_PROPERTY_IMAGE;
+    return (
+        <TouchableOpacity style={styles.reelCard} activeOpacity={0.86} onPress={onPress}>
+            <View style={styles.reelImageWrap}>
+                <Image source={{ uri: thumbnail }} style={styles.reelImage} contentFit="cover" />
+                <View style={styles.reelScrim} />
+                <View style={styles.reelPlayButton}>
+                    <Ionicons name="play" size={22} color="white" style={{ marginLeft: 2 }} />
+                </View>
+                <View style={styles.reelBadge}>
+                    <Ionicons name="videocam" size={10} color="white" />
+                    <Text style={styles.relatedBadgeText}>Video</Text>
+                </View>
+            </View>
+            <View style={styles.relatedCardBody}>
+                <Text style={styles.relatedCardTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={styles.relatedCardPrice}>{formatCompactVND(item.price)}</Text>
+            </View>
+        </TouchableOpacity>
+    );
+}
+
 const styles = StyleSheet.create({
-    wrapper: { flex: 1, backgroundColor: '#F8F9FA' },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-    loadingText: { color: '#666', fontSize: 14 },
+    wrapper: { flex: 1, backgroundColor: '#F5F7FB' },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: '#F5F7FB' },
+    loadingText: { color: '#6B7280', fontSize: 14, fontWeight: '600' },
+    // Error state
+    errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingHorizontal: 32 },
+    errorTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', textAlign: 'center' },
+    errorMessage: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
+    retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0066FF', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
+    retryBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
+    backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: '#0066FF', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
+    backBtnText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
     container: { flex: 1 },
-    content: { padding: 16 },
+    content: { padding: 16, paddingBottom: 8 },
     galleryOverlayTop: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    overlayBtn: { backgroundColor: 'rgba(0,0,0,0.4)', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+    overlayBtn: { backgroundColor: 'rgba(17,24,39,0.58)', width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
     overlayRightBtns: { flexDirection: 'row', gap: 8 },
-    priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 4 },
-    price: { fontSize: 26, fontWeight: '800', color: '#FF6B35' },
-    priceUnit: { fontSize: 13, color: '#888', marginTop: 2 },
+    videoPreview: { width, height: 258, backgroundColor: '#111827', overflow: 'hidden' },
+    videoPreviewImage: { width: '100%', height: '100%' },
+    videoPreviewScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
+    videoBadge: { position: 'absolute', left: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.58)', borderRadius: 18, paddingHorizontal: 11, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+    videoBadgeText: { color: 'white', fontSize: 12, fontWeight: '800' },
+    mediaCountBadge: { position: 'absolute', right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.58)', borderRadius: 18, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+    mediaCountText: { color: 'white', fontSize: 12, fontWeight: '800' },
+    videoPlayButton: { position: 'absolute', alignSelf: 'center', top: 99, width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(0,102,255,0.94)', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 6 },
+    heroCard: { backgroundColor: 'white', borderRadius: 18, padding: 16, marginTop: -20, marginBottom: 16, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 18, elevation: 4 },
+    priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+    price: { fontSize: 28, fontWeight: '900', color: '#FF6B35', letterSpacing: 0 },
+    priceUnit: { fontSize: 12, color: '#8A94A6', marginTop: 2, fontWeight: '700' },
     statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
     statusText: { fontSize: 12, fontWeight: '600' },
-    title: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginTop: 8, marginBottom: 8 },
-    addressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, backgroundColor: '#F0F5FF', padding: 10, borderRadius: 10 },
+    title: { fontSize: 19, fontWeight: '800', color: '#111827', marginTop: 10, marginBottom: 6, lineHeight: 26, letterSpacing: 0 },
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10 },
+    metaText: { color: '#8A94A6', fontSize: 12, fontWeight: '600' },
+    // Badge chips
+    badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+    transactionBadge: { backgroundColor: '#EEF4FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: '#D7E6FF' },
+    transactionBadgeText: { fontSize: 12, fontWeight: '800', color: '#0066FF' },
+    promotedBadge: { backgroundColor: '#FFF8E1', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#FFD54F' },
+    promotedBadgeText: { fontSize: 12, fontWeight: '700', color: '#F57F17' },
+    projectBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EEF4FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#C5D9FF' },
+    projectBadgeText: { fontSize: 12, fontWeight: '600', color: '#0066FF', maxWidth: 200 },
+    addressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, backgroundColor: '#F7FAFF', padding: 11, borderRadius: 12, borderWidth: 1, borderColor: '#E7EEF9' },
     directionChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#E8F0FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
     directionText: { fontSize: 11, color: '#0066FF', fontWeight: '600' },
     distanceBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#EFF4FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 8 },
     distanceText: { fontSize: 13, color: '#0066FF', fontWeight: '600' },
-    ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+    ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
     stars: { flexDirection: 'row', gap: 2 },
     ratingText: { fontSize: 13, color: '#666' },
-    statsGrid: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: 'white', borderRadius: 14, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-    statItem: { alignItems: 'center', gap: 4 },
-    statValue: { fontSize: 15, fontWeight: '700', color: '#1A1A1A' },
-    statLabel: { fontSize: 11, color: '#888' },
-    tabBar: { flexDirection: 'row', backgroundColor: '#F0F0F0', borderRadius: 10, padding: 4, marginBottom: 20 },
+    statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, backgroundColor: 'white', borderRadius: 18, padding: 12, marginBottom: 18, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
+    statItem: { width: '31%', minHeight: 78, alignItems: 'center', justifyContent: 'center', gap: 4, backgroundColor: '#F8FAFC', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4 },
+    statValue: { fontSize: 15, fontWeight: '800', color: '#111827', textAlign: 'center' },
+    statLabel: { fontSize: 11, color: '#7B8494', textAlign: 'center', fontWeight: '600' },
+    tabBar: { flexDirection: 'row', backgroundColor: '#E9EEF6', borderRadius: 14, padding: 4, marginBottom: 20 },
     addressText: { flex: 1, fontSize: 13, color: '#555' },
 
     tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
     tabActive: { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
     tabText: { fontSize: 14, color: '#888' },
     tabTextActive: { fontWeight: '700', color: '#1A1A1A' },
-    section: { marginBottom: 22 },
-    sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
-    description: { fontSize: 14, color: '#555', lineHeight: 22 },
-    seeMoreBtn: { color: '#0066FF', fontWeight: '600', marginTop: 6, fontSize: 14 },
-    detailsGrid: { backgroundColor: 'white', borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-    detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-    detailLabel: { fontSize: 14, color: '#888' },
-    detailValue: { fontSize: 14, fontWeight: '600', color: '#1A1A1A' },
-    amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    amenityItem: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F0F5FF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-    amenityText: { fontSize: 13, color: '#333' },
-    mapContainer: { borderRadius: 14, overflow: 'hidden', marginBottom: 10, height: 190 },
+    section: { marginBottom: 20 },
+    sectionHeader: { marginBottom: 12 },
+    sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 10, letterSpacing: 0 },
+    sectionSubtitle: { fontSize: 12, color: '#7B8494', lineHeight: 17, marginTop: -4 },
+    description: { fontSize: 14, color: '#4B5563', lineHeight: 23, backgroundColor: 'white', borderRadius: 16, padding: 14, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+    seeMoreBtn: { color: '#0066FF', fontWeight: '800', marginTop: 8, fontSize: 14 },
+    detailsGrid: { backgroundColor: 'white', borderRadius: 16, overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+    detailGroupTitle: { backgroundColor: '#F8FAFC', color: '#667085', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+    detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F4F8' },
+    detailLabel: { flex: 0.44, fontSize: 13, color: '#7B8494', lineHeight: 19 },
+    detailValue: { flex: 0.56, fontSize: 14, fontWeight: '700', color: '#111827', textAlign: 'right', lineHeight: 20 },
+    amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, backgroundColor: 'white', borderRadius: 16, padding: 12, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
+    amenityItem: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F4F8FF', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#E2ECFF' },
+    amenityText: { fontSize: 12, color: '#334155', fontWeight: '700' },
+    mapContainer: { borderRadius: 16, overflow: 'hidden', marginBottom: 10, height: 176, backgroundColor: '#E5E7EB', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
     map: { flex: 1 },
     mapExpandBtn: { position: 'absolute', bottom: 10, right: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'white', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 },
     mapExpandText: { color: '#0066FF', fontSize: 12, fontWeight: '600' },
-    addressNavRow: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12, backgroundColor: '#F8FAFF', borderRadius: 10, marginBottom: 14 },
+    addressNavRow: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12, backgroundColor: 'white', borderRadius: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E7EEF9' },
     fullAddress: { flex: 1, fontSize: 13, color: '#444' },
-    directionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#0066FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
+    directionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#0066FF', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },
     directionBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
-    poiSection: { backgroundColor: 'white', borderRadius: 12, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-    poiTitle: { fontSize: 13, fontWeight: '700', color: '#888', marginBottom: 10 },
-    poiItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-    poiIcon: { fontSize: 18, marginRight: 10 },
-    poiLabel: { flex: 1, fontSize: 13, color: '#333' },
-    poiDistance: { fontSize: 13, color: '#0066FF', fontWeight: '600' },
-    landlordCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 14, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-    landlordAvatar: { width: 52, height: 52, borderRadius: 26 },
+    mapFallbackCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'white', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E7EEF9' },
+    mapFallbackTitle: { color: '#111827', fontSize: 14, fontWeight: '800', marginBottom: 3 },
+    mapFallbackText: { color: '#667085', fontSize: 13, lineHeight: 18 },
+    landlordCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 18, padding: 16, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
+    landlordAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#EEF4FF' },
     landlordInfo: { flex: 1, marginLeft: 12 },
     landlordName: { fontSize: 16, fontWeight: '600', color: '#1A1A1A' },
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
@@ -1248,6 +1692,26 @@ const styles = StyleSheet.create({
     landlordBtns: { flexDirection: 'row', gap: 8 },
     landlordCallBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0066FF', justifyContent: 'center', alignItems: 'center' },
     landlordChatBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F0FF', justifyContent: 'center', alignItems: 'center' },
+    landlordScheduleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF2EA', justifyContent: 'center', alignItems: 'center' },
+    relatedList: { gap: 12, paddingRight: 16, paddingBottom: 2 },
+    relatedLoading: { height: 120, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white', borderRadius: 16 },
+    relatedCard: { width: 184, backgroundColor: 'white', borderRadius: 16, overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2 },
+    relatedImageWrap: { height: 116, backgroundColor: '#E5E7EB' },
+    relatedImage: { width: '100%', height: '100%' },
+    relatedBadgeRow: { position: 'absolute', left: 8, top: 8, right: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    relatedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: 'rgba(17,24,39,0.72)', borderRadius: 12, paddingHorizontal: 7, paddingVertical: 4 },
+    relatedBadgeText: { color: 'white', fontSize: 10, fontWeight: '800' },
+    relatedCardBody: { padding: 11, gap: 5 },
+    relatedCardTitle: { fontSize: 13, lineHeight: 18, color: '#1A1A1A', fontWeight: '700' },
+    relatedCardPrice: { fontSize: 14, color: '#FF6B35', fontWeight: '800' },
+    relatedAddressRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    relatedAddressText: { flex: 1, fontSize: 11, color: '#6B7280' },
+    reelCard: { width: 166, backgroundColor: 'white', borderRadius: 16, overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 2 },
+    reelImageWrap: { height: 158, backgroundColor: '#111827' },
+    reelImage: { width: '100%', height: '100%' },
+    reelScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.18)' },
+    reelPlayButton: { position: 'absolute', alignSelf: 'center', top: 56, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(0,102,255,0.94)', justifyContent: 'center', alignItems: 'center' },
+    reelBadge: { position: 'absolute', left: 8, top: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.62)', borderRadius: 12, paddingHorizontal: 7, paddingVertical: 4 },
     ownerActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12 },
     ownerActionText: { fontSize: 15, fontWeight: '600' },
     reviewSummary: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
@@ -1257,15 +1721,20 @@ const styles = StyleSheet.create({
     writeReviewText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
     emptyReviews: { alignItems: 'center', paddingVertical: 32, gap: 8 },
     emptyText: { color: '#999', fontSize: 14 },
-    bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'white', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F0F0F0', shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 10 },
-    bottomPriceInfo: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
-    bottomPrice: { fontSize: 20, fontWeight: '700', color: '#FF6B35' },
-    bottomUnit: { fontSize: 12, color: '#888' },
-    bottomBtns: { flexDirection: 'row', gap: 10 },
-    scheduleBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: '#0066FF', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
-    scheduleBtnText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
-    chatBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0066FF', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+    bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'white', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E8EDF5', shadowColor: '#0F172A', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 10 },
+    bottomPriceInfo: { flexShrink: 1, marginRight: 8 },
+    bottomPrice: { fontSize: 18, fontWeight: '900', color: '#FF6B35', letterSpacing: 0 },
+    bottomUnit: { fontSize: 11, color: '#8A94A6', fontWeight: '700', marginTop: 1 },
+    bottomBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    bottomCallBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#EEF4FF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#D7E6FF' },
+    scheduleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: '#0066FF', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: 'white' },
+    scheduleBtnText: { color: '#0066FF', fontWeight: '800', fontSize: 13 },
+    chatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0066FF', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
     chatBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
+    // Video modal
+    videoModalContainer: { flex: 1, backgroundColor: 'black' },
+    videoModalPlayer: { flex: 1 },
+    videoModalClose: { position: 'absolute', right: 16, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
     // Full Map Modal
     fullMapContainer: { flex: 1, backgroundColor: 'white' },
     fullMapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
