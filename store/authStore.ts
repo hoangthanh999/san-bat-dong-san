@@ -17,6 +17,7 @@ interface AuthState {
     // Actions
     login: (credentials: LoginRequest) => Promise<void>;
     loginWithGoogle: (jwtToken: string) => Promise<void>;
+    loginWithOAuthCode: (code: string) => Promise<void>;
     register: (data: RegisterRequest) => Promise<void>;
     logout: () => Promise<void>;
     /** Bị gọi bởi API interceptor khi nhận 401 — không gọi API logout */
@@ -81,6 +82,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         } catch (error: any) {
             set({
                 error: error.message || 'Đăng nhập Google thất bại',
+                isLoading: false,
+            });
+            throw error;
+        }
+    },
+
+    loginWithOAuthCode: async (code: string) => {
+        set({ isLoading: true, error: null });
+        try {
+            const authData: AuthResponse = await authService.exchangeOAuthCode(code);
+            const user: User = {
+                id: authData.id,
+                email: authData.email,
+                fullName: authData.fullName,
+                role: authData.role as User['role'],
+            };
+            set({
+                user,
+                token: authData.token,
+                isAuthenticated: true,
+                isLoading: false,
+            });
+        } catch (error: any) {
+            set({
+                error: error.message || 'ÄÄƒng nháº­p Google tháº¥t báº¡i',
                 isLoading: false,
             });
             throw error;

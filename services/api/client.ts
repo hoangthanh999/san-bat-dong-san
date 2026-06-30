@@ -32,6 +32,7 @@ const AUTH_REFRESH_EXCLUDED_PATHS = [
     '/auth/register',
     '/auth/refresh',
     '/auth/logout',
+    '/auth/oauth2/exchange-code',
     '/auth/forgot-password',
     '/auth/reset-password',
 ];

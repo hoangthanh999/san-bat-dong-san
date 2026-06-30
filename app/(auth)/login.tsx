@@ -15,9 +15,25 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Linking from 'expo-linking';
 import { getApiBaseUrl } from '../../services/api/environment';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
+import { API_ENDPOINTS } from '../../constants';
+
+const GOOGLE_CALLBACK_URL = 'homeswipe://login-success';
+
+const getOAuthCallbackQuery = (url: string) => {
+    const query = url.split('?')[1]?.split('#')[0];
+    if (!query) return null;
+
+    const params = new URLSearchParams(query);
+    const code = params.get('code');
+    const token = params.get('token') || params.get('accessToken');
+
+    if (code) return `code=${encodeURIComponent(code)}`;
+    if (token) return `token=${encodeURIComponent(token)}`;
+
+    return null;
+};
 
 export default function LoginScreen() {
     const { safePush, safeReplace } = useSafeRouter();
@@ -116,7 +132,6 @@ export default function LoginScreen() {
 // ============================================================
 function GoogleLoginButton() {
     const { safeReplace } = useSafeRouter();
-    const { loginWithGoogle } = useAuthStore();
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
     const handleGoogleLogin = async () => {
@@ -125,27 +140,23 @@ function GoogleLoginButton() {
             const WebBrowser = require('expo-web-browser');
             const { Alert } = require('react-native');
 
-            // URL backend Google OAuth2 (qua nginx gateway)
-            const backendOAuthUrl = `${await getApiBaseUrl()}/oauth2/authorization/google`;
-            const redirectUri = Linking.createURL('login-success');
+            const baseUrl = await getApiBaseUrl();
+            const redirectUri = encodeURIComponent(GOOGLE_CALLBACK_URL);
+            const backendOAuthUrl = `${baseUrl}${API_ENDPOINTS.GOOGLE_MOBILE_LOGIN}?redirect_uri=${redirectUri}`;
 
-            // Mở in-app browser để đăng nhập Google
-            // Deep link: homeswipe://login-success?token=xxx (cần cấu hình trong app.json)
+            // Open the backend mobile OAuth entrypoint and let login-success finish auth.
             const result = await WebBrowser.openAuthSessionAsync(
                 backendOAuthUrl,
-                redirectUri
+                GOOGLE_CALLBACK_URL
             );
 
             if (result.type === 'success' && result.url) {
-                // Parse token từ callback URL
-                const url = result.url;
-                const tokenMatch = url.match(/[?&]token=([^&]+)/);
-                if (tokenMatch && tokenMatch[1]) {
-                    const token = decodeURIComponent(tokenMatch[1]);
-                    await loginWithGoogle(token);
-                    safeReplace('/(tabs)' as any);
+                // Hand off the callback payload to the dedicated route.
+                const callbackQuery = getOAuthCallbackQuery(result.url);
+                if (callbackQuery) {
+                    safeReplace(`/login-success?${callbackQuery}` as any);
                 } else {
-                    Alert.alert('Lỗi', 'Không nhận được token từ Google. Vui lòng thử lại.');
+                    Alert.alert('Lỗi', 'Không nhận được thông tin đăng nhập từ Google. Vui lòng thử lại.');
                 }
             }
             // Nếu type === 'cancel' → user đóng browser, không làm gì

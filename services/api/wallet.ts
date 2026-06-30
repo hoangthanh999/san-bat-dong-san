@@ -4,6 +4,8 @@ import { API_ENDPOINTS, STORAGE_KEYS } from '../../constants';
 import { VNPayPaymentResponse, Transaction, WalletInfo, PaginatedResponse } from '../../types';
 import paymentClient from './paymentClient';
 
+export const MOBILE_PAYMENT_SUCCESS_URL = 'homeswipe://payment-success';
+
 export interface ReleaseRequest {
     userId: number;
     amount: number;
@@ -45,7 +47,14 @@ export const walletService = {
         const res = await paymentClient.post<VNPayPaymentResponse>(
             API_ENDPOINTS.PAYMENT_CREATE,
             null,
-            { params: { amount, userId } }
+            {
+                params: {
+                    amount,
+                    userId,
+                    platform: 'mobile',
+                    returnUrl: MOBILE_PAYMENT_SUCCESS_URL,
+                },
+            }
         );
         return res.data.url
             ?? res.data.paymentUrl

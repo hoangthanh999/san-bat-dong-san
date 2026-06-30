@@ -39,6 +39,25 @@ export const authService = {
         return authData;
     },
 
+    // OAuth2 mobile callback - exchange one-time code for backend AuthResponse
+    exchangeOAuthCode: async (code: string): Promise<AuthResponse> => {
+        const response = await apiClient.post(API_ENDPOINTS.OAUTH_EXCHANGE_CODE, { code });
+        const authData: AuthResponse = response.data;
+
+        if (authData.token) {
+            await setAccessToken(authData.token);
+            const user: User = {
+                id: authData.id,
+                email: authData.email,
+                fullName: authData.fullName,
+                role: authData.role as User['role'],
+            };
+            await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+        }
+
+        return authData;
+    },
+
     // Logout - gọi backend blacklist token rồi xóa local storage
     logout: async (): Promise<void> => {
         try {

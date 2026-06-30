@@ -84,6 +84,8 @@ export const API_ENDPOINTS = {
     // ============================================================
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
+    GOOGLE_MOBILE_LOGIN: '/auth/oauth2/google/mobile',
+    OAUTH_EXCHANGE_CODE: '/auth/oauth2/exchange-code',
     FORGOT_PASSWORD: '/auth/forgot-password',
     RESET_PASSWORD: '/auth/reset-password',
     CHANGE_PASSWORD: '/auth/change-password',

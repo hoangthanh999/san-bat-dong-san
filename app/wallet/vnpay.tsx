@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
@@ -6,36 +6,79 @@ import { StatusBar } from 'expo-status-bar';
 import { useWalletStore } from '../../store/walletStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+function getQueryParams(url: string) {
+    const queryString = url.includes('?') ? url.split('?')[1].split('#')[0] : '';
+    return new URLSearchParams(queryString);
+}
+
+function getFinalPaymentRoute(url: string): '/payment-success' | '/wallet/success' | '/wallet/failed' | null {
+    if (url.startsWith('homeswipe://payment-success') || url.includes('/payment-success')) {
+        return '/payment-success';
+    }
+
+    if (url.startsWith('homeswipe://wallet/success')) {
+        return '/wallet/success';
+    }
+
+    if (url.startsWith('homeswipe://wallet/failed') || url.includes('/payment-failed')) {
+        return '/wallet/failed';
+    }
+
+    return null;
+}
+
 export default function VNPayWebViewScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { paymentUrl, amount } = useLocalSearchParams<{ paymentUrl: string; amount: string }>();
-    const { fetchTransactions } = useWalletStore();
+    const { fetchWallet, fetchTransactions } = useWalletStore();
     const hasNavigated = useRef(false);
 
-    const handleNavigationChange = async (navState: { url: string }) => {
-        const { url } = navState;
+    const routeFromFinalCallback = useCallback(async (url: string) => {
+        const route = getFinalPaymentRoute(url);
+        if (!route || hasNavigated.current) return false;
 
-        // Backend redirects here after payment
-        if ((url.includes('/payment/vnpay-return') || url.includes('vnpay-return')) && !hasNavigated.current) {
-            hasNavigated.current = true;
-            try {
-                const queryString = url.includes('?') ? url.split('?')[1] : '';
-                const params = new URLSearchParams(queryString);
-                const responseCode = params.get('vnp_ResponseCode');
-                const txRef = params.get('vnp_TxnRef') || params.get('vnp_TransactionNo') || '';
+        hasNavigated.current = true;
 
-                await fetchTransactions();
+        try {
+            const params = getQueryParams(url);
+            const txRef = params.get('txnRef') || params.get('transactionId') || '';
+            const callbackAmount = params.get('amount') || amount;
+            const status = params.get('status') || (route === '/wallet/failed' ? 'failed' : 'success');
+            const message = params.get('message') || undefined;
 
-                if (responseCode === '00') {
-                    router.replace({ pathname: '/wallet/success' as any, params: { amount, txRef } });
-                } else {
-                    router.replace('/wallet/failed' as any);
-                }
-            } catch {
-                router.replace('/wallet/failed' as any);
+            if (status !== 'failed') {
+                await Promise.all([fetchWallet(), fetchTransactions()]);
             }
+
+            if (route === '/payment-success') {
+                router.replace({
+                    pathname: '/payment-success' as any,
+                    params: { amount: callbackAmount, txRef, txnRef: txRef, status, message },
+                });
+            } else if (route === '/wallet/success') {
+                router.replace({ pathname: '/wallet/success' as any, params: { amount: callbackAmount, txRef } });
+            } else {
+                router.replace({ pathname: '/wallet/failed' as any, params: { txRef, message } });
+            }
+
+            return true;
+        } catch {
+            router.replace('/wallet/failed' as any);
+            return true;
         }
+    }, [amount, fetchTransactions, fetchWallet, router]);
+
+    const handleNavigationChange = (navState: { url: string }) => {
+        void routeFromFinalCallback(navState.url);
+    };
+
+    const handleShouldStartLoadWithRequest = (request: { url: string }) => {
+        const route = getFinalPaymentRoute(request.url);
+        if (!route) return true;
+
+        void routeFromFinalCallback(request.url);
+        return false;
     };
 
     if (!paymentUrl) {
@@ -57,8 +100,10 @@ export default function VNPayWebViewScreen() {
             <WebView
                 source={{ uri: paymentUrl }}
                 onNavigationStateChange={handleNavigationChange}
+                onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
                 style={styles.webview}
                 startInLoadingState
+                originWhitelist={['*']}
                 renderLoading={() => (
                     <View style={styles.loading}>
                         <ActivityIndicator size="large" color="#0066FF" />
