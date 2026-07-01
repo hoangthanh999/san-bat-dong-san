@@ -351,7 +351,7 @@ function ProfileScreenContent() {
         {
             icon: 'help-circle-outline',
             label: 'Hỗ trợ',
-            subtitle: 'Trung tâm trợ giúp HomeSwipe',
+            subtitle: 'Trung tâm trợ giúp HomeVerse',
             onPress: () => Alert.alert(
                 'Hỗ trợ',
                 'Vui lòng liên hệ nhóm phát triển hoặc giảng viên hướng dẫn trong phiên bản demo.'
@@ -402,7 +402,7 @@ function ProfileScreenContent() {
                     </TouchableOpacity>
                 </View>
 
-                <Text style={styles.fullName} numberOfLines={2}>{displayUser?.fullName || 'Người dùng HomeSwipe'}</Text>
+                <Text style={styles.fullName} numberOfLines={2}>{displayUser?.fullName || 'Người dùng HomeVerse'}</Text>
                 <Text style={styles.email} numberOfLines={1}>{primaryContact}</Text>
 
                 {/* Stats Row */}

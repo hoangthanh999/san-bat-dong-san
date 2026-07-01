@@ -98,7 +98,7 @@ export default function RegisterScreen() {
             <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Tạo tài khoản</Text>
-                    <Text style={styles.subtitle}>Tham gia cộng đồng HomeSwipe ngay</Text>
+                    <Text style={styles.subtitle}>Tham gia cộng đồng HomeVerse ngay</Text>
                 </View>
 
                 <View style={styles.form}>

@@ -35,7 +35,7 @@ type OnboardingStep = {
 const STEPS: OnboardingStep[] = [
     {
         id: 'welcome',
-        title: 'Chào mừng đến với HomeSwipe',
+        title: 'Chào mừng đến với HomeVerse',
         subtitle: 'Tìm bất động sản, xem bản đồ, chat với chủ nhà và đặt lịch xem nhà ngay trên điện thoại.',
         icon: '🏠',
     },

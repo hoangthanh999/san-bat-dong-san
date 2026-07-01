@@ -171,7 +171,7 @@ export default function FeedScreen() {
                         <Ionicons name="home" size={18} color="#0066FF" />
                     </View>
                     <View>
-                        <Text style={styles.brandName}>HomeSwipe</Text>
+                        <Text style={styles.brandName}>HomeVerse</Text>
                         <Text style={styles.brandSubtitle}>Khám phá bất động sản phù hợp</Text>
                     </View>
                 </View>

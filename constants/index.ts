@@ -29,7 +29,7 @@ export const CLOUDINARY_CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NA
 export const CLOUDINARY_UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '';
 
 // App Info
-export const APP_NAME = 'HomeSwipe';
+export const APP_NAME = 'HomeVerse';
 export const APP_VERSION = '1.0.0';
 
 // Pagination

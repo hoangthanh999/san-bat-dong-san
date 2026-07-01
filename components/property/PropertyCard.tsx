@@ -173,7 +173,7 @@ export default function PropertyCard({ item, isActive, cardHeight, tagsTop: tags
         try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             await Share.share({
-                message: `🏠 ${item.title}\n📍 ${getFullAddress(item)}\n💰 ${formatCompactVND(item.price)}/tháng\n\nXem thêm trên HomeSwipe`,
+                message: `🏠 ${item.title}\n📍 ${getFullAddress(item)}\n💰 ${formatCompactVND(item.price)}/tháng\n\nXem thêm trên HomeVerse`,
                 title: item.title,
             });
         } catch (e) { }
