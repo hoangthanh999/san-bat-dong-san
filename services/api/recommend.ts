@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import apiClient from './client';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../../constants';
+import { RecommendedProperty, RecommendedReel } from '../../types';
 
 export type RecommendAction = 'VIEW' | 'CONTACT' | 'SHARE' | 'LIKE' | 'SAVE';
 export type RecommendItemType = 'PROPERTY' | 'REEL';
@@ -14,7 +15,33 @@ export interface RecommendTrackMetadata {
     locationMatch?: number;
     categoryMatch?: number;
     district?: string;
+    ward?: string;
+    province?: string;
+    propertyType?: string;
+    transactionType?: string;
 }
+
+const unwrapRecommendList = <T>(payload: any): T[] => {
+    const candidates = [
+        payload,
+        payload?.data,
+        payload?.result,
+        payload?.content,
+        payload?.items,
+        payload?.recommendations,
+        payload?.data?.content,
+        payload?.result?.content,
+        payload?.result?.items,
+        payload?.result?.recommendations,
+    ];
+    const list = candidates.find(Array.isArray);
+    return Array.isArray(list) ? list : [];
+};
+
+const limitList = <T>(items: T[], limit: number): T[] => {
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : 5;
+    return items.slice(0, safeLimit);
+};
 
 const getRecommendUserId = async (): Promise<number> => {
     try {
@@ -40,6 +67,46 @@ const getRecommendUserId = async (): Promise<number> => {
 };
 
 export const recommendApi = {
+    getFinalPropertyRecommendations: async (
+        userId: number,
+        limit = 5
+    ): Promise<RecommendedProperty[]> => {
+        try {
+            const response = await apiClient.get<any>(
+                API_ENDPOINTS.RECOMMEND_PROPERTIES_FINAL(userId),
+                {
+                    params: { limit },
+                    _silentError: true,
+                } as any
+            );
+            const items = unwrapRecommendList<RecommendedProperty>(response.data)
+                .filter(item => Number.isFinite(Number(item?.id)) && Number(item.id) > 0);
+            return limitList(items, limit);
+        } catch {
+            return [];
+        }
+    },
+
+    getFinalReelRecommendations: async (
+        userId: number,
+        limit = 5
+    ): Promise<RecommendedReel[]> => {
+        try {
+            const response = await apiClient.get<any>(
+                API_ENDPOINTS.RECOMMEND_REELS_FINAL(userId),
+                {
+                    params: { limit },
+                    _silentError: true,
+                } as any
+            );
+            const items = unwrapRecommendList<RecommendedReel>(response.data)
+                .filter(item => Number.isFinite(Number(item?.id)) && Number(item.id) > 0);
+            return limitList(items, limit);
+        } catch {
+            return [];
+        }
+    },
+
     trackBehavior: async (
         itemId: number,
         itemType: RecommendItemType,
@@ -47,7 +114,7 @@ export const recommendApi = {
         metadata: RecommendTrackMetadata = {}
     ): Promise<void> => {
         try {
-            await apiClient.post(API_ENDPOINTS.RECOMMEND_TRACK, {
+            const payload: Record<string, any> = {
                 userId: await getRecommendUserId(),
                 itemId: Number(itemId),
                 itemType,
@@ -55,11 +122,20 @@ export const recommendApi = {
                 watchTime: Number(metadata.watchTime || 0),
                 duration: Number(metadata.duration || 1),
                 price: Number(metadata.price || 0),
-                userBudget: Number(metadata.userBudget || 0),
                 locationMatch: Number(metadata.locationMatch || 0),
                 categoryMatch: Number(metadata.categoryMatch || 0),
                 district: metadata.district || '',
-            }, { _silentError: true } as any);
+                ward: metadata.ward || '',
+                province: metadata.province || '',
+                propertyType: metadata.propertyType || '',
+                transactionType: metadata.transactionType || '',
+            };
+
+            if (metadata.userBudget !== undefined && metadata.userBudget !== null) {
+                payload.userBudget = Number(metadata.userBudget);
+            }
+
+            await apiClient.post(API_ENDPOINTS.RECOMMEND_TRACK, payload, { _silentError: true } as any);
         } catch {
         }
     },

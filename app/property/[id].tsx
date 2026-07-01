@@ -320,10 +320,13 @@ const buildRecommendMetadata = (room: Room) => ({
     duration: 1,
     watchTime: 0,
     price: Number(room.price || 0),
-    userBudget: Number(room.price || 0),
     locationMatch: 0,
     categoryMatch: 0,
-    district: room.ward ? '' : (room.district || ''),
+    district: room.district || '',
+    ward: room.ward || '',
+    province: room.province || '',
+    propertyType: room.propertyType || '',
+    transactionType: room.transactionType || '',
 });
 
 const trackPropertyEngagement = (room: Room, action: RecommendAction) => {
@@ -481,43 +484,16 @@ export default function PropertyDetailScreen() {
         if (!room?.id) return;
         let cancelled = false;
 
-        const fetchSimilarRooms = async () => {
+        const fetchRelatedContent = async () => {
             setIsLoadingSimilar(true);
-            try {
-                const similar = await roomService.getSimilarRooms(room.id);
-                let nextRooms = pickSimilarRooms(similar, room, 6);
-
-                if (nextRooms.length === 0) {
-                    const res = await roomService.getRooms({ page: 0, size: 20 });
-                    const rooms = getRoomListFromResponse(res);
-                    nextRooms = pickSimilarRooms(rooms, room, 6, true);
-                }
-
-                if (!cancelled) setSimilarRooms(nextRooms);
-            } catch {
-                try {
-                    const res = await roomService.getRooms({ page: 0, size: 20 });
-                    const rooms = getRoomListFromResponse(res);
-                    const nextRooms = pickSimilarRooms(rooms, room, 6, true);
-                    if (!cancelled) setSimilarRooms(nextRooms);
-                } catch {
-                    if (!cancelled) setSimilarRooms([]);
-                }
-            } finally {
-                if (!cancelled) setIsLoadingSimilar(false);
-            }
-        };
-
-        fetchSimilarRooms();
-        return () => { cancelled = true; };
-    }, [room?.id]);
-
-    useEffect(() => {
-        if (!room?.id) return;
-        let cancelled = false;
-
-        const fetchRelatedReels = async () => {
             setIsLoadingRelatedReels(true);
+
+            const fetchStrictRoomFallback = async () => {
+                const res = await roomService.getRooms({ page: 0, size: 20 });
+                const rooms = getRoomListFromResponse(res);
+                return pickSimilarRooms(rooms, room, 6, true);
+            };
+
             const fetchStrictReelFallback = async () => {
                 const res = await reelsApi.getFeed(12);
                 return pickRelatedVideos(res.items || [], room, 6);
@@ -525,26 +501,55 @@ export default function PropertyDetailScreen() {
 
             try {
                 const similar = await roomService.getSimilarRooms(room.id);
+                let nextRooms = pickSimilarRooms(similar, room, 6);
                 let nextReels = pickRelatedVideos(similar, room, 6);
 
-                if (nextReels.length === 0) {
-                    nextReels = await fetchStrictReelFallback();
+                if (nextRooms.length === 0) {
+                    try {
+                        nextRooms = await fetchStrictRoomFallback();
+                    } catch {
+                        nextRooms = [];
+                    }
                 }
 
-                if (!cancelled) setRelatedReels(nextReels);
+                if (nextReels.length === 0) {
+                    try {
+                        nextReels = await fetchStrictReelFallback();
+                    } catch {
+                        nextReels = [];
+                    }
+                }
+
+                if (!cancelled) {
+                    setSimilarRooms(nextRooms);
+                    setRelatedReels(nextReels);
+                }
             } catch {
                 try {
-                    const nextReels = await fetchStrictReelFallback();
-                    if (!cancelled) setRelatedReels(nextReels);
+                    const [nextRooms, nextReels] = await Promise.all([
+                        fetchStrictRoomFallback().catch(() => []),
+                        fetchStrictReelFallback().catch(() => []),
+                    ]);
+
+                    if (!cancelled) {
+                        setSimilarRooms(nextRooms);
+                        setRelatedReels(nextReels);
+                    }
                 } catch {
-                    if (!cancelled) setRelatedReels([]);
+                    if (!cancelled) {
+                        setSimilarRooms([]);
+                        setRelatedReels([]);
+                    }
                 }
             } finally {
-                if (!cancelled) setIsLoadingRelatedReels(false);
+                if (!cancelled) {
+                    setIsLoadingSimilar(false);
+                    setIsLoadingRelatedReels(false);
+                }
             }
         };
 
-        fetchRelatedReels();
+        fetchRelatedContent();
         return () => { cancelled = true; };
     }, [room?.id]);
 

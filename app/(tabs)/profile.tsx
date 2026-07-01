@@ -18,6 +18,20 @@ import { Room, Appointment } from '../../types';
 import { InteractionPropertyDTO } from '../../services/api/interaction';
 import { roomService } from '../../services/api/rooms';
 import { useFocusEffect } from 'expo-router';
+import { formatCompactVND } from '../../utils/formatPrice';
+
+const isRentTransaction = (transactionType?: string) => {
+    const type = String(transactionType || '').toUpperCase();
+    return type === 'FOR_RENT' || type === 'RENT';
+};
+
+const formatPropertyPrice = (price?: number | string | null, transactionType?: string) => {
+    const amount = typeof price === 'string' ? Number(price.replace(/[^\d.-]/g, '')) : Number(price);
+    if (!Number.isFinite(amount) || amount <= 0) return 'Thỏa thuận';
+
+    const base = formatCompactVND(amount);
+    return isRentTransaction(transactionType) ? `${base} đ/tháng` : `${base} đ`;
+};
 
 function MiniRoomCard({ room, onPress, onEdit, onDelete }: {
     room: Room;
@@ -25,13 +39,12 @@ function MiniRoomCard({ room, onPress, onEdit, onDelete }: {
     onEdit: () => void;
     onDelete: () => void;
 }) {
-    const formatPrice = (p: number) => `${(p / 1000000).toFixed(0)} tr/th`;
     return (
         <TouchableOpacity style={styles.miniCard} onPress={onPress} activeOpacity={0.8}>
             <Image source={{ uri: room.images[0] || 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400' }} style={styles.miniCardImg} contentFit="cover" />
             <View style={styles.miniCardBody}>
                 <Text numberOfLines={2} style={styles.miniCardTitle}>{room.title}</Text>
-                <Text style={styles.miniCardPrice}>{formatPrice(room.price)}</Text>
+                <Text style={styles.miniCardPrice}>{formatPropertyPrice(room.price, room.transactionType)}</Text>
                 <View style={[styles.statusBadge, room.status === 'ACTIVE' ? styles.statusActive : styles.statusPending]}>
                     <Text style={[styles.statusText, room.status === 'ACTIVE' ? styles.statusActiveText : styles.statusPendingText]}>
                         {room.status === 'ACTIVE' ? 'Đang đăng' : room.status === 'PENDING' ? 'Chờ duyệt' : room.status}
@@ -62,10 +75,6 @@ function SavedPropertyCard({
     onPress: () => void;
     onUnsave: () => void;
 }) {
-    const formatPrice = (p: number) => {
-        if (p >= 1_000_000_000) return `${(p / 1_000_000_000).toFixed(1)} tỷ`;
-        return `${(p / 1_000_000).toFixed(0)} tr`;
-    };
     return (
         <TouchableOpacity style={styles.savedCard} onPress={onPress} activeOpacity={0.85}>
             <Image
@@ -75,7 +84,7 @@ function SavedPropertyCard({
             />
             <View style={styles.savedCardBody}>
                 <Text numberOfLines={2} style={styles.savedCardTitle}>{item.title}</Text>
-                <Text style={styles.savedCardPrice}>{formatPrice(item.price)}</Text>
+                <Text style={styles.savedCardPrice}>{formatPropertyPrice(item.price, item.transactionType)}</Text>
                 <Text style={styles.savedCardAddr} numberOfLines={1}>
                     <Ionicons name="location-outline" size={11} color="#888" /> {item.district || item.address}
                 </Text>

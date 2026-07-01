@@ -43,7 +43,7 @@ const BUDGET_OPTIONS = [
 const AREA_OPTIONS = [
     { value: 'SMALL', label: 'Nhỏ gọn', sublabel: '< 30m²', icon: 'resize-outline' },
     { value: 'MEDIUM', label: 'Vừa phải', sublabel: '30 - 60m²', icon: 'expand-outline' },
-    { value: 'LARGE', label: 'Rộng rãi', sublabel: '> 60m²', icon: 'maximize-outline' },
+    { value: 'LARGE', label: 'Rộng rãi', sublabel: '> 60m²', icon: 'expand-outline' },
 ] as const;
 
 // 10 tiêu chí — hasPet & smoking map trực tiếp sang backend field

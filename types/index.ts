@@ -88,6 +88,59 @@ export interface Room {
 // Backward compatibility alias
 export type Property = Room;
 
+export interface RecommendedProperty {
+    id: number;
+    title: string;
+    price?: number;
+    address?: string;
+    videoUrl?: string;
+    images?: string[];
+    createdAt?: string;
+    isPromoted?: boolean;
+    itemType?: string;
+    score?: number;
+    district?: string;
+    ownerId?: number;
+    reasons?: string[];
+    ownerTrustScore?: number;
+    viewCount?: number;
+    likeCount?: number;
+    saveCount?: number;
+    isLiked?: boolean;
+    isSaved?: boolean;
+    commentCount?: number;
+    contactCount?: number;
+    primarySource?: string;
+    shareCount?: number;
+}
+
+export interface RecommendedReel {
+    id: number;
+    title: string;
+    price?: number;
+    address?: string;
+    videoUrl?: string;
+    viewCount?: number;
+    likeCount?: number;
+    saveCount?: number;
+    isLiked?: boolean;
+    isSaved?: boolean;
+    commentCount?: number;
+    primarySource?: string;
+    ownerSlug?: string;
+    ownerId?: number;
+    contactCount?: number;
+    shareCount?: number;
+    ownerNameSnapshot?: string;
+    ownerAvatarSnapshot?: string;
+    createdAt?: string;
+    isPromoted?: boolean;
+    itemType?: string;
+    score?: number;
+    reasons?: string[];
+    ownerTrustScore?: number;
+}
+
 // ============================
 // User (kết hợp identity-service + customer-service)
 // ============================

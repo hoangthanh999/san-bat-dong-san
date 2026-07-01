@@ -10,16 +10,20 @@ import {
     ScrollView,
     useWindowDimensions,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePropertyStore } from '../../store/propertyStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import { useProjectStore } from '../../store/projectStore';
+import { useAuthStore } from '../../store/authStore';
 import FeedPropertyCard from '../../components/property/FeedPropertyCard';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { Room } from '../../types';
+import { RecommendedProperty, Room } from '../../types';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
+import { recommendApi } from '../../services/api/recommend';
+import { formatCompactVND } from '../../utils/formatPrice';
 
 const CATEGORIES = [
     { key: 'all', label: 'Tất cả' },
@@ -42,6 +46,44 @@ const getFilterSummary = (filters: Record<string, unknown>, isSearchMode: boolea
     return `${activeCount} bộ lọc đang áp dụng`;
 };
 
+const RECOMMEND_REASON_LABELS: Record<string, string> = {
+    BANDIT_BEHAVIOR: 'Dựa trên tin bạn đã xem, lưu và liên hệ',
+    BEHAVIOR: 'Dựa trên tin bạn đã xem, lưu và liên hệ',
+    BANDIT_COLLABORATIVE: 'Người có hành vi tương tự cũng quan tâm',
+    COLLABORATIVE: 'Người có hành vi tương tự cũng quan tâm',
+    BANDIT_TRENDING: 'Tin nổi bật có thể phù hợp',
+    TRENDING: 'Tin nổi bật có thể phù hợp',
+    PROMOTED: 'Tin nổi bật có thể phù hợp',
+    DISTRICT_MATCH: 'Dựa trên khu vực bạn quan tâm',
+    LOCATION_MATCH: 'Dựa trên khu vực bạn quan tâm',
+    BUDGET_MATCH: 'Gần với mức giá bạn thường quan tâm',
+    BUDGET_STRONG_MATCH: 'Gần với mức giá bạn thường quan tâm',
+    FAVORITE_PROPERTY: 'Dựa trên loại tin bạn thường quan tâm',
+    FOLLOWING_OWNER: 'Từ chủ nhà bạn đang theo dõi',
+    LIKED_OWNER: 'Từ chủ nhà bạn từng quan tâm',
+    TRUSTED_OWNER: 'Chủ nhà có độ tin cậy cao',
+    FRESH_ITEM: 'Tin mới có thể phù hợp',
+    EXPLORE: 'Gợi ý để bạn khám phá thêm',
+};
+
+const getRecommendationReason = (item: RecommendedProperty) => {
+    const source = item.primarySource || item.reasons?.[0];
+    if (source && RECOMMEND_REASON_LABELS[source]) return RECOMMEND_REASON_LABELS[source];
+
+    const matchedReason = item.reasons?.find(reason => RECOMMEND_REASON_LABELS[reason]);
+    if (matchedReason) return RECOMMEND_REASON_LABELS[matchedReason];
+
+    return 'Dựa trên tin bạn đã xem, lưu và liên hệ';
+};
+
+const getRecommendationScoreLabel = (score?: number) => {
+    if (typeof score !== 'number' || !Number.isFinite(score) || score <= 0 || score > 1) {
+        return null;
+    }
+
+    return `Phù hợp ${Math.round(score * 100)}%`;
+};
+
 export default function FeedScreen() {
     const { safePush } = useSafeRouter();
     const {
@@ -56,23 +98,46 @@ export default function FeedScreen() {
     } = usePropertyStore();
     const { unreadCount } = useNotificationStore();
     const { projects, fetchProjects } = useProjectStore();
+    const { user, isAuthenticated } = useAuthStore();
     const insets = useSafeAreaInsets();
     const { height } = useWindowDimensions();
     const flatListRef = useRef<FlatList<Room>>(null);
 
     const [refreshing, setRefreshing] = useState(false);
     const [activeCategory, setActiveCategory] = useState('all');
+    const [recommendedProperties, setRecommendedProperties] = useState<RecommendedProperty[]>([]);
+    const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+
+    const userId = Number(user?.id);
+    const canLoadRecommendations = isAuthenticated && Number.isFinite(userId) && userId > 0;
+
+    const fetchRecommendations = useCallback(async () => {
+        if (!canLoadRecommendations) {
+            setRecommendedProperties([]);
+            setIsLoadingRecommendations(false);
+            return;
+        }
+
+        setIsLoadingRecommendations(true);
+        const items = await recommendApi.getFinalPropertyRecommendations(userId, 5);
+        setRecommendedProperties(items);
+        setIsLoadingRecommendations(false);
+    }, [canLoadRecommendations, userId]);
 
     useEffect(() => {
         fetchRooms();
         fetchProjects(true);
     }, [fetchRooms, fetchProjects]);
 
+    useEffect(() => {
+        fetchRecommendations();
+    }, [fetchRecommendations]);
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await Promise.all([fetchRooms(), fetchProjects(true)]);
+        await Promise.all([fetchRooms(), fetchProjects(true), fetchRecommendations()]);
         setRefreshing(false);
-    }, [fetchRooms, fetchProjects]);
+    }, [fetchRooms, fetchProjects, fetchRecommendations]);
 
     const sourceRooms = searchResults ?? rooms;
     const isSearchMode = searchResults !== null;
@@ -143,6 +208,108 @@ export default function FeedScreen() {
         () => getFilterSummary(filters as unknown as Record<string, unknown>, isSearchMode),
         [filters, isSearchMode],
     );
+
+    const renderRecommendationCard = useCallback((item: RecommendedProperty) => {
+        const imageUri = item.images?.[0];
+        const scoreLabel = getRecommendationScoreLabel(item.score);
+
+        return (
+            <TouchableOpacity
+                key={item.id}
+                style={styles.recommendationCard}
+                activeOpacity={0.9}
+                onPress={() => safePush(`/property/${item.id}` as any)}
+            >
+                <View style={styles.recommendationImageWrap}>
+                    {imageUri ? (
+                        <Image
+                            source={{ uri: imageUri }}
+                            style={styles.recommendationImage}
+                            contentFit="cover"
+                            transition={160}
+                        />
+                    ) : (
+                        <View style={styles.recommendationImageFallback}>
+                            <Ionicons name="home-outline" size={28} color="#94A3B8" />
+                        </View>
+                    )}
+                    <View style={styles.aiBadge}>
+                        <Ionicons name="sparkles-outline" size={11} color="#FFFFFF" />
+                        <Text style={styles.aiBadgeText}>Cá nhân hóa</Text>
+                    </View>
+                    {scoreLabel && (
+                        <View style={styles.scoreBadge}>
+                            <Text style={styles.scoreBadgeText}>{scoreLabel}</Text>
+                        </View>
+                    )}
+                    {item.videoUrl && (
+                        <View style={styles.recommendationVideoBadge}>
+                            <Ionicons name="play" size={10} color="#FFFFFF" />
+                        </View>
+                    )}
+                </View>
+
+                <View style={styles.recommendationBody}>
+                    <Text style={styles.recommendationPrice}>{formatCompactVND(Number(item.price || 0))}</Text>
+                    <Text style={styles.recommendationTitle} numberOfLines={2}>{item.title}</Text>
+                    <View style={styles.recommendationAddressRow}>
+                        <Ionicons name="location-outline" size={13} color="#64748B" />
+                        <Text style={styles.recommendationAddress} numberOfLines={1}>
+                            {[item.district, item.address].filter(Boolean).join(' - ') || 'Chưa cập nhật địa chỉ'}
+                        </Text>
+                    </View>
+                    <Text style={styles.recommendationReason} numberOfLines={2}>
+                        {getRecommendationReason(item)}
+                    </Text>
+                </View>
+            </TouchableOpacity>
+        );
+    }, [safePush]);
+
+    const renderRecommendationsSection = () => {
+        if (!canLoadRecommendations) return null;
+        if (!isLoadingRecommendations && recommendedProperties.length === 0) return null;
+
+        return (
+            <View style={styles.recommendationsSection}>
+                <View style={styles.sectionHeader}>
+                    <View style={styles.sectionTitleGroup}>
+                        <Text style={styles.sectionTitle}>Gợi ý dành riêng cho bạn</Text>
+                        <Text style={styles.sectionSubtitleText}>
+                            Dựa trên hành vi xem, lưu và liên hệ của bạn
+                        </Text>
+                    </View>
+                </View>
+
+                {isLoadingRecommendations ? (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.recommendationScroll}
+                    >
+                        {[0, 1, 2].map(index => (
+                            <View key={index} style={styles.recommendationSkeletonCard}>
+                                <Skeleton width="100%" height={128} borderRadius={16} />
+                                <View style={styles.recommendationSkeletonBody}>
+                                    <Skeleton width="62%" height={18} borderRadius={8} />
+                                    <Skeleton width="88%" height={14} borderRadius={8} />
+                                    <Skeleton width="72%" height={14} borderRadius={8} />
+                                </View>
+                            </View>
+                        ))}
+                    </ScrollView>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.recommendationScroll}
+                    >
+                        {recommendedProperties.slice(0, 5).map(renderRecommendationCard)}
+                    </ScrollView>
+                )}
+            </View>
+        );
+    };
 
     const renderProperty = useCallback(({ item }: { item: Room }) => (
         <FeedPropertyCard item={item} />
@@ -238,6 +405,8 @@ export default function FeedScreen() {
                     </TouchableOpacity>
                 ))}
             </ScrollView>
+
+            {renderRecommendationsSection()}
 
             {projects.length > 0 && (
                 <View style={styles.projectsSection}>
@@ -517,6 +686,137 @@ const styles = StyleSheet.create({
     },
     categoryTextActive: {
         color: '#FFFFFF',
+    },
+    recommendationsSection: {
+        gap: 10,
+    },
+    sectionTitleGroup: {
+        flex: 1,
+        paddingRight: 12,
+    },
+    sectionSubtitleText: {
+        color: '#64748B',
+        fontSize: 12,
+        fontWeight: '700',
+        lineHeight: 17,
+        marginTop: 3,
+    },
+    recommendationScroll: {
+        gap: 12,
+        paddingRight: 16,
+    },
+    recommendationCard: {
+        width: 224,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.07,
+        shadowRadius: 14,
+        elevation: 3,
+    },
+    recommendationImageWrap: {
+        height: 128,
+        backgroundColor: '#E2E8F0',
+    },
+    recommendationImage: {
+        width: '100%',
+        height: '100%',
+    },
+    recommendationImageFallback: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F1F5F9',
+    },
+    aiBadge: {
+        position: 'absolute',
+        top: 9,
+        left: 9,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(0,102,255,0.92)',
+        borderRadius: 13,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+    },
+    aiBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    scoreBadge: {
+        position: 'absolute',
+        left: 9,
+        bottom: 9,
+        backgroundColor: 'rgba(15,23,42,0.74)',
+        borderRadius: 13,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+    },
+    scoreBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '900',
+    },
+    recommendationVideoBadge: {
+        position: 'absolute',
+        right: 9,
+        bottom: 9,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: 'rgba(15,23,42,0.74)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    recommendationBody: {
+        padding: 11,
+        gap: 6,
+    },
+    recommendationPrice: {
+        color: '#F97316',
+        fontSize: 17,
+        fontWeight: '900',
+    },
+    recommendationTitle: {
+        color: '#0F172A',
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '900',
+    },
+    recommendationAddressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    recommendationAddress: {
+        flex: 1,
+        color: '#64748B',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    recommendationReason: {
+        color: '#2563EB',
+        fontSize: 11,
+        lineHeight: 16,
+        fontWeight: '800',
+    },
+    recommendationSkeletonCard: {
+        width: 224,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    recommendationSkeletonBody: {
+        padding: 11,
+        gap: 8,
     },
     projectsSection: {
         gap: 10,
