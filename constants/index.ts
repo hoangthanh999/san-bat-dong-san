@@ -66,6 +66,7 @@ export const STORAGE_KEYS = {
     PUSH_TOKEN: 'push_token',
     NOTIFICATIONS_ENABLED: 'notifications_enabled',
     API_ENVIRONMENT_BASE_URL: 'api_environment_base_url',
+    GUEST_ID: 'guest_id',
 };
 
 // Animation Durations
@@ -129,6 +130,7 @@ export const API_ENDPOINTS = {
     PUBLIC_PROPERTIES_REELS_RANDOM: '/public/properties/reels/random',
     PUBLIC_PROPERTIES_BY_OWNER: (ownerId: number) => `/public/properties/owners/${ownerId}`,
     PUBLIC_OWNER_TRUST_SCORE: (ownerId: number) => `/public/properties/owners/${ownerId}/trust-score`,
+    PUBLIC_PROPERTY_SIMILAR: (id: number) => `/public/properties/${id}/similar`,
 
     // ============================================================
     // RECOMMENDATION
@@ -154,6 +156,8 @@ export const API_ENDPOINTS = {
     PROPERTY_LIKE: (id: number) => `/properties/${id}/like`,
     PROPERTY_SAVE: (id: number) => `/properties/${id}/save`,
     PROPERTY_VIEW: (id: number) => `/properties/${id}/view`,  // ✅ THÊM: track view endpoint
+    PROPERTY_CONTACT: (id: number) => `/properties/${id}/contact`,
+    PROPERTY_SHARE: (id: number) => `/properties/${id}/share`,
     PROPERTY_ME_LIKED: '/properties/me/liked',
     PROPERTY_ME_SAVED: '/properties/me/saved',
 

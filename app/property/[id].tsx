@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     View, Text, ScrollView, StyleSheet, TouchableOpacity,
     Linking, Dimensions, Alert, TextInput, Modal, Share,
     StatusBar, Platform, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';   // ✅ Thay react-native-maps
 import { Image } from 'expo-image';
@@ -22,6 +23,7 @@ import { useAppointmentStore } from '../../store/appointmentStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { roomService } from '../../services/api/rooms';
 import { reelsApi, PropertyReel } from '../../services/api/reels';
+import { recommendApi, type RecommendAction } from '../../services/api/recommend';
 import { ImageGallery } from '../../components/property/ImageGallery';
 import { ReviewCard } from '../../components/property/ReviewCard';
 import { CommentResponse, Room } from '../../types';
@@ -29,7 +31,35 @@ import { formatCompactVND } from '../../utils/formatPrice';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
 
 const { width } = Dimensions.get('window');
-const FALLBACK_PROPERTY_IMAGE = 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800';
+
+type MapLoadState = 'loading' | 'ready' | 'error';
+
+const buildSvgDataUri = (svg: string) =>
+    `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+
+const FALLBACK_PROPERTY_IMAGE = buildSvgDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520" viewBox="0 0 800 520">
+  <rect width="800" height="520" fill="#E5E7EB"/>
+  <rect x="220" y="150" width="360" height="220" rx="22" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="8"/>
+  <circle cx="320" cy="230" r="34" fill="#CBD5E1"/>
+  <path d="M250 330l86-88 72 70 46-48 96 66" fill="none" stroke="#94A3B8" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="400" y="425" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#64748B">Chua co anh</text>
+</svg>
+`);
+
+const getInitials = (name: string) => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return 'CN';
+    return parts.slice(-2).map(part => part.charAt(0)).join('').toUpperCase();
+};
+
+const buildAvatarPlaceholderUri = (name: string, background = '#0066FF', color = '#FFFFFF') =>
+    buildSvgDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <rect width="160" height="160" rx="80" fill="${background}"/>
+  <text x="80" y="94" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" font-weight="700" fill="${color}">${getInitials(name)}</text>
+</svg>
+`);
 
 // ✅ Tạo HTML cho Leaflet map (OpenStreetMap - miễn phí, không cần API Key)
 const buildLeafletHtml = (
@@ -110,7 +140,7 @@ const getOwnerAvatar = (room: Room): string => {
     const name = getOwnerName(room);
     return room.ownerAvatarSnapshot
         || room.ownerAvatarUrl
-        || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0066FF&color=fff`;
+        || buildAvatarPlaceholderUri(name);
 };
 
 const getOwnerPhone = (room: Room): string | undefined =>
@@ -205,37 +235,111 @@ const scoreSimilarRoom = (candidate: Room, current: Room) => {
     return score;
 };
 
-const pickSimilarRooms = (items: Room[], current: Room, limit = 6) => {
-    const candidates = items.filter(item => item?.id && item.id !== current.id);
+const isStrictSimilarRoom = (candidate: Room, current: Room) => {
+    const sameCore =
+        candidate.propertyType === current.propertyType &&
+        candidate.transactionType === current.transactionType;
+    const samePlace =
+        (!!current.projectId && candidate.projectId === current.projectId) ||
+        (normalizeText(candidate.ward) && normalizeText(candidate.ward) === normalizeText(current.ward)) ||
+        (normalizeText(candidate.district) && normalizeText(candidate.district) === normalizeText(current.district)) ||
+        (normalizeText(candidate.province) && normalizeText(candidate.province) === normalizeText(current.province));
+    return sameCore && samePlace;
+};
+
+const pickSimilarRooms = (items: Room[], current: Room, limit = 6, strict = false) => {
+    const candidates = items.filter(item =>
+        item?.id &&
+        item.id !== current.id &&
+        (!strict || isStrictSimilarRoom(item, current))
+    );
     const sorted = candidates
         .map(item => ({ item, score: scoreSimilarRoom(item, current) }))
+        .filter(({ score }) => score > 0)
         .sort((a, b) => b.score - a.score)
         .map(({ item }) => item);
     return sorted.slice(0, limit);
 };
 
-const scoreRelatedReel = (candidate: PropertyReel, current: Room) => {
+type RelatedVideoItem = Room | PropertyReel;
+
+const getRelatedVideoUrl = (candidate: RelatedVideoItem) =>
+    candidate.videoUrl?.trim() || null;
+
+const getRelatedVideoThumbnail = (candidate: RelatedVideoItem) => {
+    const raw = candidate as any;
+    return raw.thumbnailUrl?.trim?.() || raw.images?.[0] || FALLBACK_PROPERTY_IMAGE;
+};
+
+const isStronglyRelatedVideo = (candidate: RelatedVideoItem, current: Room) => {
+    const raw = candidate as any;
+    if (!candidate?.id || candidate.id === current.id || !getRelatedVideoUrl(candidate)) return false;
+
+    const sameProject = !!current.projectId && raw.projectId === current.projectId;
+    if (sameProject) return true;
+
+    const sameWard = !!normalizeText(raw.ward) && normalizeText(raw.ward) === normalizeText(current.ward);
+    const sameDistrict = !!normalizeText(raw.district) && normalizeText(raw.district) === normalizeText(current.district);
+    const samePropertyType = !!raw.propertyType && raw.propertyType === current.propertyType;
+    const sameTransactionType =
+        (!!raw.transactionType && raw.transactionType === current.transactionType) ||
+        (raw.listingType === current.transactionType) ||
+        (raw.listingType === 'RENT' && current.transactionType === 'FOR_RENT') ||
+        (raw.listingType === 'SALE' && current.transactionType === 'FOR_SALE');
+    const sameOwner = !!current.ownerId && raw.ownerId === current.ownerId;
+
+    return sameOwner ||
+        ((sameWard || sameDistrict) && samePropertyType) ||
+        (sameDistrict && sameTransactionType && samePropertyType);
+};
+
+const scoreRelatedVideo = (candidate: RelatedVideoItem, current: Room) => {
     const raw = candidate as any;
     let score = 0;
-    if (current.projectId && raw.projectId === current.projectId) score += 80;
-    if (normalizeText(raw.ward) && normalizeText(raw.ward) === normalizeText(current.ward)) score += 18;
-    if (normalizeText(raw.district) && normalizeText(raw.district) === normalizeText(current.district)) score += 14;
-    if (normalizeText(raw.province) && normalizeText(raw.province) === normalizeText(current.province)) score += 10;
-    if (raw.propertyType && raw.propertyType === current.propertyType) score += 20;
-    if (raw.transactionType && raw.transactionType === current.transactionType) score += 20;
+    if (current.projectId && raw.projectId === current.projectId) score += 100;
+    if (current.ownerId && raw.ownerId === current.ownerId) score += 70;
+    if (normalizeText(raw.ward) && normalizeText(raw.ward) === normalizeText(current.ward)) score += 40;
+    if (normalizeText(raw.district) && normalizeText(raw.district) === normalizeText(current.district)) score += 32;
+    if (raw.propertyType && raw.propertyType === current.propertyType) score += 24;
+    if (raw.transactionType && raw.transactionType === current.transactionType) score += 18;
     if (raw.listingType && (raw.listingType === current.transactionType || (raw.listingType === 'RENT' && current.transactionType === 'FOR_RENT') || (raw.listingType === 'SALE' && current.transactionType === 'FOR_SALE'))) score += 18;
-    if (candidate.isPromoted) score += 2;
+    if (raw.isPromoted) score += 2;
     return score;
 };
 
-const pickRelatedReels = (items: PropertyReel[], current: Room, limit = 6) => (
+const pickRelatedVideos = (items: RelatedVideoItem[], current: Room, limit = 6) => (
     items
-        .filter(item => item?.id && item.id !== current.id && !!item.videoUrl)
-        .map(item => ({ item, score: scoreRelatedReel(item, current) }))
+        .filter(item => isStronglyRelatedVideo(item, current))
+        .map(item => ({ item, score: scoreRelatedVideo(item, current) }))
         .sort((a, b) => b.score - a.score)
         .map(({ item }) => item)
         .slice(0, limit)
 );
+
+const buildRecommendMetadata = (room: Room) => ({
+    duration: 1,
+    watchTime: 0,
+    price: Number(room.price || 0),
+    userBudget: Number(room.price || 0),
+    locationMatch: 0,
+    categoryMatch: 0,
+    district: room.ward ? '' : (room.district || ''),
+});
+
+const trackPropertyEngagement = (room: Room, action: RecommendAction) => {
+    if (!room?.id) return;
+
+    if (action === 'VIEW') roomService.trackView(room.id).catch(() => { });
+    if (action === 'CONTACT') roomService.trackContact(room.id).catch(() => { });
+    if (action === 'SHARE') roomService.trackShare(room.id).catch(() => { });
+
+    recommendApi.trackBehavior(
+        room.id,
+        room.videoUrl ? 'REEL' : 'PROPERTY',
+        action,
+        buildRecommendMetadata(room)
+    ).catch(() => { });
+};
 
 export default function PropertyDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -257,12 +361,9 @@ export default function PropertyDetailScreen() {
     const { createAppointment, isSubmitting: bookingSubmitting } = useAppointmentStore();
     const {
         isLiked, isSaved: isPropertySaved, toggleLike, toggleSave: toggleSaveInteraction,
-        setSaved, setLiked,
     } = useInteractionStore();
 
     const [activeTab, setActiveTab] = useState<'info' | 'reviews' | 'comments'>('info');
-    const [isSavedLocal, setIsSavedLocal] = useState(false);
-    const [isLikedLocal, setIsLikedLocal] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [showBookingModal, setShowBookingModal] = useState(false);
     const [showFullMap, setShowFullMap] = useState(false);
@@ -278,12 +379,19 @@ export default function PropertyDetailScreen() {
     const [showVideoModal, setShowVideoModal] = useState(false);
     const [similarRooms, setSimilarRooms] = useState<Room[]>([]);
     const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
-    const [relatedReels, setRelatedReels] = useState<PropertyReel[]>([]);
+    const [relatedReels, setRelatedReels] = useState<RelatedVideoItem[]>([]);
     const [isLoadingRelatedReels, setIsLoadingRelatedReels] = useState(false);
+    const [mapLoadState, setMapLoadState] = useState<MapLoadState>('loading');
+    const [fullMapLoadState, setFullMapLoadState] = useState<MapLoadState>('loading');
+    const [isEnsuringRouteRoom, setIsEnsuringRouteRoom] = useState(true);
 
     const roomId = Number(id);
-    const room = currentRoom?.id === roomId ? currentRoom : null;
+    const hasValidRoomId = Number.isFinite(roomId) && roomId > 0;
+    const currentRoomMatchesRoute = hasValidRoomId && !!currentRoom && String(currentRoom.id) === String(roomId);
+    const room = currentRoomMatchesRoute ? currentRoom : null;
     const videoUrl = room?.videoUrl?.trim() || null;
+    const isSavedForRoom = isPropertySaved(roomId);
+    const isLikedForRoom = isLiked(roomId);
 
     const videoPlayer = useVideoPlayer(videoUrl, player => {
         player.loop = false;
@@ -308,12 +416,37 @@ export default function PropertyDetailScreen() {
     const safeComments = Array.isArray(rawComments) ? rawComments : ([] as CommentResponse[]);
     const commentCount = countByProperty[roomId] || 0;
 
+    useFocusEffect(
+        useCallback(() => {
+            if (!hasValidRoomId) {
+                setIsEnsuringRouteRoom(false);
+                return;
+            }
+
+            let active = true;
+            const shouldFetchRouteRoom = !currentRoomMatchesRoute || !!storeError;
+
+            if (shouldFetchRouteRoom) {
+                setIsEnsuringRouteRoom(true);
+                fetchRoomDetail(roomId).finally(() => {
+                    if (active) setIsEnsuringRouteRoom(false);
+                });
+            } else {
+                setIsEnsuringRouteRoom(false);
+            }
+
+            return () => {
+                active = false;
+                setIsEnsuringRouteRoom(true);
+            };
+        }, [hasValidRoomId, roomId, currentRoomMatchesRoute, storeError, fetchRoomDetail])
+    );
+
     useEffect(() => {
-        if (roomId) {
-            fetchRoomDetail(roomId);
+        if (hasValidRoomId) {
             fetchComments(roomId, true);
         }
-    }, [roomId]);
+    }, [hasValidRoomId, roomId]);
 
     // Khi room load xong và có ownerId → tải review + summary
     useEffect(() => {
@@ -330,9 +463,19 @@ export default function PropertyDetailScreen() {
     }, [room?.latitude, room?.longitude]);
 
     useEffect(() => {
-        setIsSavedLocal(isPropertySaved(roomId));
-        setIsLikedLocal(isLiked(roomId));
-    }, [roomId, isPropertySaved, isLiked]);
+        setMapLoadState('loading');
+        setFullMapLoadState('loading');
+    }, [room?.id, room?.latitude, room?.longitude]);
+
+    useEffect(() => {
+        if (showFullMap) setFullMapLoadState('loading');
+    }, [showFullMap, room?.id]);
+
+    useEffect(() => {
+        if (room?.id) {
+            trackPropertyEngagement(room, 'VIEW');
+        }
+    }, [room?.id]);
 
     useEffect(() => {
         if (!room?.id) return;
@@ -341,12 +484,25 @@ export default function PropertyDetailScreen() {
         const fetchSimilarRooms = async () => {
             setIsLoadingSimilar(true);
             try {
-                const res = await roomService.getRooms({ page: 0, size: 20 });
-                const rooms = getRoomListFromResponse(res);
-                const nextRooms = pickSimilarRooms(rooms, room, 6);
+                const similar = await roomService.getSimilarRooms(room.id);
+                let nextRooms = pickSimilarRooms(similar, room, 6);
+
+                if (nextRooms.length === 0) {
+                    const res = await roomService.getRooms({ page: 0, size: 20 });
+                    const rooms = getRoomListFromResponse(res);
+                    nextRooms = pickSimilarRooms(rooms, room, 6, true);
+                }
+
                 if (!cancelled) setSimilarRooms(nextRooms);
             } catch {
-                if (!cancelled) setSimilarRooms([]);
+                try {
+                    const res = await roomService.getRooms({ page: 0, size: 20 });
+                    const rooms = getRoomListFromResponse(res);
+                    const nextRooms = pickSimilarRooms(rooms, room, 6, true);
+                    if (!cancelled) setSimilarRooms(nextRooms);
+                } catch {
+                    if (!cancelled) setSimilarRooms([]);
+                }
             } finally {
                 if (!cancelled) setIsLoadingSimilar(false);
             }
@@ -362,12 +518,27 @@ export default function PropertyDetailScreen() {
 
         const fetchRelatedReels = async () => {
             setIsLoadingRelatedReels(true);
-            try {
+            const fetchStrictReelFallback = async () => {
                 const res = await reelsApi.getFeed(12);
-                const nextReels = pickRelatedReels(res.items || [], room, 6);
+                return pickRelatedVideos(res.items || [], room, 6);
+            };
+
+            try {
+                const similar = await roomService.getSimilarRooms(room.id);
+                let nextReels = pickRelatedVideos(similar, room, 6);
+
+                if (nextReels.length === 0) {
+                    nextReels = await fetchStrictReelFallback();
+                }
+
                 if (!cancelled) setRelatedReels(nextReels);
             } catch {
-                if (!cancelled) setRelatedReels([]);
+                try {
+                    const nextReels = await fetchStrictReelFallback();
+                    if (!cancelled) setRelatedReels(nextReels);
+                } catch {
+                    if (!cancelled) setRelatedReels([]);
+                }
             } finally {
                 if (!cancelled) setIsLoadingRelatedReels(false);
             }
@@ -423,14 +594,9 @@ export default function PropertyDetailScreen() {
     const handleFavorite = async () => {
         if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        const newSaved = !isSavedLocal;
-        setIsSavedLocal(newSaved);
-        setSaved(roomId, newSaved);
         try {
             await toggleSaveInteraction(roomId);
         } catch {
-            setIsSavedLocal(!newSaved);
-            setSaved(roomId, !newSaved);
             Alert.alert('Lỗi', 'Không thể lưu tin. Vui lòng thử lại.');
         }
     };
@@ -438,14 +604,9 @@ export default function PropertyDetailScreen() {
     const handleLike = async () => {
         if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const newLiked = !isLikedLocal;
-        setIsLikedLocal(newLiked);
-        setLiked(roomId, newLiked);
         try {
             await toggleLike(roomId);
         } catch {
-            setIsLikedLocal(!newLiked);
-            setLiked(roomId, !newLiked);
         }
     };
 
@@ -454,10 +615,13 @@ export default function PropertyDetailScreen() {
             const sharePriceText = room
                 ? `${formatCompactVND(room.price)}${room.transactionType === 'FOR_SALE' ? ' đ' : ' đ/tháng'}`
                 : 'Thỏa thuận';
-            await Share.share({
+            const result = await Share.share({
                 message: `${room?.title}\n${room ? getFullAddress(room) : ''}\nGiá: ${sharePriceText}\n\nXem thêm trên HomeVerse`,
                 title: room?.title,
             });
+            if (room && result.action !== Share.dismissedAction) {
+                trackPropertyEngagement(room, 'SHARE');
+            }
         } catch { }
     };
 
@@ -477,6 +641,7 @@ export default function PropertyDetailScreen() {
         const ownerPhone = room ? getOwnerPhone(room) : undefined;
         if (ownerPhone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            trackPropertyEngagement(room!, 'CONTACT');
             Linking.openURL(`tel:${ownerPhone}`);
         } else {
             Alert.alert('Thông báo', 'Số điện thoại chủ nhà chưa được cập nhật.');
@@ -486,6 +651,8 @@ export default function PropertyDetailScreen() {
  const handleChat = () => {
     if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
     if (!room) return;
+
+    trackPropertyEngagement(room, 'CONTACT');
 
     // Navigate sang chat với property info để auto-send
     safePush({
@@ -642,6 +809,9 @@ export default function PropertyDetailScreen() {
     };
 
     const openBookingModal = () => {
+        if (room) {
+            trackPropertyEngagement(room, 'CONTACT');
+        }
         setBookingDate(formatBookingInput(getDefaultBookingDate()));
         setShowBookingModal(true);
     };
@@ -713,7 +883,9 @@ export default function PropertyDetailScreen() {
         );
     };
 
-    if (isLoading) {
+    const isRouteRoomStale = hasValidRoomId && !!currentRoom && !currentRoomMatchesRoute;
+
+    if (isLoading || isEnsuringRouteRoom || isRouteRoomStale) {
         return (
             <View style={styles.loadingContainer}>
                 <Stack.Screen options={{ headerShown: false }} />
@@ -732,7 +904,10 @@ export default function PropertyDetailScreen() {
                 <Text style={styles.errorMessage}>
                     {storeError || 'Tin đăng không tồn tại hoặc đã bị gỡ.'}
                 </Text>
-                <TouchableOpacity style={styles.retryBtn} onPress={() => fetchRoomDetail(roomId)}>
+                <TouchableOpacity style={styles.retryBtn} onPress={() => {
+                    setIsEnsuringRouteRoom(true);
+                    fetchRoomDetail(roomId).finally(() => setIsEnsuringRouteRoom(false));
+                }}>
                     <Ionicons name="refresh" size={18} color="white" />
                     <Text style={styles.retryBtnText}>Thử lại</Text>
                 </TouchableOpacity>
@@ -753,6 +928,7 @@ export default function PropertyDetailScreen() {
     const galleryImages = room.images?.length > 0 ? room.images : [FALLBACK_PROPERTY_IMAGE];
     const previewImage = room.images?.[0] || FALLBACK_PROPERTY_IMAGE;
     const hasVideo = !!videoUrl;
+    const hasMapCoordinates = !!(room.latitude && room.longitude);
 
     return (
         <View style={styles.wrapper}>
@@ -803,10 +979,10 @@ export default function PropertyDetailScreen() {
                                 <Ionicons name="share-social-outline" size={22} color="white" />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.overlayBtn} onPress={handleLike}>
-                                <Ionicons name={isLikedLocal ? 'heart' : 'heart-outline'} size={22} color={isLikedLocal ? '#FF4D6D' : 'white'} />
+                                <Ionicons name={isLikedForRoom ? 'heart' : 'heart-outline'} size={22} color={isLikedForRoom ? '#FF4D6D' : 'white'} />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.overlayBtn} onPress={handleFavorite}>
-                                <Ionicons name={isSavedLocal ? 'bookmark' : 'bookmark-outline'} size={22} color={isSavedLocal ? '#FFB800' : 'white'} />
+                                <Ionicons name={isSavedForRoom ? 'bookmark' : 'bookmark-outline'} size={22} color={isSavedForRoom ? '#FFB800' : 'white'} />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -1013,7 +1189,7 @@ export default function PropertyDetailScreen() {
                             )}
 
                             {/* ✅ Map - Leaflet WebView (thay MapView Google) */}
-                            {!!(room.latitude && room.longitude) && (
+                            {hasMapCoordinates && (
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>Vị trí bất động sản</Text>
                                     <TouchableOpacity
@@ -1037,7 +1213,21 @@ export default function PropertyDetailScreen() {
                                             javaScriptEnabled
                                             scrollEnabled={false}
                                             pointerEvents="none"
+                                            onLoadStart={() => setMapLoadState('loading')}
+                                            onLoad={() => setMapLoadState('ready')}
+                                            onError={() => setMapLoadState('error')}
                                         />
+                                        {mapLoadState === 'loading' && (
+                                            <View style={styles.mapStateOverlay} pointerEvents="none">
+                                                <ActivityIndicator size="small" color="#0066FF" />
+                                            </View>
+                                        )}
+                                        {mapLoadState === 'error' && (
+                                            <View style={styles.mapStateOverlay}>
+                                                <Ionicons name="map-outline" size={22} color="#0066FF" />
+                                                <Text style={styles.mapStateText}>Không tải được bản đồ, vui lòng thử lại sau</Text>
+                                            </View>
+                                        )}
                                         <View style={styles.mapExpandBtn}>
                                             <Ionicons name="expand-outline" size={16} color="#0066FF" />
                                             <Text style={styles.mapExpandText}>Xem bản đồ đầy đủ</Text>
@@ -1056,7 +1246,7 @@ export default function PropertyDetailScreen() {
                                 </View>
                             )}
 
-                            {!(room.latitude && room.longitude) && (
+                            {!hasMapCoordinates && (
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>Vị trí bất động sản</Text>
                                     <View style={styles.mapFallbackCard}>
@@ -1111,7 +1301,7 @@ export default function PropertyDetailScreen() {
                                 <View style={styles.section}>
                                     <SectionHeader
                                         title="Có thể bạn quan tâm"
-                                        subtitle="Các tin cùng loại với bài đang xem"
+                                        subtitle="Các tin tương tự từ hệ thống"
                                     />
                                     {isLoadingSimilar ? (
                                         <View style={styles.relatedLoading}>
@@ -1123,7 +1313,9 @@ export default function PropertyDetailScreen() {
                                                 <SimilarRoomCard
                                                     key={item.id}
                                                     item={item}
-                                                    onPress={() => safePush(`/property/${item.id}` as any)}
+                                                    onPress={() => {
+                                                        if (item.id !== room.id) safePush(`/property/${item.id}` as any);
+                                                    }}
                                                 />
                                             ))}
                                         </ScrollView>
@@ -1147,7 +1339,9 @@ export default function PropertyDetailScreen() {
                                                 <RelatedReelCard
                                                     key={item.id}
                                                     item={item}
-                                                    onPress={() => safePush(`/property/${item.id}` as any)}
+                                                    onPress={() => {
+                                                        if (item.id !== room.id) safePush(`/property/${item.id}` as any);
+                                                    }}
                                                 />
                                             ))}
                                         </ScrollView>
@@ -1225,7 +1419,7 @@ export default function PropertyDetailScreen() {
                                     <View key={c.id} style={styles.commentCard}>
                                         <View style={styles.commentHeader}>
                                             <Image
-                                                source={{ uri: getCommentAvatar(c) || `https://ui-avatars.com/api/?name=${encodeURIComponent(getCommentDisplayName(c))}&background=EEF4FF&color=0066FF` }}
+                                                source={{ uri: getCommentAvatar(c) || buildAvatarPlaceholderUri(getCommentDisplayName(c), '#EEF4FF', '#0066FF') }}
                                                 style={styles.commentAvatar}
                                             />
                                             <View style={styles.commentMeta}>
@@ -1379,29 +1573,54 @@ export default function PropertyDetailScreen() {
                         <View style={{ width: 40 }} />
                     </View>
 
-                    {/* ✅ WebView Leaflet - Full Map */}
-                    <WebView
-                        style={{ flex: 1 }}
-                        source={{
-                            html: buildLeafletHtml(
-                                room.latitude || 10.762622,
-                                room.longitude || 106.660172,
-                                room.title,
-                                true,   // showCircle = true (vùng 500m)
-                                15
-                            )
-                        }}
-                        originWhitelist={['*']}
-                        javaScriptEnabled
-                    />
+                    {hasMapCoordinates ? (
+                        <>
+                            <View style={styles.fullMapBody}>
+                                <WebView
+                                    style={{ flex: 1 }}
+                                    source={{
+                                        html: buildLeafletHtml(
+                                            room.latitude,
+                                            room.longitude,
+                                            room.title,
+                                            true,
+                                            15
+                                        )
+                                    }}
+                                    originWhitelist={['*']}
+                                    javaScriptEnabled
+                                    onLoadStart={() => setFullMapLoadState('loading')}
+                                    onLoad={() => setFullMapLoadState('ready')}
+                                    onError={() => setFullMapLoadState('error')}
+                                />
+                                {fullMapLoadState === 'loading' && (
+                                    <View style={styles.mapStateOverlay} pointerEvents="none">
+                                        <ActivityIndicator size="small" color="#0066FF" />
+                                    </View>
+                                )}
+                                {fullMapLoadState === 'error' && (
+                                    <View style={styles.mapStateOverlay}>
+                                        <Ionicons name="map-outline" size={28} color="#0066FF" />
+                                        <Text style={styles.mapStateText}>Không tải được bản đồ, vui lòng thử lại sau</Text>
+                                    </View>
+                                )}
+                            </View>
 
-                    <View style={[styles.fullMapBottom, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-                        <TouchableOpacity style={styles.fullMapNavBtn} onPress={handleNavigate}>
-                            <Ionicons name="navigate" size={20} color="white" />
-                            <Text style={styles.fullMapNavText}>🧭 Chỉ đường đến đây</Text>
-                        </TouchableOpacity>
-                        {userDistance && <Text style={styles.fullMapDistance}>📏 {userDistance} từ bạn</Text>}
-                    </View>
+                            <View style={[styles.fullMapBottom, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                                <TouchableOpacity style={styles.fullMapNavBtn} onPress={handleNavigate}>
+                                    <Ionicons name="navigate" size={20} color="white" />
+                                    <Text style={styles.fullMapNavText}>🧭 Chỉ đường đến đây</Text>
+                                </TouchableOpacity>
+                                {userDistance && <Text style={styles.fullMapDistance}>📏 {userDistance} từ bạn</Text>}
+                            </View>
+                        </>
+                    ) : (
+                        <View style={styles.fullMapFallback}>
+                            <Ionicons name="location-outline" size={32} color="#0066FF" />
+                            <Text style={styles.mapFallbackTitle}>Chưa có tọa độ bản đồ</Text>
+                            <Text style={styles.mapFallbackText} numberOfLines={2}>{getFullAddress(room) || 'Địa chỉ đang được cập nhật.'}</Text>
+                        </View>
+                    )}
                 </View>
             </Modal>
 
@@ -1543,11 +1762,17 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 function SimilarRoomCard({ item, onPress }: { item: Room; onPress: () => void }) {
-    const thumbnail = item.images?.[0] || FALLBACK_PROPERTY_IMAGE;
+    const hasThumbnail = !!item.images?.[0];
+    const thumbnail = hasThumbnail ? item.images[0] : FALLBACK_PROPERTY_IMAGE;
     return (
         <TouchableOpacity style={styles.relatedCard} activeOpacity={0.86} onPress={onPress}>
             <View style={styles.relatedImageWrap}>
                 <Image source={{ uri: thumbnail }} style={styles.relatedImage} contentFit="cover" />
+                {!hasThumbnail && (
+                    <View style={styles.noImageBadge}>
+                        <Text style={styles.noImageBadgeText}>Chưa có ảnh</Text>
+                    </View>
+                )}
                 <View style={styles.relatedBadgeRow}>
                     {item.isPromoted && (
                         <View style={styles.relatedBadge}>
@@ -1574,12 +1799,18 @@ function SimilarRoomCard({ item, onPress }: { item: Room; onPress: () => void })
     );
 }
 
-function RelatedReelCard({ item, onPress }: { item: PropertyReel; onPress: () => void }) {
-    const thumbnail = item.thumbnailUrl || FALLBACK_PROPERTY_IMAGE;
+function RelatedReelCard({ item, onPress }: { item: RelatedVideoItem; onPress: () => void }) {
+    const thumbnail = getRelatedVideoThumbnail(item);
+    const hasThumbnail = thumbnail !== FALLBACK_PROPERTY_IMAGE;
     return (
         <TouchableOpacity style={styles.reelCard} activeOpacity={0.86} onPress={onPress}>
             <View style={styles.reelImageWrap}>
                 <Image source={{ uri: thumbnail }} style={styles.reelImage} contentFit="cover" />
+                {!hasThumbnail && (
+                    <View style={styles.noImageBadge}>
+                        <Text style={styles.noImageBadgeText}>Chưa có ảnh</Text>
+                    </View>
+                )}
                 <View style={styles.reelScrim} />
                 <View style={styles.reelPlayButton}>
                     <Ionicons name="play" size={22} color="white" style={{ marginLeft: 2 }} />
@@ -1674,6 +1905,8 @@ const styles = StyleSheet.create({
     amenityText: { fontSize: 12, color: '#334155', fontWeight: '700' },
     mapContainer: { borderRadius: 16, overflow: 'hidden', marginBottom: 10, height: 176, backgroundColor: '#E5E7EB', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
     map: { flex: 1 },
+    mapStateOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', gap: 8, paddingHorizontal: 18, backgroundColor: 'rgba(248,250,252,0.94)' },
+    mapStateText: { color: '#475569', fontSize: 13, fontWeight: '700', textAlign: 'center', lineHeight: 18 },
     mapExpandBtn: { position: 'absolute', bottom: 10, right: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'white', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 },
     mapExpandText: { color: '#0066FF', fontSize: 12, fontWeight: '600' },
     addressNavRow: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12, backgroundColor: 'white', borderRadius: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E7EEF9' },
@@ -1701,6 +1934,8 @@ const styles = StyleSheet.create({
     relatedBadgeRow: { position: 'absolute', left: 8, top: 8, right: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     relatedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: 'rgba(17,24,39,0.72)', borderRadius: 12, paddingHorizontal: 7, paddingVertical: 4 },
     relatedBadgeText: { color: 'white', fontSize: 10, fontWeight: '800' },
+    noImageBadge: { position: 'absolute', left: 8, bottom: 8, backgroundColor: 'rgba(17,24,39,0.72)', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 },
+    noImageBadgeText: { color: 'white', fontSize: 10, fontWeight: '800' },
     relatedCardBody: { padding: 11, gap: 5 },
     relatedCardTitle: { fontSize: 13, lineHeight: 18, color: '#1A1A1A', fontWeight: '700' },
     relatedCardPrice: { fontSize: 14, color: '#FF6B35', fontWeight: '800' },
@@ -1737,6 +1972,8 @@ const styles = StyleSheet.create({
     videoModalClose: { position: 'absolute', right: 16, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center' },
     // Full Map Modal
     fullMapContainer: { flex: 1, backgroundColor: 'white' },
+    fullMapBody: { flex: 1, position: 'relative' },
+    fullMapFallback: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8, paddingHorizontal: 28, backgroundColor: '#F8FAFC' },
     fullMapHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
     fullMapBack: { width: 40, height: 40, justifyContent: 'center' },
     fullMapTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },

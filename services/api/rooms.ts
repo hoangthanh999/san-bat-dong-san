@@ -4,6 +4,51 @@ import { Room, PropertyRequestDTO, SearchParams, PaginatedResponse, ReelsFeedRes
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../../constants';
 
+const getStoredUserId = async (): Promise<number | null> => {
+    try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const id = Number(parsed?.id ?? parsed?.userId);
+        return Number.isFinite(id) && id > 0 ? id : null;
+    } catch {
+        return null;
+    }
+};
+
+const getGuestId = async (): Promise<string> => {
+    try {
+        const existing = await AsyncStorage.getItem(STORAGE_KEYS.GUEST_ID);
+        if (existing) return existing;
+
+        const next = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        await AsyncStorage.setItem(STORAGE_KEYS.GUEST_ID, next);
+        return next;
+    } catch {
+        return `guest-${Date.now()}`;
+    }
+};
+
+const getTrackingHeaders = async (requireUser = false): Promise<Record<string, string> | null> => {
+    const userId = await getStoredUserId();
+    if (userId) return { 'X-User-Id': String(userId) };
+    if (requireUser) return null;
+    return { 'X-Guest-Id': await getGuestId() };
+};
+
+const normalizeRoomList = (payload: any): Room[] => {
+    const candidates = [
+        payload,
+        payload?.content,
+        payload?.data?.content,
+        payload?.items,
+        payload?.result,
+        payload?.result?.content,
+    ];
+    const list = candidates.find(Array.isArray);
+    return Array.isArray(list) ? list : [];
+};
+
 /**
  * Tất cả property endpoints đi qua apiClient (nginx gateway)
  * Nginx đã route: /public/properties, /properties, /admin/properties → property-service:8086
@@ -31,6 +76,15 @@ export const roomService = {
     getRoomDetail: async (id: number): Promise<Room> => {
         const response = await apiClient.get<Room>(API_ENDPOINTS.PUBLIC_PROPERTY_DETAIL(id));
         return response.data;
+    },
+
+    /**
+     * Tin tương tự từ backend
+     * GET /public/properties/{id}/similar
+     */
+    getSimilarRooms: async (id: number): Promise<Room[]> => {
+        const response = await apiClient.get<any>(API_ENDPOINTS.PUBLIC_PROPERTY_SIMILAR(id));
+        return normalizeRoomList(response.data);
     },
 
     /**
@@ -152,6 +206,31 @@ export const roomService = {
 
         const response = await apiClient.post<string>(API_ENDPOINTS.PROPERTY_SAVE(id), null, { headers });
         return response.data;
+    },
+
+    trackView: async (id: number): Promise<void> => {
+        const headers = await getTrackingHeaders(false);
+        await apiClient.post(API_ENDPOINTS.PROPERTY_VIEW(id), null, {
+            headers: headers || undefined,
+            _silentError: true,
+        } as any);
+    },
+
+    trackContact: async (id: number): Promise<void> => {
+        const headers = await getTrackingHeaders(true);
+        if (!headers) return;
+        await apiClient.post(API_ENDPOINTS.PROPERTY_CONTACT(id), null, {
+            headers,
+            _silentError: true,
+        } as any);
+    },
+
+    trackShare: async (id: number): Promise<void> => {
+        const headers = await getTrackingHeaders(false);
+        await apiClient.post(API_ENDPOINTS.PROPERTY_SHARE(id), null, {
+            headers: headers || undefined,
+            _silentError: true,
+        } as any);
     },
 
     // ============================================================
