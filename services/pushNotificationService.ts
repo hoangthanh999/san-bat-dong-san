@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants';
 import { notificationService } from './api/notifications';
+import { isWalletNotification } from '../utils/notificationRouting';
 
 const LAST_HANDLED_NOTIFICATION_RESPONSE_KEY = 'last_handled_notification_response_id';
 
@@ -281,7 +282,7 @@ export function handleNotificationNavigation(router: any, data: any) {
             router.push(`/appointments/${appointmentId}`);
             return;
         }
-        if (transactionId) {
+        if (transactionId || isWalletNotification(normalizedType)) {
             router.push('/wallet/history');
             return;
         }

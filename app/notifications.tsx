@@ -10,6 +10,7 @@ import { Notification } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGuardScreen } from '../components/auth/AuthGuardScreen';
 import { useSafeRouter } from '../hooks/useSafeRouter';
+import { isWalletNotification } from '../utils/notificationRouting';
 
 function NotificationItem({ item, onPress }: { item: Notification; onPress: () => void }) {
     const icons: Record<string, { name: string; bg: string; color: string }> = {
@@ -64,11 +65,6 @@ function getSectionTitle(dateStr: string): string {
     if (itemDate.getTime() === yesterday.getTime()) return 'Hôm qua';
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
-
-const WALLET_HISTORY_TYPES = new Set([
-    'PAYMENT_SUCCESS',
-    'WALLET_DEPOSIT',
-]);
 
 const DEMO_DISABLED_ROUTE_PATTERN = /^\/(?:contracts|bills)(?:\/|$)/i;
 
@@ -144,7 +140,7 @@ function NotificationsContent() {
             return;
         }
 
-        if (WALLET_HISTORY_TYPES.has(normalizedType)) {
+        if (isWalletNotification(normalizedType)) {
             safePush('/wallet/history' as any);
             return;
         }
@@ -160,12 +156,6 @@ function NotificationsContent() {
             case 'CHAT_NEW':
                 safePush(refId ? `/chat/${refId}` as any : '/(tabs)/chat' as any);
                 break;
-            case 'PAYMENT':
-            case 'WALLET':
-            case 'DEPOSIT':
-            case 'TRANSACTION':
-            case 'PURCHASE_PACKAGE':
-            case 'DEDUCTION':
             case 'BILL_NEW':
             case 'BILL':
                 showDemoDisabledMessage();
