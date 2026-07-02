@@ -20,9 +20,10 @@ import { useProjectStore } from '../../store/projectStore';
 import { useAuthStore } from '../../store/authStore';
 import FeedPropertyCard from '../../components/property/FeedPropertyCard';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { RecommendedProperty, Room } from '../../types';
+import { MarketInsight, RecommendedProperty, RegionTransactionStat, Room } from '../../types';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
 import { recommendApi } from '../../services/api/recommend';
+import { analyticsService } from '../../services/api/analytics';
 import { formatCompactVND } from '../../utils/formatPrice';
 import { sortFeaturedFirst } from '../../utils/promotion';
 
@@ -85,6 +86,13 @@ const getRecommendationScoreLabel = (score?: number) => {
     return `Phù hợp ${Math.round(score * 100)}%`;
 };
 
+const MARKET_ANALYTICS_PROVINCE = 'Thành phố Hồ Chí Minh';
+
+const formatPercentLabel = (value?: number) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '0%';
+    return `${Math.abs(value).toFixed(value % 1 === 0 ? 0 : 1)}%`;
+};
+
 export default function FeedScreen() {
     const { safePush } = useSafeRouter();
     const {
@@ -108,6 +116,9 @@ export default function FeedScreen() {
     const [activeCategory, setActiveCategory] = useState('all');
     const [recommendedProperties, setRecommendedProperties] = useState<RecommendedProperty[]>([]);
     const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+    const [marketInsight, setMarketInsight] = useState<MarketInsight | null>(null);
+    const [marketRegions, setMarketRegions] = useState<RegionTransactionStat[]>([]);
+    const [isLoadingMarketInsights, setIsLoadingMarketInsights] = useState(false);
 
     const userId = Number(user?.id);
     const canLoadRecommendations = isAuthenticated && Number.isFinite(userId) && userId > 0;
@@ -125,10 +136,40 @@ export default function FeedScreen() {
         setIsLoadingRecommendations(false);
     }, [canLoadRecommendations, userId]);
 
+    const fetchMarketInsights = useCallback(async () => {
+        setIsLoadingMarketInsights(true);
+        try {
+            const [trendResult, regionResult] = await Promise.allSettled([
+                analyticsService.getPriceTrends({
+                    transactionType: 'FOR_RENT',
+                    province: MARKET_ANALYTICS_PROVINCE,
+                }),
+                analyticsService.getTopRegions({ limit: 3, regionField: 'province.keyword' }),
+            ]);
+
+            setMarketInsight(
+                trendResult.status === 'fulfilled'
+                    ? trendResult.value.marketInsights ?? null
+                    : null
+            );
+            setMarketRegions(
+                regionResult.status === 'fulfilled' && Array.isArray(regionResult.value)
+                    ? regionResult.value.slice(0, 3)
+                    : []
+            );
+        } catch {
+            setMarketInsight(null);
+            setMarketRegions([]);
+        } finally {
+            setIsLoadingMarketInsights(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchRooms();
         fetchProjects(true);
-    }, [fetchRooms, fetchProjects]);
+        fetchMarketInsights();
+    }, [fetchRooms, fetchProjects, fetchMarketInsights]);
 
     useEffect(() => {
         fetchRecommendations();
@@ -136,9 +177,9 @@ export default function FeedScreen() {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await Promise.all([fetchRooms(), fetchProjects(true), fetchRecommendations()]);
+        await Promise.all([fetchRooms(), fetchProjects(true), fetchRecommendations(), fetchMarketInsights()]);
         setRefreshing(false);
-    }, [fetchRooms, fetchProjects, fetchRecommendations]);
+    }, [fetchRooms, fetchProjects, fetchRecommendations, fetchMarketInsights]);
 
     const sourceRooms = searchResults ?? rooms;
     const isSearchMode = searchResults !== null;
@@ -304,6 +345,178 @@ export default function FeedScreen() {
         );
     };
 
+    const renderMarketInsightsSection = () => {
+        const hasData = !!marketInsight || marketRegions.length > 0;
+        if (!isLoadingMarketInsights && !hasData) return null;
+
+        const growthUp = marketInsight?.yearlyGrowthTrend !== 'DOWN';
+        const growthColor = growthUp ? '#16A34A' : '#DC2626';
+
+        return (
+            <View style={styles.marketSection}>
+                <View style={styles.sectionHeader}>
+                    <View style={styles.sectionTitleGroup}>
+                        <Text style={styles.sectionTitle}>Góc nhìn thị trường</Text>
+                        <Text style={styles.sectionSubtitleText}>
+                            Cập nhật tin tức và xu hướng bất động sản
+                        </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => safePush('/analytics' as any)}>
+                        <Text style={styles.sectionLink}>Xem táº¥t cáº£</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {isLoadingMarketInsights ? (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.marketScroll}
+                    >
+                        {[0, 1, 2].map(index => (
+                            <View key={index} style={styles.marketCard}>
+                                <Skeleton width={36} height={36} borderRadius={12} />
+                                <Skeleton width="72%" height={16} borderRadius={8} />
+                                <Skeleton width="88%" height={13} borderRadius={8} />
+                            </View>
+                        ))}
+                    </ScrollView>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.marketScroll}
+                    >
+                        {marketInsight && (
+                            <TouchableOpacity
+                                style={styles.marketCard}
+                                activeOpacity={0.88}
+                                onPress={() => safePush('/analytics' as any)}
+                            >
+                                <View style={styles.marketIcon}>
+                                    <Ionicons name="analytics-outline" size={18} color="#f96302" />
+                                </View>
+                                <Text style={styles.marketCardTitle} numberOfLines={2}>
+                                    {marketInsight.popularPriceLabel || 'Phân khúc phổ biến'}
+                                </Text>
+                                <Text style={styles.marketCardValue} numberOfLines={1}>
+                                    {marketInsight.popularPriceText || 'Đang cập nhật'}
+                                </Text>
+                                {!!marketInsight.popularPriceUnit && (
+                                    <Text style={styles.marketCardMeta} numberOfLines={1}>
+                                        {marketInsight.popularPriceUnit}
+                                    </Text>
+                                )}
+                                <View style={styles.readMoreRow}>
+                                    <Text style={styles.readMoreText}>Xem phân tích</Text>
+                                    <Ionicons name="arrow-forward" size={13} color="#f96302" />
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
+                        {marketInsight && (
+                            <TouchableOpacity
+                                style={styles.marketCard}
+                                activeOpacity={0.88}
+                                onPress={() => safePush('/analytics' as any)}
+                            >
+                                <View style={[styles.marketIcon, { backgroundColor: growthUp ? '#ECFDF5' : '#FEF2F2' }]}>
+                                    <Ionicons name={growthUp ? 'trending-up' : 'trending-down'} size={18} color={growthColor} />
+                                </View>
+                                <Text style={styles.marketCardTitle} numberOfLines={2}>
+                                    {marketInsight.yearlyGrowthLabel || 'Tăng trưởng cùng kỳ'}
+                                </Text>
+                                <Text style={[styles.marketCardValue, { color: growthColor }]} numberOfLines={1}>
+                                    {formatPercentLabel(marketInsight.yearlyGrowthPercent)}
+                                </Text>
+                                <Text style={styles.marketCardMeta} numberOfLines={2}>
+                                    {growthUp ? 'Xu hướng tăng' : 'Xu hướng giảm'} theo dữ liệu tin đăng
+                                </Text>
+                                <View style={styles.readMoreRow}>
+                                    <Text style={styles.readMoreText}>Đọc tiếp</Text>
+                                    <Ionicons name="arrow-forward" size={13} color="#f96302" />
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
+                        {marketRegions.map(region => (
+                            <TouchableOpacity
+                                key={region.regionName}
+                                style={styles.marketCard}
+                                activeOpacity={0.88}
+                                onPress={() => safePush('/analytics' as any)}
+                            >
+                                <View style={styles.marketIcon}>
+                                    <Ionicons name="location-outline" size={18} color="#f96302" />
+                                </View>
+                                <Text style={styles.marketCardTitle} numberOfLines={2}>
+                                    {region.regionName || 'Khu vực nổi bật'}
+                                </Text>
+                                <Text style={styles.marketCardValue} numberOfLines={1}>
+                                    {Number(region.totalPosts || 0).toLocaleString('vi-VN')} tin
+                                </Text>
+                                <Text style={styles.marketCardMeta} numberOfLines={2}>
+                                    Mua bán {Number(region.forSaleCount || 0).toLocaleString('vi-VN')} - Cho thuê {Number(region.forRentCount || 0).toLocaleString('vi-VN')}
+                                </Text>
+                                <View style={styles.readMoreRow}>
+                                    <Text style={styles.readMoreText}>Xem khu vực</Text>
+                                    <Ionicons name="arrow-forward" size={13} color="#f96302" />
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                )}
+            </View>
+        );
+    };
+
+    const renderMarketCtaSection = () => {
+        const hasData = !!marketInsight || marketRegions.length > 0;
+        if (!isLoadingMarketInsights && !hasData) return null;
+
+        const growthUp = marketInsight?.yearlyGrowthTrend !== 'DOWN';
+        const growthColor = growthUp ? '#16A34A' : '#DC2626';
+        const topRegion = marketRegions[0];
+
+        return (
+            <TouchableOpacity
+                style={styles.marketCta}
+                activeOpacity={0.88}
+                onPress={() => safePush('/analytics' as any)}
+            >
+                {isLoadingMarketInsights ? (
+                    <>
+                        <Skeleton width={38} height={38} borderRadius={14} />
+                        <View style={styles.marketCtaBody}>
+                            <Skeleton width="58%" height={16} borderRadius={8} />
+                            <Skeleton width="86%" height={13} borderRadius={8} />
+                        </View>
+                    </>
+                ) : (
+                    <>
+                        <View style={[styles.marketIcon, { backgroundColor: growthUp ? '#ECFDF5' : '#FFF7ED' }]}>
+                            <Ionicons name={growthUp ? 'trending-up' : 'analytics-outline'} size={18} color={growthUp ? growthColor : '#f96302'} />
+                        </View>
+                        <View style={styles.marketCtaBody}>
+                            <Text style={styles.marketCtaTitle}>Góc nhìn thị trường</Text>
+                            <Text style={styles.marketCtaText} numberOfLines={2}>
+                                {marketInsight
+                                    ? `${marketInsight.popularPriceLabel || 'Giá phổ biến'}: ${marketInsight.popularPriceText || 'đang cập nhật'} ${marketInsight.popularPriceUnit || ''}`
+                                    : `Khu vực nổi bật: ${topRegion?.regionName || 'đang cập nhật'}`
+                                }
+                            </Text>
+                            {!!marketInsight?.yearlyGrowthPercent && (
+                                <Text style={[styles.marketCtaMeta, { color: growthColor }]}>
+                                    {growthUp ? 'Tăng' : 'Giảm'} {formatPercentLabel(marketInsight.yearlyGrowthPercent)}
+                                </Text>
+                            )}
+                        </View>
+                        <Ionicons name="arrow-forward" size={18} color="#f96302" />
+                    </>
+                )}
+            </TouchableOpacity>
+        );
+    };
+
     const renderProperty = useCallback(({ item }: { item: Room }) => (
         <FeedPropertyCard item={item} />
     ), []);
@@ -401,6 +614,8 @@ export default function FeedScreen() {
 
             {renderRecommendationsSection()}
 
+            {renderMarketCtaSection()}
+
             {projects.length > 0 && (
                 <View style={styles.projectsSection}>
                     <View style={styles.sectionHeader}>
@@ -466,16 +681,17 @@ export default function FeedScreen() {
         </View>
     );
 
-    const renderFooter = () => {
-        if (!isLoadingMore) return <View style={styles.footerSpacer} />;
-
-        return (
-            <View style={styles.footerLoading}>
-                <Skeleton width={160} height={16} borderRadius={8} />
-                <Text style={styles.footerText}>Đang tải thêm...</Text>
-            </View>
-        );
-    };
+    const renderFooter = () => (
+        <View style={styles.footerContent}>
+            {isLoadingMore && (
+                <View style={styles.footerLoading}>
+                    <Skeleton width={160} height={16} borderRadius={8} />
+                    <Text style={styles.footerText}>Đang tải thêm...</Text>
+                </View>
+            )}
+            <View style={styles.footerSpacer} />
+        </View>
+    );
 
     return (
         <View style={styles.container}>
@@ -811,6 +1027,100 @@ const styles = StyleSheet.create({
         padding: 11,
         gap: 8,
     },
+    marketSection: {
+        gap: 10,
+    },
+    marketCta: {
+        marginHorizontal: 16,
+        minHeight: 92,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: 13,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        elevation: 2,
+    },
+    marketCtaBody: {
+        flex: 1,
+        gap: 4,
+    },
+    marketCtaTitle: {
+        color: '#0F172A',
+        fontSize: 14,
+        fontWeight: '900',
+    },
+    marketCtaText: {
+        color: '#64748B',
+        fontSize: 12,
+        lineHeight: 17,
+        fontWeight: '700',
+    },
+    marketCtaMeta: {
+        fontSize: 11,
+        fontWeight: '900',
+    },
+    marketScroll: {
+        gap: 12,
+        paddingRight: 16,
+    },
+    marketCard: {
+        width: 214,
+        minHeight: 158,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        gap: 7,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.06,
+        shadowRadius: 14,
+        elevation: 2,
+    },
+    marketIcon: {
+        width: 38,
+        height: 38,
+        borderRadius: 14,
+        backgroundColor: '#FFF7ED',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    marketCardTitle: {
+        color: '#111827',
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '900',
+    },
+    marketCardValue: {
+        color: '#f96302',
+        fontSize: 18,
+        fontWeight: '900',
+    },
+    marketCardMeta: {
+        color: '#6B7280',
+        fontSize: 11,
+        lineHeight: 16,
+        fontWeight: '700',
+    },
+    readMoreRow: {
+        marginTop: 'auto',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    readMoreText: {
+        color: '#f96302',
+        fontSize: 12,
+        fontWeight: '900',
+    },
     projectsSection: {
         gap: 10,
     },
@@ -956,6 +1266,11 @@ const styles = StyleSheet.create({
     },
     footerSpacer: {
         height: 8,
+    },
+    footerContent: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        gap: 16,
     },
     footerLoading: {
         alignItems: 'center',

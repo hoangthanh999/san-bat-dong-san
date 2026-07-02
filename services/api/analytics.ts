@@ -43,7 +43,7 @@ export const analyticsService = {
     }): Promise<PropertyAnalyticsResponse> => {
         const response = await apiClient.get<PropertyAnalyticsResponse>(
             API_ENDPOINTS.ANALYTICS_PRICE_TRENDS,
-            { params: compactParams(params) }
+            { params: compactParams(params), _silentError: true } as any
         );
         return response.data;
     },
@@ -64,7 +64,7 @@ export const analyticsService = {
     }): Promise<WardPriceDTO[]> => {
         const response = await apiClient.get<WardPriceDTO[]>(
             API_ENDPOINTS.ANALYTICS_WARD_PRICES,
-            { params: compactParams(params) }
+            { params: compactParams(params), _silentError: true } as any
         );
         return response.data;
     },
@@ -81,7 +81,7 @@ export const analyticsService = {
     }): Promise<RegionTransactionStat[]> => {
         const response = await apiClient.get<RegionTransactionStat[]>(
             API_ENDPOINTS.ANALYTICS_TOP_REGIONS,
-            { params: compactParams({ limit: 5, ...params }) }
+            { params: compactParams({ limit: 5, ...params }), _silentError: true } as any
         );
         return response.data;
     },

@@ -43,14 +43,6 @@ interface AnalyticsState {
     clearError: () => void;
 }
 
-// Danh sách quận TPHCM (mock để render picker — user có thể chọn)
-export const HCM_DISTRICTS = [
-    'Quận 1', 'Quận 2', 'Quận 3', 'Quận 4', 'Quận 5',
-    'Quận 6', 'Quận 7', 'Quận 8', 'Quận 9', 'Quận 10',
-    'Quận 11', 'Quận 12', 'Bình Thạnh', 'Gò Vấp', 'Phú Nhuận',
-    'Tân Bình', 'Tân Phú', 'Thủ Đức', 'Bình Dương', 'Hà Nội',
-];
-
 export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
     transactionType: 'FOR_RENT',
     priceTrends: [],
@@ -152,35 +144,3 @@ export const useAnalyticsStore = create<AnalyticsState>((set, get) => ({
 
     clearError: () => set({ error: null }),
 }));
-
-// ──────────────────────────────────────────
-// MOCK DATA (fallback khi API lỗi / chưa có data)
-// ──────────────────────────────────────────
-const MOCK_TRENDS: PriceTrendItem[] = [
-    { month: '2024-10', averagePrice: 9800000, totalPosts: 145 },
-    { month: '2024-11', averagePrice: 10200000, totalPosts: 162 },
-    { month: '2024-12', averagePrice: 10500000, totalPosts: 178 },
-    { month: '2025-01', averagePrice: 10800000, totalPosts: 190 },
-    { month: '2025-02', averagePrice: 11200000, totalPosts: 205 },
-    { month: '2025-03', averagePrice: 11500000, totalPosts: 220 },
-];
-
-const MOCK_INSIGHTS: MarketInsight = {
-    popularPriceText: '8 – 15 triệu',
-    popularPriceUnit: 'VND/tháng',
-    popularPriceLabel: 'Phân khúc phổ biến nhất',
-    yearlyGrowthPercent: 17.3,
-    yearlyGrowthTrend: 'UP',
-    yearlyGrowthLabel: 'Tăng trưởng năm 2024',
-    diffFromPeakPercent: 8.5,
-    diffFromPeakTrend: 'DOWN',
-    diffFromPeakLabel: 'Cách đỉnh Q3/2023',
-};
-
-const MOCK_REGIONS: RegionTransactionStat[] = [
-    { regionName: 'Hồ Chí Minh', totalPosts: 4520, forSaleCount: 1820, forRentCount: 2700 },
-    { regionName: 'Hà Nội', totalPosts: 3840, forSaleCount: 1640, forRentCount: 2200 },
-    { regionName: 'Bình Dương', totalPosts: 1280, forSaleCount: 780, forRentCount: 500 },
-    { regionName: 'Đồng Nai', totalPosts: 960, forSaleCount: 610, forRentCount: 350 },
-    { regionName: 'Đà Nẵng', totalPosts: 740, forSaleCount: 420, forRentCount: 320 },
-];

@@ -224,7 +224,7 @@ apiClient.interceptors.response.use(
         // Handle Network Error
         if (error.message === 'Network Error' || !error.response) {
             const msg = 'Không thể kết nối đến server. Kiểm tra kết nối mạng.';
-            showToast?.(msg, 'error');
+            if (!isSilent) showToast?.(msg, 'error');
             return Promise.reject({
                 ...error,
                 message: msg,
@@ -244,7 +244,7 @@ apiClient.interceptors.response.use(
         // Handle 404 Not Found
         if (status === 404) {
             const msg = 'Không tìm thấy dữ liệu yêu cầu.';
-            showToast?.(msg, 'warning');
+            if (!isSilent) showToast?.(msg, 'warning');
             return Promise.reject({
                 ...error,
                 message: msg,
@@ -258,7 +258,7 @@ apiClient.interceptors.response.use(
         const errorMessage = backendMessage || error.message || 'Đã xảy ra lỗi';
 
         // Chỉ hiện toast cho lỗi không phải validation (validation đã hiện Alert riêng)
-        if (status !== 400) {
+        if (status !== 400 && !isSilent) {
             showToast?.(errorMessage, 'error');
         }
 
