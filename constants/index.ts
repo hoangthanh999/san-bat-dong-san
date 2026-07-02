@@ -32,6 +32,25 @@ export const CLOUDINARY_UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOA
 export const APP_NAME = 'HomeVerse';
 export const APP_VERSION = '1.0.0';
 
+// Brand palette aligned with HomeVerse web.
+export const BRAND_COLORS = {
+    primary: '#f96302',
+    primaryDark: '#d85502',
+    primaryLight: '#fff7ed',
+    primarySoft: '#fff3e8',
+    primaryBorder: '#fed7aa',
+    accentBlack: '#111111',
+    background: '#F5F6F8',
+    surface: '#FFFFFF',
+    textPrimary: '#111827',
+    textSecondary: '#6B7280',
+    border: '#E5E7EB',
+    success: '#22C55E',
+    warning: '#FACC15',
+    danger: '#EF4444',
+    vip: '#FACC15',
+};
+
 // Pagination
 export const DEFAULT_PAGE_SIZE = 10;
 export const FEED_PAGE_SIZE = 8;

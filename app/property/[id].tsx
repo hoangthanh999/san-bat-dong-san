@@ -53,7 +53,7 @@ const getInitials = (name: string) => {
     return parts.slice(-2).map(part => part.charAt(0)).join('').toUpperCase();
 };
 
-const buildAvatarPlaceholderUri = (name: string, background = '#0066FF', color = '#FFFFFF') =>
+const buildAvatarPlaceholderUri = (name: string, background = '#f96302', color = '#FFFFFF') =>
     buildSvgDataUri(`
 <svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
   <rect width="160" height="160" rx="80" fill="${background}"/>
@@ -90,7 +90,7 @@ const buildLeafletHtml = (
     }).addTo(map);
 
     var icon = L.divIcon({
-      html: '<div style="background:#0066FF;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>',
+      html: '<div style="background:#f96302;width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>',
       iconSize: [28, 28],
       iconAnchor: [14, 28],
       className: ''
@@ -104,8 +104,8 @@ const buildLeafletHtml = (
     ${showCircle ? `
     L.circle([${lat}, ${lng}], {
       radius: 500,
-      color: 'rgba(0,102,255,0.4)',
-      fillColor: 'rgba(0,102,255,0.08)',
+      color: 'rgba(249,99,2,0.4)',
+      fillColor: 'rgba(249,99,2,0.08)',
       fillOpacity: 1,
       weight: 2
     }).addTo(map);
@@ -894,7 +894,7 @@ export default function PropertyDetailScreen() {
         return (
             <View style={styles.loadingContainer}>
                 <Stack.Screen options={{ headerShown: false }} />
-                <ActivityIndicator size="large" color="#0066FF" />
+                <ActivityIndicator size="large" color="#f96302" />
                 <Text style={styles.loadingText}>Đang tải thông tin...</Text>
             </View>
         );
@@ -917,7 +917,7 @@ export default function PropertyDetailScreen() {
                     <Text style={styles.retryBtnText}>Thử lại</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-                    <Ionicons name="arrow-back" size={18} color="#0066FF" />
+                    <Ionicons name="arrow-back" size={18} color="#f96302" />
                     <Text style={styles.backBtnText}>Quay lại</Text>
                 </TouchableOpacity>
             </View>
@@ -1031,7 +1031,7 @@ export default function PropertyDetailScreen() {
                         )}
                         {!!room.projectNameSnapshot && (
                             <View style={styles.projectBadge}>
-                                <Ionicons name="business-outline" size={12} color="#0066FF" />
+                                <Ionicons name="business-outline" size={12} color="#f96302" />
                                 <Text style={styles.projectBadgeText} numberOfLines={1}>{room.projectNameSnapshot}</Text>
                             </View>
                         )}
@@ -1039,17 +1039,17 @@ export default function PropertyDetailScreen() {
 
                     {/* Address */}
                     <TouchableOpacity style={styles.addressRow} onPress={handleNavigate} activeOpacity={0.7}>
-                        <Ionicons name="location" size={16} color="#0066FF" />
+                        <Ionicons name="location" size={16} color="#f96302" />
                         <Text style={styles.addressText} numberOfLines={2}>{getFullAddress(room)}</Text>
                         <View style={styles.directionChip}>
-                            <Ionicons name="navigate-outline" size={12} color="#0066FF" />
+                            <Ionicons name="navigate-outline" size={12} color="#f96302" />
                             <Text style={styles.directionText}>Chỉ đường</Text>
                         </View>
                     </TouchableOpacity>
 
                     {userDistance && (
                         <View style={styles.distanceBadge}>
-                            <Ionicons name="walk-outline" size={14} color="#0066FF" />
+                            <Ionicons name="walk-outline" size={14} color="#f96302" />
                             <Text style={styles.distanceText}>📏 {userDistance} từ bạn</Text>
                         </View>
                     )}
@@ -1070,35 +1070,35 @@ export default function PropertyDetailScreen() {
                     <View style={styles.statsGrid}>
                         {!!room.area && (
                             <View style={styles.statItem}>
-                                <Ionicons name="resize-outline" size={22} color="#0066FF" />
+                                <Ionicons name="resize-outline" size={22} color="#f96302" />
                                 <Text style={styles.statValue}>{room.area} m²</Text>
                                 <Text style={styles.statLabel}>Diện tích</Text>
                             </View>
                         )}
                         {room.bedrooms !== undefined && (
                             <View style={styles.statItem}>
-                                <Ionicons name="bed-outline" size={22} color="#0066FF" />
+                                <Ionicons name="bed-outline" size={22} color="#f96302" />
                                 <Text style={styles.statValue}>{room.bedrooms}</Text>
                                 <Text style={styles.statLabel}>Phòng ngủ</Text>
                             </View>
                         )}
                         {room.bathrooms !== undefined && (
                             <View style={styles.statItem}>
-                                <Ionicons name="water-outline" size={22} color="#0066FF" />
+                                <Ionicons name="water-outline" size={22} color="#f96302" />
                                 <Text style={styles.statValue}>{room.bathrooms}</Text>
                                 <Text style={styles.statLabel}>Phòng tắm</Text>
                             </View>
                         )}
                         {room.capacity !== undefined && (
                             <View style={styles.statItem}>
-                                <Ionicons name="people-outline" size={22} color="#0066FF" />
+                                <Ionicons name="people-outline" size={22} color="#f96302" />
                                 <Text style={styles.statValue}>{room.capacity}</Text>
                                 <Text style={styles.statLabel}>Sức chứa</Text>
                             </View>
                         )}
                         {room.hasBalcony !== undefined && (
                             <View style={styles.statItem}>
-                                <Ionicons name="home-outline" size={22} color="#0066FF" />
+                                <Ionicons name="home-outline" size={22} color="#f96302" />
                                 <Text style={styles.statValue}>{room.hasBalcony ? 'Có' : 'Không'}</Text>
                                 <Text style={styles.statLabel}>Ban công</Text>
                             </View>
@@ -1185,7 +1185,7 @@ export default function PropertyDetailScreen() {
                                     <View style={styles.amenitiesGrid}>
                                         {room.amenities.map((amenity, index) => (
                                             <View key={index} style={styles.amenityItem}>
-                                                <Ionicons name={getAmenityIcon(amenity) as any} size={18} color="#0066FF" />
+                                                <Ionicons name={getAmenityIcon(amenity) as any} size={18} color="#f96302" />
                                                 <Text style={styles.amenityText}>{amenity}</Text>
                                             </View>
                                         ))}
@@ -1224,23 +1224,23 @@ export default function PropertyDetailScreen() {
                                         />
                                         {mapLoadState === 'loading' && (
                                             <View style={styles.mapStateOverlay} pointerEvents="none">
-                                                <ActivityIndicator size="small" color="#0066FF" />
+                                                <ActivityIndicator size="small" color="#f96302" />
                                             </View>
                                         )}
                                         {mapLoadState === 'error' && (
                                             <View style={styles.mapStateOverlay}>
-                                                <Ionicons name="map-outline" size={22} color="#0066FF" />
+                                                <Ionicons name="map-outline" size={22} color="#f96302" />
                                                 <Text style={styles.mapStateText}>Không tải được bản đồ, vui lòng thử lại sau</Text>
                                             </View>
                                         )}
                                         <View style={styles.mapExpandBtn}>
-                                            <Ionicons name="expand-outline" size={16} color="#0066FF" />
+                                            <Ionicons name="expand-outline" size={16} color="#f96302" />
                                             <Text style={styles.mapExpandText}>Xem bản đồ đầy đủ</Text>
                                         </View>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity style={styles.addressNavRow} onPress={handleNavigate}>
-                                        <Ionicons name="location" size={16} color="#0066FF" />
+                                        <Ionicons name="location" size={16} color="#f96302" />
                                         <Text style={styles.fullAddress} numberOfLines={2}>{getFullAddress(room)}</Text>
                                         <View style={styles.directionBtn}>
                                             <Ionicons name="navigate" size={14} color="white" />
@@ -1255,7 +1255,7 @@ export default function PropertyDetailScreen() {
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>Vị trí bất động sản</Text>
                                     <View style={styles.mapFallbackCard}>
-                                        <Ionicons name="location-outline" size={24} color="#0066FF" />
+                                        <Ionicons name="location-outline" size={24} color="#f96302" />
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.mapFallbackTitle}>Chưa có tọa độ bản đồ</Text>
                                             <Text style={styles.mapFallbackText} numberOfLines={2}>{getFullAddress(room) || 'Địa chỉ đang được cập nhật.'}</Text>
@@ -1277,17 +1277,17 @@ export default function PropertyDetailScreen() {
                                         <View style={styles.landlordInfo}>
                                             <Text style={styles.landlordName}>{ownerName}</Text>
                                             <View style={styles.verifiedBadge}>
-                                                <Ionicons name="checkmark-circle" size={14} color="#0066FF" />
+                                                <Ionicons name="checkmark-circle" size={14} color="#f96302" />
                                                 <Text style={styles.verifiedText}>Đã xác minh</Text>
                                             </View>
-                                            <Text style={{ fontSize: 12, color: '#0066FF', marginTop: 2 }}>Xem hồ sơ →</Text>
+                                            <Text style={{ fontSize: 12, color: '#f96302', marginTop: 2 }}>Xem hồ sơ →</Text>
                                         </View>
                                         <View style={styles.landlordBtns}>
                                             <TouchableOpacity style={styles.landlordCallBtn} onPress={handleCall}>
                                                 <Ionicons name="call" size={18} color="white" />
                                             </TouchableOpacity>
                                             <TouchableOpacity style={styles.landlordChatBtn} onPress={handleChat}>
-                                                <Ionicons name="chatbubble-ellipses" size={18} color="#0066FF" />
+                                                <Ionicons name="chatbubble-ellipses" size={18} color="#f96302" />
                                             </TouchableOpacity>
                                             {!isOwner && (
                                                 <TouchableOpacity style={styles.landlordScheduleBtn} onPress={() => {
@@ -1310,7 +1310,7 @@ export default function PropertyDetailScreen() {
                                     />
                                     {isLoadingSimilar ? (
                                         <View style={styles.relatedLoading}>
-                                            <ActivityIndicator size="small" color="#0066FF" />
+                                            <ActivityIndicator size="small" color="#f96302" />
                                         </View>
                                     ) : (
                                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedList}>
@@ -1336,7 +1336,7 @@ export default function PropertyDetailScreen() {
                                     />
                                     {isLoadingRelatedReels ? (
                                         <View style={styles.relatedLoading}>
-                                            <ActivityIndicator size="small" color="#0066FF" />
+                                            <ActivityIndicator size="small" color="#f96302" />
                                         </View>
                                     ) : (
                                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.relatedList}>
@@ -1408,7 +1408,7 @@ export default function PropertyDetailScreen() {
                                     style={styles.loginToCommentBtn}
                                     onPress={() => safePush('/(auth)/login' as any)}
                                 >
-                                    <Ionicons name="log-in-outline" size={16} color="#0066FF" />
+                                    <Ionicons name="log-in-outline" size={16} color="#f96302" />
                                     <Text style={styles.loginToCommentText}>Đăng nhập để bình luận</Text>
                                 </TouchableOpacity>
                             )}
@@ -1424,7 +1424,7 @@ export default function PropertyDetailScreen() {
                                     <View key={c.id} style={styles.commentCard}>
                                         <View style={styles.commentHeader}>
                                             <Image
-                                                source={{ uri: getCommentAvatar(c) || buildAvatarPlaceholderUri(getCommentDisplayName(c), '#EEF4FF', '#0066FF') }}
+                                                source={{ uri: getCommentAvatar(c) || buildAvatarPlaceholderUri(getCommentDisplayName(c), '#FFF7ED', '#f96302') }}
                                                 style={styles.commentAvatar}
                                             />
                                             <View style={styles.commentMeta}>
@@ -1474,7 +1474,7 @@ export default function PropertyDetailScreen() {
                             {/* Nút viết đánh giá — chỉ hiện cho user không phải owner */}
                             {isAuthenticated && user?.id !== room?.ownerId && (
                                 <TouchableOpacity style={styles.writeReviewBtn} onPress={() => setShowReviewModal(true)}>
-                                    <Ionicons name="create-outline" size={18} color="#0066FF" />
+                                    <Ionicons name="create-outline" size={18} color="#f96302" />
                                     <Text style={styles.writeReviewText}>Viết đánh giá chủ nhà</Text>
                                 </TouchableOpacity>
                             )}
@@ -1513,7 +1513,7 @@ export default function PropertyDetailScreen() {
                 {user?.id === room.ownerId ? (
                     <View style={styles.bottomBtns}>
                         <TouchableOpacity style={styles.scheduleBtn} onPress={() => safePush(`/packages/boost/${roomId}` as any)}>
-                            <Ionicons name="rocket-outline" size={18} color="#0066FF" />
+                            <Ionicons name="rocket-outline" size={18} color="#f96302" />
                             <Text style={styles.scheduleBtnText}>Boost tin</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.chatBtn} onPress={() => safePush('/edit-profile' as any)}>
@@ -1524,13 +1524,13 @@ export default function PropertyDetailScreen() {
                 ) : (
                     <View style={styles.bottomBtns}>
                         <TouchableOpacity style={styles.bottomCallBtn} onPress={handleCall}>
-                            <Ionicons name="call" size={18} color="#0066FF" />
+                            <Ionicons name="call" size={18} color="#f96302" />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.scheduleBtn} onPress={() => {
                             if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
                             openBookingModal();
                         }}>
-                            <Ionicons name="calendar-outline" size={18} color="#0066FF" />
+                            <Ionicons name="calendar-outline" size={18} color="#f96302" />
                             <Text style={styles.scheduleBtnText}>Đặt lịch</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.chatBtn} onPress={handleChat}>
@@ -1600,12 +1600,12 @@ export default function PropertyDetailScreen() {
                                 />
                                 {fullMapLoadState === 'loading' && (
                                     <View style={styles.mapStateOverlay} pointerEvents="none">
-                                        <ActivityIndicator size="small" color="#0066FF" />
+                                        <ActivityIndicator size="small" color="#f96302" />
                                     </View>
                                 )}
                                 {fullMapLoadState === 'error' && (
                                     <View style={styles.mapStateOverlay}>
-                                        <Ionicons name="map-outline" size={28} color="#0066FF" />
+                                        <Ionicons name="map-outline" size={28} color="#f96302" />
                                         <Text style={styles.mapStateText}>Không tải được bản đồ, vui lòng thử lại sau</Text>
                                     </View>
                                 )}
@@ -1621,7 +1621,7 @@ export default function PropertyDetailScreen() {
                         </>
                     ) : (
                         <View style={styles.fullMapFallback}>
-                            <Ionicons name="location-outline" size={32} color="#0066FF" />
+                            <Ionicons name="location-outline" size={32} color="#f96302" />
                             <Text style={styles.mapFallbackTitle}>Chưa có tọa độ bản đồ</Text>
                             <Text style={styles.mapFallbackText} numberOfLines={2}>{getFullAddress(room) || 'Địa chỉ đang được cập nhật.'}</Text>
                         </View>
@@ -1672,7 +1672,7 @@ export default function PropertyDetailScreen() {
                                     style={{ width: 64, height: 64, borderRadius: 8, borderWidth: 2, borderColor: '#E0E0E0', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' }}
                                     onPress={pickReviewImages}
                                 >
-                                    <Ionicons name="camera-outline" size={24} color="#0066FF" />
+                                    <Ionicons name="camera-outline" size={24} color="#f96302" />
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -1841,10 +1841,10 @@ const styles = StyleSheet.create({
     errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingHorizontal: 32 },
     errorTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', textAlign: 'center' },
     errorMessage: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
-    retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0066FF', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
+    retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f96302', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
     retryBtnText: { color: 'white', fontWeight: '700', fontSize: 15 },
-    backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: '#0066FF', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
-    backBtnText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
+    backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderColor: '#f96302', borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 },
+    backBtnText: { color: '#f96302', fontWeight: '600', fontSize: 14 },
     container: { flex: 1 },
     content: { padding: 16, paddingBottom: 8 },
     galleryOverlayTop: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -1857,7 +1857,7 @@ const styles = StyleSheet.create({
     videoBadgeText: { color: 'white', fontSize: 12, fontWeight: '800' },
     mediaCountBadge: { position: 'absolute', right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.58)', borderRadius: 18, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
     mediaCountText: { color: 'white', fontSize: 12, fontWeight: '800' },
-    videoPlayButton: { position: 'absolute', alignSelf: 'center', top: 99, width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(0,102,255,0.94)', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 6 },
+    videoPlayButton: { position: 'absolute', alignSelf: 'center', top: 99, width: 60, height: 60, borderRadius: 30, backgroundColor: 'rgba(249,99,2,0.94)', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 6 },
     heroCard: { backgroundColor: 'white', borderRadius: 18, padding: 16, marginTop: -20, marginBottom: 16, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 18, elevation: 4 },
     priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
     price: { fontSize: 28, fontWeight: '900', color: '#FF6B35', letterSpacing: 0 },
@@ -1869,17 +1869,17 @@ const styles = StyleSheet.create({
     metaText: { color: '#8A94A6', fontSize: 12, fontWeight: '600' },
     // Badge chips
     badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-    transactionBadge: { backgroundColor: '#EEF4FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: '#D7E6FF' },
-    transactionBadgeText: { fontSize: 12, fontWeight: '800', color: '#0066FF' },
+    transactionBadge: { backgroundColor: '#FFF7ED', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: '#FED7AA' },
+    transactionBadgeText: { fontSize: 12, fontWeight: '800', color: '#f96302' },
     promotedBadge: { backgroundColor: '#FFF8E1', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#FFD54F' },
     promotedBadgeText: { fontSize: 12, fontWeight: '700', color: '#F57F17' },
-    projectBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EEF4FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#C5D9FF' },
-    projectBadgeText: { fontSize: 12, fontWeight: '600', color: '#0066FF', maxWidth: 200 },
-    addressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, backgroundColor: '#F7FAFF', padding: 11, borderRadius: 12, borderWidth: 1, borderColor: '#E7EEF9' },
-    directionChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#E8F0FF', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-    directionText: { fontSize: 11, color: '#0066FF', fontWeight: '600' },
-    distanceBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#EFF4FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 8 },
-    distanceText: { fontSize: 13, color: '#0066FF', fontWeight: '600' },
+    projectBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF7ED', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#FDBA74' },
+    projectBadgeText: { fontSize: 12, fontWeight: '600', color: '#f96302', maxWidth: 200 },
+    addressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, backgroundColor: '#FFF7ED', padding: 11, borderRadius: 12, borderWidth: 1, borderColor: '#E7EEF9' },
+    directionChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFF3E8', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+    directionText: { fontSize: 11, color: '#f96302', fontWeight: '600' },
+    distanceBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFF7ED', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 8 },
+    distanceText: { fontSize: 13, color: '#f96302', fontWeight: '600' },
     ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
     stars: { flexDirection: 'row', gap: 2 },
     ratingText: { fontSize: 13, color: '#666' },
@@ -1899,37 +1899,37 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 17, fontWeight: '800', color: '#111827', marginBottom: 10, letterSpacing: 0 },
     sectionSubtitle: { fontSize: 12, color: '#7B8494', lineHeight: 17, marginTop: -4 },
     description: { fontSize: 14, color: '#4B5563', lineHeight: 23, backgroundColor: 'white', borderRadius: 16, padding: 14, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-    seeMoreBtn: { color: '#0066FF', fontWeight: '800', marginTop: 8, fontSize: 14 },
+    seeMoreBtn: { color: '#f96302', fontWeight: '800', marginTop: 8, fontSize: 14 },
     detailsGrid: { backgroundColor: 'white', borderRadius: 16, overflow: 'hidden', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
     detailGroupTitle: { backgroundColor: '#F8FAFC', color: '#667085', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
     detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F4F8' },
     detailLabel: { flex: 0.44, fontSize: 13, color: '#7B8494', lineHeight: 19 },
     detailValue: { flex: 0.56, fontSize: 14, fontWeight: '700', color: '#111827', textAlign: 'right', lineHeight: 20 },
     amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, backgroundColor: 'white', borderRadius: 16, padding: 12, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1 },
-    amenityItem: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F4F8FF', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#E2ECFF' },
+    amenityItem: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF7ED', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: '#FED7AA' },
     amenityText: { fontSize: 12, color: '#334155', fontWeight: '700' },
     mapContainer: { borderRadius: 16, overflow: 'hidden', marginBottom: 10, height: 176, backgroundColor: '#E5E7EB', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
     map: { flex: 1 },
     mapStateOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', gap: 8, paddingHorizontal: 18, backgroundColor: 'rgba(248,250,252,0.94)' },
     mapStateText: { color: '#475569', fontSize: 13, fontWeight: '700', textAlign: 'center', lineHeight: 18 },
     mapExpandBtn: { position: 'absolute', bottom: 10, right: 10, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'white', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 3 },
-    mapExpandText: { color: '#0066FF', fontSize: 12, fontWeight: '600' },
+    mapExpandText: { color: '#f96302', fontSize: 12, fontWeight: '600' },
     addressNavRow: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 12, backgroundColor: 'white', borderRadius: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E7EEF9' },
     fullAddress: { flex: 1, fontSize: 13, color: '#444' },
-    directionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#0066FF', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },
+    directionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f96302', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12 },
     directionBtnText: { color: 'white', fontSize: 12, fontWeight: '700' },
     mapFallbackCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'white', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E7EEF9' },
     mapFallbackTitle: { color: '#111827', fontSize: 14, fontWeight: '800', marginBottom: 3 },
     mapFallbackText: { color: '#667085', fontSize: 13, lineHeight: 18 },
     landlordCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 18, padding: 16, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
-    landlordAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#EEF4FF' },
+    landlordAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#FFF7ED' },
     landlordInfo: { flex: 1, marginLeft: 12 },
     landlordName: { fontSize: 16, fontWeight: '600', color: '#1A1A1A' },
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-    verifiedText: { fontSize: 12, color: '#0066FF' },
+    verifiedText: { fontSize: 12, color: '#f96302' },
     landlordBtns: { flexDirection: 'row', gap: 8 },
-    landlordCallBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0066FF', justifyContent: 'center', alignItems: 'center' },
-    landlordChatBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F0FF', justifyContent: 'center', alignItems: 'center' },
+    landlordCallBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f96302', justifyContent: 'center', alignItems: 'center' },
+    landlordChatBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF3E8', justifyContent: 'center', alignItems: 'center' },
     landlordScheduleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF2EA', justifyContent: 'center', alignItems: 'center' },
     relatedList: { gap: 12, paddingRight: 16, paddingBottom: 2 },
     relatedLoading: { height: 120, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white', borderRadius: 16 },
@@ -1950,15 +1950,15 @@ const styles = StyleSheet.create({
     reelImageWrap: { height: 158, backgroundColor: '#111827' },
     reelImage: { width: '100%', height: '100%' },
     reelScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.18)' },
-    reelPlayButton: { position: 'absolute', alignSelf: 'center', top: 56, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(0,102,255,0.94)', justifyContent: 'center', alignItems: 'center' },
+    reelPlayButton: { position: 'absolute', alignSelf: 'center', top: 56, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(249,99,2,0.94)', justifyContent: 'center', alignItems: 'center' },
     reelBadge: { position: 'absolute', left: 8, top: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.62)', borderRadius: 12, paddingHorizontal: 7, paddingVertical: 4 },
     ownerActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12 },
     ownerActionText: { fontSize: 15, fontWeight: '600' },
     reviewSummary: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 16 },
     bigRating: { fontSize: 48, fontWeight: '800', color: '#1A1A1A' },
     reviewCount: { fontSize: 13, color: '#888', marginTop: 4 },
-    writeReviewBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#E8F0FF', padding: 12, borderRadius: 10, marginBottom: 16, justifyContent: 'center' },
-    writeReviewText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
+    writeReviewBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF3E8', padding: 12, borderRadius: 10, marginBottom: 16, justifyContent: 'center' },
+    writeReviewText: { color: '#f96302', fontWeight: '600', fontSize: 14 },
     emptyReviews: { alignItems: 'center', paddingVertical: 32, gap: 8 },
     emptyText: { color: '#999', fontSize: 14 },
     bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'white', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E8EDF5', shadowColor: '#0F172A', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 10 },
@@ -1966,10 +1966,10 @@ const styles = StyleSheet.create({
     bottomPrice: { fontSize: 18, fontWeight: '900', color: '#FF6B35', letterSpacing: 0 },
     bottomUnit: { fontSize: 11, color: '#8A94A6', fontWeight: '700', marginTop: 1 },
     bottomBtns: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    bottomCallBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#EEF4FF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#D7E6FF' },
-    scheduleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: '#0066FF', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: 'white' },
-    scheduleBtnText: { color: '#0066FF', fontWeight: '800', fontSize: 13 },
-    chatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#0066FF', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
+    bottomCallBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFF7ED', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA' },
+    scheduleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: '#f96302', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: 'white' },
+    scheduleBtnText: { color: '#f96302', fontWeight: '800', fontSize: 13 },
+    chatBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#f96302', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
     chatBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
     // Video modal
     videoModalContainer: { flex: 1, backgroundColor: 'black' },
@@ -1983,7 +1983,7 @@ const styles = StyleSheet.create({
     fullMapBack: { width: 40, height: 40, justifyContent: 'center' },
     fullMapTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
     fullMapBottom: { padding: 16, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#F0F0F0', gap: 8 },
-    fullMapNavBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0066FF', borderRadius: 14, paddingVertical: 14, shadowColor: '#0066FF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
+    fullMapNavBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#f96302', borderRadius: 14, paddingVertical: 14, shadowColor: '#f96302', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
     fullMapNavText: { color: 'white', fontWeight: '700', fontSize: 16 },
     fullMapDistance: { textAlign: 'center', color: '#666', fontSize: 14 },
     // Modals
@@ -1998,11 +1998,11 @@ const styles = StyleSheet.create({
     reviewTextInput: { borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 12, padding: 12, fontSize: 14, minHeight: 100, textAlignVertical: 'top', marginBottom: 20 },
     bookingInput: { borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 12, padding: 12, fontSize: 14, marginBottom: 10 },
     bookingQuickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-    bookingQuickBtn: { borderWidth: 1, borderColor: '#D8E6FF', backgroundColor: '#F4F8FF', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-    bookingQuickText: { color: '#0066FF', fontSize: 13, fontWeight: '700' },
+    bookingQuickBtn: { borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFF7ED', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+    bookingQuickText: { color: '#f96302', fontSize: 13, fontWeight: '700' },
     bookingHint: { color: '#777', fontSize: 12, lineHeight: 17, marginBottom: 14 },
-    submitBtn: { backgroundColor: '#0066FF', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
-    submitBtnDisabled: { backgroundColor: '#AAC8FF' },
+    submitBtn: { backgroundColor: '#f96302', borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
+    submitBtnDisabled: { backgroundColor: '#FDBA74' },
     submitBtnText: { color: 'white', fontSize: 16, fontWeight: '700' },
     // Comment styles
     commentCard: { backgroundColor: 'white', borderRadius: 12, padding: 12, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
@@ -2015,9 +2015,10 @@ const styles = StyleSheet.create({
     commentContent: { fontSize: 14, color: '#444', lineHeight: 20 },
     commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 14, backgroundColor: '#F8F8F8', borderRadius: 12, padding: 8, borderWidth: 1, borderColor: '#E8E8E8' },
     commentInput: { flex: 1, fontSize: 14, color: '#1A1A1A', maxHeight: 80, minHeight: 36, paddingTop: 4 },
-    commentSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0066FF', justifyContent: 'center', alignItems: 'center' },
-    commentSendBtnDisabled: { backgroundColor: '#AAC8FF' },
-    loginToCommentBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', backgroundColor: '#EEF4FF', borderRadius: 10, paddingVertical: 12, marginBottom: 14 },
-    loginToCommentText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
+    commentSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f96302', justifyContent: 'center', alignItems: 'center' },
+    commentSendBtnDisabled: { backgroundColor: '#FDBA74' },
+    loginToCommentBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', backgroundColor: '#FFF7ED', borderRadius: 10, paddingVertical: 12, marginBottom: 14 },
+    loginToCommentText: { color: '#f96302', fontWeight: '600', fontSize: 14 },
     verifiedCount: { fontSize: 12, color: '#22C55E', marginTop: 2 },
 });
+

@@ -173,7 +173,7 @@ export default function OnboardingScreen() {
                                         <Ionicons
                                             name={option.icon}
                                             size={24}
-                                            color={isSelected ? 'white' : '#0066FF'}
+                                            color={isSelected ? 'white' : '#f96302'}
                                         />
                                     </View>
                                     <Text style={[styles.optionLabel, isSelected && styles.optionLabelSelected]}>
@@ -193,7 +193,7 @@ export default function OnboardingScreen() {
                     </View>
                 ) : (
                     <View style={styles.infoCard}>
-                        <Ionicons name="phone-portrait-outline" size={26} color="#0066FF" />
+                        <Ionicons name="phone-portrait-outline" size={26} color="#f96302" />
                         <Text style={styles.infoTitle}>Vào app trước, đăng nhập khi cần</Text>
                         <Text style={styles.infoText}>
                             Bạn có thể xem Feed, Search và Map ngay. Một số chức năng như chat, đặt lịch,
@@ -223,7 +223,7 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FAFBFF' },
+    container: { flex: 1, backgroundColor: '#F5F6F8' },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -235,14 +235,14 @@ const styles = StyleSheet.create({
         flex: 1,
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#E0E8FF',
+        backgroundColor: '#FED7AA',
         overflow: 'hidden',
         marginRight: 16,
     },
     progressFill: {
         height: '100%',
         borderRadius: 3,
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
     },
     skipBtn: {
         paddingHorizontal: 12,
@@ -288,30 +288,30 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 15,
         borderWidth: 2,
-        borderColor: '#E0E8FF',
+        borderColor: '#FED7AA',
         position: 'relative',
-        shadowColor: '#0066FF',
+        shadowColor: '#f96302',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
         elevation: 2,
     },
     optionCardSelected: {
-        borderColor: '#0066FF',
-        backgroundColor: '#EFF4FF',
+        borderColor: '#f96302',
+        backgroundColor: '#FFF7ED',
         shadowOpacity: 0.15,
     },
     optionIcon: {
         width: 44,
         height: 44,
         borderRadius: 12,
-        backgroundColor: '#EFF4FF',
+        backgroundColor: '#FFF7ED',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 10,
     },
     optionIconSelected: {
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
     },
     optionLabel: {
         fontSize: 15,
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     optionLabelSelected: {
-        color: '#0066FF',
+        color: '#f96302',
     },
     optionDesc: {
         fontSize: 12,
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
         lineHeight: 17,
     },
     optionDescSelected: {
-        color: '#4D94FF',
+        color: '#ea580c',
     },
     checkmark: {
         position: 'absolute',
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
         width: 20,
         height: 20,
         borderRadius: 10,
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -346,8 +346,8 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 18,
         borderWidth: 1,
-        borderColor: '#E0E8FF',
-        shadowColor: '#0066FF',
+        borderColor: '#FED7AA',
+        shadowColor: '#f96302',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
@@ -384,11 +384,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         borderRadius: 14,
         paddingHorizontal: 22,
         paddingVertical: 14,
-        shadowColor: '#0066FF',
+        shadowColor: '#f96302',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 10,
@@ -405,3 +405,4 @@ const styles = StyleSheet.create({
         fontSize: 15,
     },
 });
+

@@ -53,7 +53,7 @@ function MiniRoomCard({ room, onPress, onEdit, onDelete }: {
                 {/* Action buttons */}
                 <View style={styles.miniCardActions}>
                     <TouchableOpacity style={styles.editBtn} onPress={onEdit} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                        <Ionicons name="create-outline" size={14} color="#0066FF" />
+                        <Ionicons name="create-outline" size={14} color="#f96302" />
                         <Text style={styles.editBtnText}>Sửa</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
@@ -121,7 +121,7 @@ function AppointmentChip({ appt }: { appt: Appointment }) {
         ACCEPTED: '#22C55E',
         REJECTED: '#EF4444',
         CANCELLED: '#EF4444',
-        COMPLETED: '#0066FF',
+        COMPLETED: '#f96302',
         SUGGESTED: '#8B5CF6',
     };
     const statusLabel: Record<string, string> = {
@@ -369,7 +369,7 @@ function ProfileScreenContent() {
     return (
         <ScrollView
             style={styles.container}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0066FF" />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#f96302" />}
             showsVerticalScrollIndicator={false}
         >
             <StatusBar barStyle="dark-content" />
@@ -404,7 +404,7 @@ function ProfileScreenContent() {
                         </TouchableOpacity>
                     </View>
                     <TouchableOpacity style={styles.editProfileBtn} onPress={() => safePush('/edit-profile' as any)}>
-                        <Ionicons name="create-outline" size={16} color="#0066FF" />
+                        <Ionicons name="create-outline" size={16} color="#f96302" />
                         <Text style={styles.editProfileText}>Chỉnh sửa</Text>
                     </TouchableOpacity>
                 </View>
@@ -429,7 +429,7 @@ function ProfileScreenContent() {
             {/* Role Badge */}
             <View style={styles.roleBadgeRow}>
                 <View style={styles.roleBadge}>
-                    <Ionicons name={roleIcon as any} size={14} color="#0066FF" />
+                    <Ionicons name={roleIcon as any} size={14} color="#f96302" />
                     <Text style={styles.roleText}>{roleLabel}</Text>
                 </View>
                 {!isOwner && hasListings && (
@@ -446,7 +446,7 @@ function ProfileScreenContent() {
                 )}
                 {(displayUser as any)?.walletBalance !== undefined && (
                     <View style={styles.walletBadge}>
-                        <Ionicons name="wallet-outline" size={14} color="#0066FF" />
+                        <Ionicons name="wallet-outline" size={14} color="#f96302" />
                         <Text style={styles.walletText}>{((displayUser as any).walletBalance / 1000).toFixed(0)}K đ</Text>
                     </View>
                 )}
@@ -456,7 +456,7 @@ function ProfileScreenContent() {
                 {quickActions.map(action => (
                     <TouchableOpacity key={action.label} style={styles.quickActionCard} onPress={action.onPress} activeOpacity={0.85}>
                         <View style={styles.quickActionIcon}>
-                            <Ionicons name={action.icon as any} size={22} color="#0066FF" />
+                            <Ionicons name={action.icon as any} size={22} color="#f96302" />
                         </View>
                         <Text style={styles.quickActionLabel}>{action.label}</Text>
                     </TouchableOpacity>
@@ -497,7 +497,7 @@ function ProfileScreenContent() {
                         style={[styles.tab, activeTab === key && styles.tabActive]}
                         onPress={() => setActiveTab(key as typeof activeTab)}
                     >
-                        <Ionicons name={icon as any} size={16} color={activeTab === key ? '#0066FF' : '#888'} />
+                        <Ionicons name={icon as any} size={16} color={activeTab === key ? '#f96302' : '#888'} />
                         <Text style={[styles.tabText, activeTab === key && styles.tabTextActive]}>{label}</Text>
                     </TouchableOpacity>
                 ))}
@@ -580,7 +580,7 @@ function ProfileScreenContent() {
                                         disabled={isLoadingSaved}
                                     >
                                         {isLoadingSaved
-                                            ? <ActivityIndicator size="small" color="#0066FF" />
+                                            ? <ActivityIndicator size="small" color="#f96302" />
                                             : <Text style={styles.loadMoreText}>Tải thêm</Text>
                                         }
                                     </TouchableOpacity>
@@ -621,7 +621,7 @@ function ProfileScreenContent() {
                 <View style={styles.settingsCard}>
                     <View style={styles.settingsItemRow}>
                         <View style={styles.settingsIconBox}>
-                            <Ionicons name="notifications-outline" size={20} color="#0066FF" />
+                            <Ionicons name="notifications-outline" size={20} color="#f96302" />
                         </View>
                         <View style={styles.settingsTextBlock}>
                             <Text style={styles.settingsLabel}>Thông báo đẩy</Text>
@@ -631,8 +631,8 @@ function ProfileScreenContent() {
                             value={isNotificationsEnabled}
                             onValueChange={handleToggleNotifications}
                             disabled={togglingNotif}
-                            trackColor={{ false: '#E5E7EB', true: '#BDD7FF' }}
-                            thumbColor={isNotificationsEnabled ? '#0066FF' : '#9CA3AF'}
+                            trackColor={{ false: '#E5E7EB', true: '#FED7AA' }}
+                            thumbColor={isNotificationsEnabled ? '#f96302' : '#9CA3AF'}
                             ios_backgroundColor="#E5E7EB"
                         />
                     </View>
@@ -655,7 +655,7 @@ function ProfileScreenContent() {
                                     activeOpacity={0.82}
                                 >
                                     <View style={styles.settingsIconBox}>
-                                        <Ionicons name={icon as any} size={20} color="#0066FF" />
+                                        <Ionicons name={icon as any} size={20} color="#f96302" />
                                     </View>
                                     <View style={styles.settingsTextBlock}>
                                         <Text style={styles.settingsLabel}>{label}</Text>
@@ -680,13 +680,13 @@ function ProfileScreenContent() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F6F8FB' },
+    container: { flex: 1, backgroundColor: '#F5F6F8' },
     authRequired: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 14, paddingHorizontal: 40, backgroundColor: 'white' },
     authTitle: { fontSize: 20, fontWeight: '700', color: '#1A1A1A' },
-    loginBtn: { backgroundColor: '#0066FF', borderRadius: 12, paddingHorizontal: 36, paddingVertical: 14, marginTop: 6 },
+    loginBtn: { backgroundColor: '#f96302', borderRadius: 12, paddingHorizontal: 36, paddingVertical: 14, marginTop: 6 },
     loginBtnText: { color: 'white', fontWeight: '700', fontSize: 16 },
-    registerLink: { color: '#0066FF', fontSize: 14, marginTop: 4 },
-    banner: { minHeight: 78, position: 'relative', backgroundColor: '#F6F8FB', paddingBottom: 10 },
+    registerLink: { color: '#f96302', fontSize: 14, marginTop: 4 },
+    banner: { minHeight: 78, position: 'relative', backgroundColor: '#F5F6F8', paddingBottom: 10 },
     bannerImg: { ...StyleSheet.absoluteFillObject, display: 'none' },
     bannerOverlay: { ...StyleSheet.absoluteFillObject, display: 'none' },
     topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 0 /* paddingTop set via inline style using useSafeAreaInsets */ },
@@ -701,26 +701,26 @@ const styles = StyleSheet.create({
     },
     avatarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 0 },
     avatarWrapper: { position: 'relative' },
-    avatar: { width: 76, height: 76, borderRadius: 38, borderWidth: 3, borderColor: '#E8F0FF', backgroundColor: '#E0E0E0' },
-    editAvatarBtn: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: '#0066FF', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'white' },
-    editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#BFDBFE', backgroundColor: '#EFF6FF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
-    editProfileText: { color: '#0066FF', fontWeight: '600', fontSize: 13 },
+    avatar: { width: 76, height: 76, borderRadius: 38, borderWidth: 3, borderColor: '#FFF3E8', backgroundColor: '#E0E0E0' },
+    editAvatarBtn: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: '#f96302', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'white' },
+    editProfileBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: '#FED7AA', backgroundColor: '#FFF7ED', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
+    editProfileText: { color: '#f96302', fontWeight: '600', fontSize: 13 },
     fullName: { fontSize: 22, fontWeight: '800', color: '#111827', marginTop: 12 },
     email: { fontSize: 14, color: '#6B7280', marginTop: 3 },
     statsRow: { display: 'none' },
     stat: { alignItems: 'center' },
-    statNum: { fontSize: 22, fontWeight: '800', color: '#0066FF' },
+    statNum: { fontSize: 22, fontWeight: '800', color: '#f96302' },
     statLbl: { fontSize: 12, color: '#888', marginTop: 2 },
     statDivider: { width: 1, backgroundColor: '#E0E0E0' },
     roleBadgeRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12 },
-    roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#E8F0FF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20 },
-    roleText: { color: '#0066FF', fontWeight: '700', fontSize: 12 },
+    roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FFF3E8', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20 },
+    roleText: { color: '#f96302', fontWeight: '700', fontSize: 12 },
     listingBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F5F3FF', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20 },
     listingBadgeText: { color: '#7C3AED', fontWeight: '700', fontSize: 12 },
     verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#F0FDF4', paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20 },
     verifiedText: { color: '#16A34A', fontWeight: '700', fontSize: 12 },
-    walletBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8F0FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-    walletText: { color: '#0066FF', fontWeight: '600', fontSize: 12 },
+    walletBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF3E8', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+    walletText: { color: '#f96302', fontWeight: '600', fontSize: 12 },
     quickActionGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -746,7 +746,7 @@ const styles = StyleSheet.create({
         width: 38,
         height: 38,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#FFF3E8',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -766,13 +766,13 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         flexBasis: '30%',
         minWidth: 92,
-        backgroundColor: '#F6F8FB',
+        backgroundColor: '#F5F6F8',
         borderRadius: 14,
         paddingVertical: 12,
         paddingHorizontal: 10,
         alignItems: 'center',
     },
-    dashboardValue: { fontSize: 19, fontWeight: '800', color: '#0066FF' },
+    dashboardValue: { fontSize: 19, fontWeight: '800', color: '#f96302' },
     dashboardLabel: { fontSize: 12, color: '#6B7280', marginTop: 2, textAlign: 'center' },
     verifyPrompt: {
         flexDirection: 'row',
@@ -789,9 +789,9 @@ const styles = StyleSheet.create({
     verifyPromptText: { flex: 1, fontSize: 13, color: '#92400E', fontWeight: '600' },
     tabBar: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 16, marginHorizontal: 16, marginTop: 14, padding: 4, borderWidth: 1, borderColor: '#E5E7EB' },
     tab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5, paddingVertical: 10, borderRadius: 12 },
-    tabActive: { backgroundColor: '#E8F0FF' },
+    tabActive: { backgroundColor: '#FFF3E8' },
     tabText: { fontSize: 12, color: '#6B7280', fontWeight: '600' },
-    tabTextActive: { color: '#0066FF', fontWeight: '600' },
+    tabTextActive: { color: '#f96302', fontWeight: '600' },
     tabContent: { minHeight: 200 },
     cardList: { padding: 16, gap: 12 },
     miniCard: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
@@ -806,17 +806,17 @@ const styles = StyleSheet.create({
     statusActiveText: { color: '#2E7D32' },
     statusPendingText: { color: '#E65100' },
     miniCardActions: { flexDirection: 'row', gap: 8, marginTop: 6 },
-    editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#E8F0FF', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-    editBtnText: { fontSize: 12, color: '#0066FF', fontWeight: '600' },
+    editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF3E8', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+    editBtnText: { fontSize: 12, color: '#f96302', fontWeight: '600' },
     deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF0F0', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
     deleteBtnText: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
     emptyState: { alignItems: 'center', paddingVertical: 40, gap: 8 },
     emptyTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
     emptySub: { fontSize: 13, color: '#999', textAlign: 'center', paddingHorizontal: 40 },
-    ctaBtn: { backgroundColor: '#0066FF', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+    ctaBtn: { backgroundColor: '#f96302', borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
     ctaBtnText: { color: 'white', fontWeight: '600', fontSize: 14 },
     apptCard: { flexDirection: 'row', backgroundColor: 'white', borderRadius: 12, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-    apptDateBox: { width: 60, backgroundColor: '#0066FF', alignItems: 'center', justifyContent: 'center', padding: 8 },
+    apptDateBox: { width: 60, backgroundColor: '#f96302', alignItems: 'center', justifyContent: 'center', padding: 8 },
     apptDay: { fontSize: 22, fontWeight: '800', color: 'white' },
     apptMonth: { fontSize: 11, color: 'rgba(255,255,255,0.8)' },
     apptInfo: { flex: 1, padding: 10, gap: 4 },
@@ -840,7 +840,7 @@ const styles = StyleSheet.create({
         width: 38,
         height: 38,
         borderRadius: 12,
-        backgroundColor: '#EFF6FF',
+        backgroundColor: '#FFF3E8',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -861,7 +861,7 @@ const styles = StyleSheet.create({
     },
     logoutText: { fontSize: 15, color: '#EF4444', fontWeight: '600' },
     seeAllBtn: { paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' as const },
-    seeAllText: { fontSize: 14, color: '#0066FF', fontWeight: '600' as const },
+    seeAllText: { fontSize: 14, color: '#f96302', fontWeight: '600' as const },
     settingsGroupLabel: { fontSize: 12, fontWeight: '800' as const, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: 0.6, paddingTop: 18, paddingBottom: 8 },
     devBanner: {
         flexDirection: 'row' as const, alignItems: 'center' as const, gap: 8,
@@ -878,16 +878,17 @@ const styles = StyleSheet.create({
     savedCardImg: { width: 100, height: 100 },
     savedCardBody: { flex: 1, paddingVertical: 10, paddingHorizontal: 10, gap: 3 },
     savedCardTitle: { fontSize: 13, fontWeight: '600', color: '#1A1A1A', lineHeight: 18 },
-    savedCardPrice: { fontSize: 14, fontWeight: '800', color: '#0066FF' },
+    savedCardPrice: { fontSize: 14, fontWeight: '800', color: '#f96302' },
     savedCardAddr: { fontSize: 11, color: '#888', marginTop: 1 },
     savedCardBadgeRow: { flexDirection: 'row', gap: 4, marginTop: 2, flexWrap: 'wrap' },
-    typeBadge: { backgroundColor: '#F0F4FF', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
-    typeBadgeText: { fontSize: 10, fontWeight: '600', color: '#0066FF' },
+    typeBadge: { backgroundColor: '#FFF7ED', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+    typeBadgeText: { fontSize: 10, fontWeight: '600', color: '#f96302' },
     unsaveBtn: { padding: 12 },
     // Load more
     loadMoreBtn: {
         alignItems: 'center', paddingVertical: 14, borderRadius: 12,
-        backgroundColor: '#F0F4FF', marginTop: 4,
+        backgroundColor: '#FFF7ED', marginTop: 4,
     },
-    loadMoreText: { color: '#0066FF', fontWeight: '600', fontSize: 14 },
+    loadMoreText: { color: '#f96302', fontWeight: '600', fontSize: 14 },
 });
+

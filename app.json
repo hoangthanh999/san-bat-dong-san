@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0066FF"
+      "backgroundColor": "#f96302"
     },
     "ios": {
       "supportsTablet": true,
@@ -27,7 +27,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0066FF"
+        "backgroundColor": "#f96302"
       },
       "package": "com.smartrental.homeswipe",
       "googleServicesFile": "./android/app/google-services.json",
@@ -65,7 +65,7 @@
         "expo-notifications",
         {
           "icon": "./assets/adaptive-icon.png",
-          "color": "#0066FF",
+          "color": "#f96302",
           "defaultChannel": "default",
           "sounds": [],
           "enableBackgroundRemoteNotifications": false

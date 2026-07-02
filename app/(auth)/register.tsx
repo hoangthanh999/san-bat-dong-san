@@ -207,8 +207,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     linkText: {
-        color: '#0066FF',
+        color: '#f96302',
         fontWeight: '600',
         fontSize: 14,
     },
 });
+

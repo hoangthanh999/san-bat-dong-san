@@ -94,7 +94,7 @@ function FeedPropertyCard({ item }: FeedPropertyCardProps) {
                     <Ionicons
                         name={isSaved ? 'bookmark' : 'bookmark-outline'}
                         size={20}
-                        color={isSaved ? '#0066FF' : '#0F172A'}
+                        color={isSaved ? '#f96302' : '#0F172A'}
                     />
                 </TouchableOpacity>
                 {item.videoUrl && (
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     transactionBadge: {
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         borderRadius: 14,
         paddingHorizontal: 10,
         paddingVertical: 6,
@@ -289,3 +289,4 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
 });
+

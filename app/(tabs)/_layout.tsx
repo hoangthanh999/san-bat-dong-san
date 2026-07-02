@@ -24,7 +24,7 @@ export default function TabLayout() {
 
     const tabBg = isDark ? '#1A1A1A' : '#FFFFFF';
     const tabBorder = isDark ? '#333' : '#E0E0E0';
-    const activeColor = '#0066FF';
+    const activeColor = '#f96302';
     const inactiveColor = isDark ? '#888' : '#999';
 
     const tabBarPaddingBottom = Math.max(insets.bottom, 12);
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
         width: 34,
         height: 34,
         borderRadius: 10,
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -192,14 +192,15 @@ const styles = StyleSheet.create({
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 16,
-        shadowColor: '#0066FF',
+        shadowColor: '#f96302',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.4,
         shadowRadius: 8,
         elevation: 8,
     },
 });
+

@@ -11,7 +11,7 @@ module.exports = ({ config }) => ({
             "expo-notifications",
             {
                 icon: "./assets/adaptive-icon.png",
-                color: "#0066FF",
+                color: "#f96302",
                 androidMode: "default",
             }
         ],

@@ -40,7 +40,7 @@ export function AuthGuardScreen({ children, message, icon = 'lock-closed-outline
                 <StatusBar barStyle="dark-content" />
                 <View style={styles.content}>
                     <View style={styles.iconCircle}>
-                        <Ionicons name={icon} size={48} color="#0066FF" />
+                        <Ionicons name={icon} size={48} color="#f96302" />
                     </View>
                     <Text style={styles.title}>Yêu cầu đăng nhập</Text>
                     <Text style={styles.message}>
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: '#E8F0FF',
+        backgroundColor: '#FFF3E8',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
@@ -121,12 +121,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         borderRadius: 14,
         paddingHorizontal: 32,
         paddingVertical: 14,
         marginTop: 8,
-        shadowColor: '#0066FF',
+        shadowColor: '#f96302',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
         color: '#888',
     },
     registerBold: {
-        color: '#0066FF',
+        color: '#f96302',
         fontWeight: '600',
     },
     backBtn: {
@@ -161,3 +161,4 @@ const styles = StyleSheet.create({
         color: '#888',
     },
 });
+

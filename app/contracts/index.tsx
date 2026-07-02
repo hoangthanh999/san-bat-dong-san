@@ -36,7 +36,7 @@ function ContractsDisabledContent() {
 
             <View style={styles.center}>
                 <View style={styles.iconWrap}>
-                    <Ionicons name="construct-outline" size={34} color="#0066FF" />
+                    <Ionicons name="construct-outline" size={34} color="#f96302" />
                 </View>
                 <Text style={styles.title}>Tính năng đang phát triển</Text>
                 <Text style={styles.message}>
@@ -78,17 +78,18 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#EAF2FF',
+        backgroundColor: '#FFF3E8',
         marginBottom: 4,
     },
     title: { fontSize: 20, fontWeight: '800', color: '#111827', textAlign: 'center' },
     message: { fontSize: 14, color: '#64748B', lineHeight: 21, textAlign: 'center' },
     primaryBtn: {
         marginTop: 8,
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         borderRadius: 14,
         paddingHorizontal: 24,
         paddingVertical: 12,
     },
     primaryText: { color: 'white', fontSize: 14, fontWeight: '800' },
 });
+

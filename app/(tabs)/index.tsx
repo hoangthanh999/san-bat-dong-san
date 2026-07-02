@@ -335,7 +335,7 @@ export default function FeedScreen() {
             <View style={styles.topBar}>
                 <View style={styles.brandRow}>
                     <View style={styles.brandIcon}>
-                        <Ionicons name="home" size={18} color="#0066FF" />
+                        <Ionicons name="home" size={18} color="#f96302" />
                     </View>
                     <View>
                         <Text style={styles.brandName}>HomeVerse</Text>
@@ -368,21 +368,21 @@ export default function FeedScreen() {
                 <Ionicons name="search-outline" size={19} color="#64748B" />
                 <Text style={styles.searchPlaceholder}>Tìm căn hộ, nhà, đất...</Text>
                 <View style={styles.searchFilterIcon}>
-                    <Ionicons name="options-outline" size={17} color="#0066FF" />
+                    <Ionicons name="options-outline" size={17} color="#f96302" />
                 </View>
             </TouchableOpacity>
 
             <View style={styles.quickActions}>
                 <TouchableOpacity style={styles.quickAction} onPress={() => safePush('/map' as any)}>
-                    <Ionicons name="map-outline" size={18} color="#0066FF" />
+                    <Ionicons name="map-outline" size={18} color="#f96302" />
                     <Text style={styles.quickActionText}>Bản đồ</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.quickAction} onPress={() => safePush('/filter' as any)}>
-                    <Ionicons name="filter-outline" size={18} color="#0066FF" />
+                    <Ionicons name="filter-outline" size={18} color="#f96302" />
                     <Text style={styles.quickActionText}>Bộ lọc</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.quickAction} onPress={() => safePush('/analytics' as any)}>
-                    <Ionicons name="bar-chart-outline" size={18} color="#0066FF" />
+                    <Ionicons name="bar-chart-outline" size={18} color="#f96302" />
                     <Text style={styles.quickActionText}>Thị trường</Text>
                 </TouchableOpacity>
             </View>
@@ -429,7 +429,7 @@ export default function FeedScreen() {
                                 activeOpacity={0.88}
                             >
                                 <View style={styles.projectIcon}>
-                                    <MaterialCommunityIcons name="office-building-marker-outline" size={19} color="#0066FF" />
+                                    <MaterialCommunityIcons name="office-building-marker-outline" size={19} color="#f96302" />
                                 </View>
                                 <Text style={styles.projectName} numberOfLines={1}>{project.name}</Text>
                                 <Text style={styles.projectAddress} numberOfLines={1}>
@@ -456,7 +456,7 @@ export default function FeedScreen() {
     const renderEmpty = () => (
         <View style={[styles.emptyState, { minHeight: Math.max(320, height * 0.45) }]}>
             <View style={styles.emptyIcon}>
-                <Ionicons name={error ? 'cloud-offline-outline' : 'search-outline'} size={34} color="#0066FF" />
+                <Ionicons name={error ? 'cloud-offline-outline' : 'search-outline'} size={34} color="#f96302" />
             </View>
             <Text style={styles.emptyTitle}>{error ? 'Không tải được dữ liệu' : 'Không có kết quả phù hợp'}</Text>
             <Text style={styles.emptyText}>
@@ -486,7 +486,7 @@ export default function FeedScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F6F8FB" />
+            <StatusBar barStyle="dark-content" backgroundColor="#F5F6F8" />
             {isLoading && rooms.length === 0 && !error ? (
                 <ScrollView
                     style={styles.container}
@@ -520,8 +520,8 @@ export default function FeedScreen() {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            tintColor="#0066FF"
-                            colors={['#0066FF']}
+                            tintColor="#f96302"
+                            colors={['#f96302']}
                             progressBackgroundColor="#FFFFFF"
                         />
                     }
@@ -538,7 +538,7 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F6F8FB',
+        backgroundColor: '#F5F6F8',
     },
     listContent: {
         paddingBottom: 24,
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#EAF2FF',
+        backgroundColor: '#FFF3E8',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 12,
-        backgroundColor: '#EAF2FF',
+        backgroundColor: '#FFF3E8',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -676,8 +676,8 @@ const styles = StyleSheet.create({
         borderColor: '#DCE6F3',
     },
     categoryChipActive: {
-        backgroundColor: '#0066FF',
-        borderColor: '#0066FF',
+        backgroundColor: '#f96302',
+        borderColor: '#f96302',
     },
     categoryText: {
         color: '#475569',
@@ -739,7 +739,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        backgroundColor: 'rgba(0,102,255,0.92)',
+        backgroundColor: 'rgba(249,99,2,0.92)',
         borderRadius: 13,
         paddingHorizontal: 8,
         paddingVertical: 5,
@@ -801,7 +801,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     recommendationReason: {
-        color: '#2563EB',
+        color: '#ea580c',
         fontSize: 11,
         lineHeight: 16,
         fontWeight: '800',
@@ -832,7 +832,7 @@ const styles = StyleSheet.create({
         fontWeight: '900',
     },
     sectionLink: {
-        color: '#0066FF',
+        color: '#f96302',
         fontSize: 13,
         fontWeight: '800',
     },
@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
         width: 34,
         height: 34,
         borderRadius: 13,
-        backgroundColor: '#EAF2FF',
+        backgroundColor: '#FFF3E8',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -888,13 +888,13 @@ const styles = StyleSheet.create({
         minWidth: 38,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#EAF2FF',
+        backgroundColor: '#FFF3E8',
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 10,
     },
     countText: {
-        color: '#0066FF',
+        color: '#f96302',
         fontSize: 13,
         fontWeight: '900',
     },
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
         width: 64,
         height: 64,
         borderRadius: 24,
-        backgroundColor: '#EAF2FF',
+        backgroundColor: '#FFF3E8',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -951,7 +951,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         paddingHorizontal: 18,
         paddingVertical: 11,
         borderRadius: 16,
@@ -976,3 +976,4 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
 });
+

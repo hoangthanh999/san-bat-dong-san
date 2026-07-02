@@ -48,7 +48,7 @@ export function Button({
             activeOpacity={0.8}
         >
             {isLoading ? (
-                <ActivityIndicator color={variant === 'outline' ? '#0066FF' : 'white'} />
+                <ActivityIndicator color={variant === 'outline' ? '#f96302' : 'white'} />
             ) : (
                 <Text style={[styles.text, getTextStyle()]}>{title}</Text>
             )}
@@ -65,8 +65,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     primary: {
-        backgroundColor: '#0066FF',
-        shadowColor: '#0066FF',
+        backgroundColor: '#f96302',
+        shadowColor: '#f96302',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 8,
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     outline: {
         backgroundColor: 'transparent',
         borderWidth: 1.5,
-        borderColor: '#0066FF',
+        borderColor: '#f96302',
     },
     ghost: {
         backgroundColor: 'transparent',
@@ -97,10 +97,10 @@ const styles = StyleSheet.create({
         color: 'white',
     },
     textOutline: {
-        color: '#0066FF',
+        color: '#f96302',
     },
     textGhost: {
-        color: '#0066FF',
+        color: '#f96302',
     },
     textDanger: {
         color: 'white',
@@ -109,3 +109,4 @@ const styles = StyleSheet.create({
         color: '#999',
     },
 });
+

@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#0066FF',
+        backgroundColor: '#f96302',
         paddingHorizontal: 32,
     },
     logoWrap: {
