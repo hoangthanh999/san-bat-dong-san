@@ -670,6 +670,16 @@ export interface OwnerRatingSummary {
 export type Review = OwnerReviewResponse;
 
 // ============================
+// Owner Follow (khớp backend property-service)
+// ============================
+export interface OwnerFollowResponse {
+    ownerId: number;
+    followerId: number;
+    followed: boolean;
+    followerCount: number;
+}
+
+// ============================
 // Favorite Types (chưa có backend)
 // ============================
 export interface Favorite {

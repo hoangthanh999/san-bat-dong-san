@@ -170,6 +170,13 @@ export const API_ENDPOINTS = {
     OWNER_PROPERTY_HARD_DELETE: (id: number) => `/properties/${id}/force`,
 
     // ============================================================
+    // OWNER FOLLOW
+    // ============================================================
+    OWNER_TOGGLE_FOLLOW: (ownerId: number) => `/owners/${ownerId}/follow`,
+    OWNER_IS_FOLLOWING: (ownerId: number) => `/owners/${ownerId}/is-following`,
+    OWNER_FOLLOWERS_COUNT: (ownerId: number) => `/owners/${ownerId}/followers/count`,
+
+    // ============================================================
     // PROPERTY - INTERACTION
     // ============================================================
     PROPERTY_LIKE: (id: number) => `/properties/${id}/like`,

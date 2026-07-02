@@ -24,6 +24,7 @@ import { useInteractionStore } from '../../store/interactionStore';
 import { roomService } from '../../services/api/rooms';
 import { reelsApi, PropertyReel } from '../../services/api/reels';
 import { recommendApi, type RecommendAction } from '../../services/api/recommend';
+import { ownerFollowService } from '../../services/api/ownerFollow';
 import { ImageGallery } from '../../components/property/ImageGallery';
 import { ReviewCard } from '../../components/property/ReviewCard';
 import { CommentResponse, Room } from '../../types';
@@ -389,6 +390,10 @@ export default function PropertyDetailScreen() {
     const [fullMapLoadState, setFullMapLoadState] = useState<MapLoadState>('loading');
     const [isEnsuringRouteRoom, setIsEnsuringRouteRoom] = useState(true);
 
+    const [isFollowingOwner, setIsFollowingOwner] = useState(false);
+    const [ownerFollowerCount, setOwnerFollowerCount] = useState<number | null>(null);
+    const [isLoadingFollow, setIsLoadingFollow] = useState(false);
+
     const roomId = Number(id);
     const hasValidRoomId = Number.isFinite(roomId) && roomId > 0;
     const currentRoomMatchesRoute = hasValidRoomId && !!currentRoom && String(currentRoom.id) === String(roomId);
@@ -453,13 +458,22 @@ export default function PropertyDetailScreen() {
         }
     }, [hasValidRoomId, roomId]);
 
-    // Khi room load xong và có ownerId → tải review + summary
+    // Khi room load xong và có ownerId → tải review + summary + follow status
     useEffect(() => {
         if (room?.ownerId) {
             fetchOwnerReviews(room.ownerId);
             fetchOwnerSummary(room.ownerId);
+
+            if (isAuthenticated) {
+                ownerFollowService.getOwnerFollowStatus(room.ownerId)
+                    .then(status => setIsFollowingOwner(status))
+                    .catch(() => {});
+            }
+            ownerFollowService.getOwnerFollowerCount(room.ownerId)
+                .then(count => setOwnerFollowerCount(count))
+                .catch(() => {});
         }
-    }, [room?.ownerId]);
+    }, [room?.ownerId, isAuthenticated]);
 
     useEffect(() => {
         if (room?.latitude && room?.longitude) {
@@ -614,6 +628,23 @@ export default function PropertyDetailScreen() {
         try {
             await toggleLike(roomId);
         } catch {
+        }
+    };
+
+    const handleFollowOwner = async () => {
+        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
+        if (!room?.ownerId || isLoadingFollow) return;
+        
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setIsLoadingFollow(true);
+        try {
+            const res = await ownerFollowService.toggleFollowOwner(room.ownerId);
+            setIsFollowingOwner(res.followed);
+            setOwnerFollowerCount(res.followerCount);
+        } catch (e: any) {
+            Alert.alert('Lỗi', 'Không thể theo dõi chủ nhà. Vui lòng thử lại.');
+        } finally {
+            setIsLoadingFollow(false);
         }
     };
 
@@ -1276,30 +1307,55 @@ export default function PropertyDetailScreen() {
                                     onPress={() => safePush(`/landlord-profile?landlordId=${room.ownerId}${room.ownerSlugSnapshot ? `&slug=${room.ownerSlugSnapshot}` : ''}` as any)}
                                         activeOpacity={0.7}
                                     >
-                                        <Image source={{ uri: ownerAvatar }} style={styles.landlordAvatar} />
-                                        <View style={styles.landlordInfo}>
-                                            <Text style={styles.landlordName}>{ownerName}</Text>
-                                            <View style={styles.verifiedBadge}>
-                                                <Ionicons name="checkmark-circle" size={14} color="#f96302" />
-                                                <Text style={styles.verifiedText}>Đã xác minh</Text>
+                                        <View style={styles.landlordHeader}>
+                                            <Image source={{ uri: ownerAvatar }} style={styles.landlordAvatar} />
+                                            <View style={styles.landlordInfo}>
+                                                <Text style={styles.landlordName} numberOfLines={1}>{ownerName}</Text>
+                                                <View style={styles.verifiedBadge}>
+                                                    <Ionicons name="checkmark-circle" size={14} color="#f96302" />
+                                                    <Text style={styles.verifiedText}>Đã xác minh</Text>
+                                                    {ownerFollowerCount !== null && (
+                                                        <Text style={styles.followerCountText}> · {ownerFollowerCount} người theo dõi</Text>
+                                                    )}
+                                                </View>
                                             </View>
-                                            <Text style={{ fontSize: 12, color: '#f96302', marginTop: 2 }}>Xem hồ sơ →</Text>
                                         </View>
-                                        <View style={styles.landlordBtns}>
-                                            <TouchableOpacity style={styles.landlordCallBtn} onPress={handleCall}>
-                                                <Ionicons name="call" size={18} color="white" />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity style={styles.landlordChatBtn} onPress={handleChat}>
-                                                <Ionicons name="chatbubble-ellipses" size={18} color="#f96302" />
-                                            </TouchableOpacity>
+                                        <View style={styles.landlordActions}>
                                             {!isOwner && (
-                                                <TouchableOpacity style={styles.landlordScheduleBtn} onPress={() => {
-                                                    if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
-                                                    openBookingModal();
-                                                }}>
-                                                    <Ionicons name="calendar-outline" size={18} color="#FF6B35" />
+                                                <TouchableOpacity
+                                                    style={[styles.landlordFollowBtn, isFollowingOwner && styles.landlordFollowingBtn]}
+                                                    onPress={(e) => { e.stopPropagation(); handleFollowOwner(); }}
+                                                    disabled={isLoadingFollow}
+                                                >
+                                                    {isLoadingFollow ? (
+                                                        <ActivityIndicator size="small" color={isFollowingOwner ? '#f96302' : 'white'} />
+                                                    ) : (
+                                                        <>
+                                                            {isFollowingOwner && <Ionicons name="checkmark" size={16} color="#f96302" style={{ marginRight: 4 }} />}
+                                                            <Text style={[styles.landlordFollowText, isFollowingOwner && styles.landlordFollowingText]}>
+                                                                {isFollowingOwner ? 'Đang theo dõi' : 'Theo dõi chủ nhà'}
+                                                            </Text>
+                                                        </>
+                                                    )}
                                                 </TouchableOpacity>
                                             )}
+                                            <View style={styles.landlordContactBtns}>
+                                                <TouchableOpacity style={styles.landlordCallBtn} onPress={(e) => { e.stopPropagation(); handleCall(); }}>
+                                                    <Ionicons name="call" size={18} color="white" />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity style={styles.landlordChatBtn} onPress={(e) => { e.stopPropagation(); handleChat(); }}>
+                                                    <Ionicons name="chatbubble-ellipses" size={18} color="#f96302" />
+                                                </TouchableOpacity>
+                                                {!isOwner && (
+                                                    <TouchableOpacity style={styles.landlordScheduleBtn} onPress={(e) => { 
+                                                        e.stopPropagation();
+                                                        if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
+                                                        openBookingModal();
+                                                    }}>
+                                                        <Ionicons name="calendar-outline" size={18} color="#FF6B35" />
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
                                         </View>
                                     </TouchableOpacity>
                                 </View>
@@ -1925,13 +1981,20 @@ const styles = StyleSheet.create({
     mapFallbackCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'white', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E7EEF9' },
     mapFallbackTitle: { color: '#111827', fontSize: 14, fontWeight: '800', marginBottom: 3 },
     mapFallbackText: { color: '#667085', fontSize: 13, lineHeight: 18 },
-    landlordCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', borderRadius: 18, padding: 16, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
-    landlordAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#FFF7ED' },
+    landlordCard: { flexDirection: 'column', gap: 16, backgroundColor: 'white', borderRadius: 18, padding: 16, shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
+    landlordHeader: { flexDirection: 'row', alignItems: 'center' },
+    landlordAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#FFF7ED' },
     landlordInfo: { flex: 1, marginLeft: 12 },
-    landlordName: { fontSize: 16, fontWeight: '600', color: '#1A1A1A' },
-    verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-    verifiedText: { fontSize: 12, color: '#f96302' },
-    landlordBtns: { flexDirection: 'row', gap: 8 },
+    landlordName: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+    verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+    verifiedText: { fontSize: 12, color: '#f96302', fontWeight: '500' },
+    followerCountText: { fontSize: 12, color: '#6B7280' },
+    landlordActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    landlordContactBtns: { flexDirection: 'row', gap: 8 },
+    landlordFollowBtn: { flex: 1, flexDirection: 'row', backgroundColor: '#f96302', paddingVertical: 10, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    landlordFollowingBtn: { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA' },
+    landlordFollowText: { color: 'white', fontSize: 12, fontWeight: '700' },
+    landlordFollowingText: { color: '#f96302' },
     landlordCallBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f96302', justifyContent: 'center', alignItems: 'center' },
     landlordChatBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF3E8', justifyContent: 'center', alignItems: 'center' },
     landlordScheduleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFF2EA', justifyContent: 'center', alignItems: 'center' },
