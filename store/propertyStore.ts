@@ -175,6 +175,10 @@ export const usePropertyStore = create<PropertyState>((set, get) => ({
             latitude: item.latitude ?? 0,
             longitude: item.longitude ?? 0,
             createdAt: item.createdAt,
+            isPromoted: item.isPromoted,
+            promotionExpiresAt: item.promotionExpiresAt,
+            promotionPackageId: item.promotionPackageId,
+            promotionPackageName: item.promotionPackageName,
         }));
         set({ searchResults: mapped });
     },

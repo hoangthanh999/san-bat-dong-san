@@ -211,6 +211,9 @@ apiClient.interceptors.response.use(
 
         // Handle 403 Forbidden
         if (status === 403) {
+            if (isSilent) {
+                return Promise.reject(error);
+            }
             showToast?.('Bạn không có quyền thực hiện hành động này.', 'error');
             return Promise.reject({
                 ...error,

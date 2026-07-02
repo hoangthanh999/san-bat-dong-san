@@ -43,6 +43,29 @@ const limitList = <T>(items: T[], limit: number): T[] => {
     return items.slice(0, safeLimit);
 };
 
+const normalizeRecommendedProperty = (item: any): RecommendedProperty | null => {
+    const property = item?.property ?? item?.propertyDto ?? item?.propertyDetail ?? {};
+    const id = Number(item?.id ?? item?.propertyId ?? item?.roomId ?? property?.id);
+    if (!Number.isFinite(id) || id <= 0) return null;
+
+    return {
+        ...property,
+        ...item,
+        id,
+        title: item?.title ?? property?.title ?? '',
+        price: item?.price ?? property?.price,
+        address: item?.address ?? property?.address,
+        district: item?.district ?? property?.district,
+        videoUrl: item?.videoUrl ?? property?.videoUrl,
+        images: item?.images ?? property?.images ?? (item?.thumbnail ? [item.thumbnail] : property?.thumbnail ? [property.thumbnail] : undefined),
+        createdAt: item?.createdAt ?? property?.createdAt,
+        isPromoted: item?.isPromoted ?? property?.isPromoted,
+        promotionExpiresAt: item?.promotionExpiresAt ?? property?.promotionExpiresAt,
+        promotionPackageId: item?.promotionPackageId ?? property?.promotionPackageId,
+        promotionPackageName: item?.promotionPackageName ?? property?.promotionPackageName,
+    };
+};
+
 const getRecommendUserId = async (): Promise<number> => {
     try {
         const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
@@ -79,8 +102,9 @@ export const recommendApi = {
                     _silentError: true,
                 } as any
             );
-            const items = unwrapRecommendList<RecommendedProperty>(response.data)
-                .filter(item => Number.isFinite(Number(item?.id)) && Number(item.id) > 0);
+            const items = unwrapRecommendList<any>(response.data)
+                .map(normalizeRecommendedProperty)
+                .filter((item): item is RecommendedProperty => item !== null);
             return limitList(items, limit);
         } catch {
             return [];

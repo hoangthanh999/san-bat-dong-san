@@ -24,6 +24,7 @@ import { RecommendedProperty, Room } from '../../types';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
 import { recommendApi } from '../../services/api/recommend';
 import { formatCompactVND } from '../../utils/formatPrice';
+import { sortFeaturedFirst } from '../../utils/promotion';
 
 const CATEGORIES = [
     { key: 'all', label: 'Tất cả' },
@@ -193,15 +194,7 @@ export default function FeedScreen() {
             });
         }
 
-        if (filters.sortBy === 'price_asc') {
-            result.sort((a, b) => a.price - b.price);
-        } else if (filters.sortBy === 'price_desc') {
-            result.sort((a, b) => b.price - a.price);
-        } else if (filters.sortBy === 'newest') {
-            result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        }
-
-        return result;
+        return sortFeaturedFirst(result, filters.sortBy);
     }, [sourceRooms, filters, activeCategory, isSearchMode]);
 
     const filterSummary = useMemo(

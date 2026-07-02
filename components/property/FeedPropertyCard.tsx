@@ -8,6 +8,7 @@ import { Room } from '../../types';
 import { formatCompactVND } from '../../utils/formatPrice';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
 import { useInteractionStore } from '../../store/interactionStore';
+import { getPromotionBadgeLabel } from '../../utils/promotion';
 
 interface FeedPropertyCardProps {
     item: Room;
@@ -45,6 +46,7 @@ function FeedPropertyCard({ item }: FeedPropertyCardProps) {
     const isSaved = useInteractionStore(state => state.isSaved(item.id));
     const toggleSave = useInteractionStore(state => state.toggleSave);
     const imageUri = item.images?.[0];
+    const promotionBadge = getPromotionBadgeLabel(item);
 
     const handleOpenDetail = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -77,10 +79,10 @@ function FeedPropertyCard({ item }: FeedPropertyCardProps) {
                     <View style={styles.transactionBadge}>
                         <Text style={styles.transactionText}>{getTransactionLabel(item.transactionType)}</Text>
                     </View>
-                    {item.isPromoted && (
+                    {promotionBadge && (
                         <View style={styles.promotedBadge}>
                             <Ionicons name="flash" size={12} color="#B45309" />
-                            <Text style={styles.promotedText}>Nổi bật</Text>
+                            <Text style={styles.promotedText}>{promotionBadge}</Text>
                         </View>
                     )}
                 </View>

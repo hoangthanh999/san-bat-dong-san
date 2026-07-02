@@ -29,6 +29,7 @@ import { ReviewCard } from '../../components/property/ReviewCard';
 import { CommentResponse, Room } from '../../types';
 import { formatCompactVND } from '../../utils/formatPrice';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
+import { getPromotionBadgeLabel, isActivePromotion } from '../../utils/promotion';
 
 const { width } = Dimensions.get('window');
 
@@ -231,7 +232,7 @@ const scoreSimilarRoom = (candidate: Room, current: Room) => {
     if (normalizeText(candidate.ward) && normalizeText(candidate.ward) === normalizeText(current.ward)) score += 18;
     if (normalizeText(candidate.district) && normalizeText(candidate.district) === normalizeText(current.district)) score += 14;
     if (normalizeText(candidate.province) && normalizeText(candidate.province) === normalizeText(current.province)) score += 10;
-    if (candidate.isPromoted) score += 2;
+    if (isActivePromotion(candidate)) score += 2;
     return score;
 };
 
@@ -303,7 +304,7 @@ const scoreRelatedVideo = (candidate: RelatedVideoItem, current: Room) => {
     if (raw.propertyType && raw.propertyType === current.propertyType) score += 24;
     if (raw.transactionType && raw.transactionType === current.transactionType) score += 18;
     if (raw.listingType && (raw.listingType === current.transactionType || (raw.listingType === 'RENT' && current.transactionType === 'FOR_RENT') || (raw.listingType === 'SALE' && current.transactionType === 'FOR_SALE'))) score += 18;
-    if (raw.isPromoted) score += 2;
+    if (isActivePromotion(raw)) score += 2;
     return score;
 };
 
@@ -329,8 +330,8 @@ const buildRecommendMetadata = (room: Room) => ({
     transactionType: room.transactionType || '',
 });
 
-const trackPropertyEngagement = (room: Room, action: RecommendAction) => {
-    if (!room?.id) return;
+const trackPropertyEngagement = (room: Room, action: RecommendAction, canTrackUserBehavior: boolean) => {
+    if (!room?.id || !canTrackUserBehavior) return;
 
     if (action === 'VIEW') roomService.trackView(room.id).catch(() => { });
     if (action === 'CONTACT') roomService.trackContact(room.id).catch(() => { });
@@ -395,6 +396,7 @@ export default function PropertyDetailScreen() {
     const videoUrl = room?.videoUrl?.trim() || null;
     const isSavedForRoom = isPropertySaved(roomId);
     const isLikedForRoom = isLiked(roomId);
+    const canTrackUserBehavior = isAuthenticated && Number.isFinite(Number(user?.id)) && Number(user?.id) > 0;
 
     const videoPlayer = useVideoPlayer(videoUrl, player => {
         player.loop = false;
@@ -476,9 +478,9 @@ export default function PropertyDetailScreen() {
 
     useEffect(() => {
         if (room?.id) {
-            trackPropertyEngagement(room, 'VIEW');
+            trackPropertyEngagement(room, 'VIEW', canTrackUserBehavior);
         }
-    }, [room?.id]);
+    }, [room?.id, canTrackUserBehavior]);
 
     useEffect(() => {
         if (!room?.id) return;
@@ -625,7 +627,7 @@ export default function PropertyDetailScreen() {
                 title: room?.title,
             });
             if (room && result.action !== Share.dismissedAction) {
-                trackPropertyEngagement(room, 'SHARE');
+                trackPropertyEngagement(room, 'SHARE', canTrackUserBehavior);
             }
         } catch { }
     };
@@ -646,7 +648,7 @@ export default function PropertyDetailScreen() {
         const ownerPhone = room ? getOwnerPhone(room) : undefined;
         if (ownerPhone) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            trackPropertyEngagement(room!, 'CONTACT');
+            trackPropertyEngagement(room!, 'CONTACT', canTrackUserBehavior);
             Linking.openURL(`tel:${ownerPhone}`);
         } else {
             Alert.alert('Thông báo', 'Số điện thoại chủ nhà chưa được cập nhật.');
@@ -657,7 +659,7 @@ export default function PropertyDetailScreen() {
     if (!isAuthenticated) { safePush('/(auth)/login' as any); return; }
     if (!room) return;
 
-    trackPropertyEngagement(room, 'CONTACT');
+    trackPropertyEngagement(room, 'CONTACT', canTrackUserBehavior);
 
     // Navigate sang chat với property info để auto-send
     safePush({
@@ -815,7 +817,7 @@ export default function PropertyDetailScreen() {
 
     const openBookingModal = () => {
         if (room) {
-            trackPropertyEngagement(room, 'CONTACT');
+            trackPropertyEngagement(room, 'CONTACT', canTrackUserBehavior);
         }
         setBookingDate(formatBookingInput(getDefaultBookingDate()));
         setShowBookingModal(true);
@@ -928,6 +930,7 @@ export default function PropertyDetailScreen() {
     const shortDesc = room.description?.slice(0, 150);
     const isLongDesc = (room.description?.length || 0) > 150;
     const statusBadge = getStatusBadge(room.status);
+    const promotionBadge = getPromotionBadgeLabel(room);
     const ownerName = getOwnerName(room);
     const ownerAvatar = getOwnerAvatar(room);
     const galleryImages = room.images?.length > 0 ? room.images : [FALLBACK_PROPERTY_IMAGE];
@@ -1024,9 +1027,9 @@ export default function PropertyDetailScreen() {
                         <View style={styles.transactionBadge}>
                             <Text style={styles.transactionBadgeText}>{getLabel(TRANSACTION_TYPE_LABELS, room.transactionType)}</Text>
                         </View>
-                        {room.isPromoted && (
+                        {promotionBadge && (
                             <View style={styles.promotedBadge}>
-                                <Text style={styles.promotedBadgeText}>Tin nổi bật</Text>
+                                <Text style={styles.promotedBadgeText}>{promotionBadge}</Text>
                             </View>
                         )}
                         {!!room.projectNameSnapshot && (
@@ -1769,6 +1772,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 function SimilarRoomCard({ item, onPress }: { item: Room; onPress: () => void }) {
     const hasThumbnail = !!item.images?.[0];
     const thumbnail = hasThumbnail ? item.images[0] : FALLBACK_PROPERTY_IMAGE;
+    const promotionBadge = getPromotionBadgeLabel(item);
     return (
         <TouchableOpacity style={styles.relatedCard} activeOpacity={0.86} onPress={onPress}>
             <View style={styles.relatedImageWrap}>
@@ -1779,9 +1783,9 @@ function SimilarRoomCard({ item, onPress }: { item: Room; onPress: () => void })
                     </View>
                 )}
                 <View style={styles.relatedBadgeRow}>
-                    {item.isPromoted && (
+                    {promotionBadge && (
                         <View style={styles.relatedBadge}>
-                            <Text style={styles.relatedBadgeText}>Nổi bật</Text>
+                            <Text style={styles.relatedBadgeText}>{promotionBadge}</Text>
                         </View>
                     )}
                     {!!item.videoUrl && (

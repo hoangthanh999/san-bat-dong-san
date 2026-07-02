@@ -72,6 +72,8 @@ export interface Room {
     // Promotion / Boost
     isPromoted?: boolean;           // true nếu đang được boost (PromotionQueue.ACTIVE)
     promotionExpiresAt?: string;    // Ngày hết hạn boost
+    promotionPackageId?: number;
+    promotionPackageName?: string;
 
     bedrooms?: number;
     bathrooms?: number;
@@ -97,6 +99,9 @@ export interface RecommendedProperty {
     images?: string[];
     createdAt?: string;
     isPromoted?: boolean;
+    promotionExpiresAt?: string;
+    promotionPackageId?: number;
+    promotionPackageName?: string;
     itemType?: string;
     score?: number;
     district?: string;
@@ -525,6 +530,10 @@ export interface PropertySearchItem {
     longitude?: number;
     thumbnail?: string;
     createdAt: string;
+    isPromoted?: boolean;
+    promotionExpiresAt?: string;
+    promotionPackageId?: number;
+    promotionPackageName?: string;
 }
 
 // Backend PropertyAnalyticsResponse (khớp PropertyAnalyticsController)

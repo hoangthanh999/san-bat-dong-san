@@ -33,6 +33,7 @@ import { useSafeRouter } from '../../hooks/useSafeRouter';
 import { useReelsStore } from '../../store/reelsStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { PropertyReel } from '../../services/api/reels';
+import { getPromotionBadgeLabel } from '../../utils/promotion';
 
 const ACCENT = '#7C3AED';
 const ACCENT_2 = '#FF3B5C';
@@ -229,6 +230,7 @@ const ReelItem = memo(({
     const shouldMountVideo = !!item.videoUrl && distanceFromActive <= 2;
 
     const listingLabel = isRentListing(item.listingType) ? 'Cho thuê' : 'Bán';
+    const promotionBadge = getPromotionBadgeLabel(item);
     const displayLikeCount = liked && !item.liked
         ? item.likeCount + 1
         : !liked && item.liked
@@ -430,10 +432,10 @@ const ReelItem = memo(({
                         <View style={[styles.infoBadge, isRentListing(item.listingType) ? styles.rentBadge : styles.saleBadge]}>
                             <Text style={styles.infoBadgeText}>{listingLabel}</Text>
                         </View>
-                        {item.isPromoted && (
+                        {promotionBadge && (
                             <View style={styles.promotedBadge}>
                                 <Ionicons name="flash" size={11} color={GOLD} />
-                                <Text style={styles.promotedText}>Nổi bật</Text>
+                                <Text style={styles.promotedText}>{promotionBadge}</Text>
                             </View>
                         )}
                     </View>

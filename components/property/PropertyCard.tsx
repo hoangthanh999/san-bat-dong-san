@@ -24,6 +24,7 @@ import { usePropertyStore } from '../../store/propertyStore';
 import { useAuthStore } from '../../store/authStore';
 import { formatCompactVND } from '../../utils/formatPrice';
 import { useSafeRouter } from '../../hooks/useSafeRouter';
+import { getPromotionBadgeLabel } from '../../utils/promotion';
 
 interface PropertyCardProps {
     item: Room;
@@ -216,6 +217,7 @@ const handleChat = () => {
     }));
 
     const tags = getSmartTags(item);
+    const promotionBadge = getPromotionBadgeLabel(item);
 
     // ---------- Responsive layout calculations ----------
     // Smart Tags: đặt dưới header floating (~insets.top + 56px header content)
@@ -341,9 +343,9 @@ const handleChat = () => {
             )}
 
             {/* Boost Badge */}
-            {item.isPromoted && (
+            {promotionBadge && (
                 <View style={[styles.boostBadge, { top: tagsTop + (tags.length > 0 ? 34 : 0) }]} pointerEvents="none">
-                    <Text style={styles.boostBadgeText}>🔥 Đang boost</Text>
+                    <Text style={styles.boostBadgeText}>{promotionBadge}</Text>
                 </View>
             )}
 
