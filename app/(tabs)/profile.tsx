@@ -348,10 +348,8 @@ function ProfileScreenContent() {
     ];
     const managementSettings = [
         { icon: 'calendar-outline', label: 'Lịch hẹn xem phòng', subtitle: 'Theo dõi các buổi xem nhà', onPress: () => safePush('/appointments' as any) },
-        { icon: 'document-text-outline', label: 'Hợp đồng của tôi', subtitle: 'Quản lý hợp đồng thuê', onPress: () => safePush('/contracts' as any) },
         ...(isOwner ? [
             { icon: 'trash-outline', label: 'Thùng rác bài đăng', subtitle: 'Khôi phục hoặc xoá hẳn tin', onPress: () => safePush('/property/trash' as any) },
-            { icon: 'receipt-outline', label: 'Tạo hóa đơn tiền trọ', subtitle: 'Tạo hóa đơn cho người thuê', onPress: () => safePush('/bills/create' as any) },
         ] : []),
         { icon: 'bar-chart-outline', label: 'Phân tích thị trường', subtitle: 'Theo dõi xu hướng giá', onPress: () => safePush('/analytics' as any) },
     ];

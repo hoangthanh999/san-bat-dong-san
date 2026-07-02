@@ -251,7 +251,7 @@ Tạo file `.env` ở thư mục gốc (copy từ `.env.example`):
 # Backend API Gateway
 EXPO_PUBLIC_API_BASE_URL=
 EXPO_PUBLIC_API_FALLBACK_BASE_URL=
-EXPO_PUBLIC_ENABLE_API_FALLBACK=
+EXPO_PUBLIC_ENABLE_API_FALLBACK=false
 
 # Property Service
 EXPO_PUBLIC_PROPERTY_API_BASE_URL=
@@ -438,7 +438,7 @@ Kiểm tra trước khi gửi APK:
 - **Nếu cài APK bị chặn:** Vào Cài đặt → Bảo mật → Cho phép cài app từ nguồn không xác định.
 - **Nếu icon chưa đổi sau cài đặt:** Gỡ app cũ → Cài lại APK mới → Restart launcher hoặc restart điện thoại.
 - **Expo Go không hiển thị icon app riêng** — chỉ bản build native (APK/AAB) mới có icon HomeSwipe.
-- **Fallback server:** App tự động detect server production. Nếu production offline và có cấu hình `EXPO_PUBLIC_ENABLE_API_FALLBACK=true` + `EXPO_PUBLIC_API_FALLBACK_BASE_URL`, app sẽ chuyển sang server backup.
+- **Fallback server:** Tắt fallback cho APK demo. Giữ `EXPO_PUBLIC_ENABLE_API_FALLBACK=false` và để trống `EXPO_PUBLIC_API_FALLBACK_BASE_URL` để app chỉ dùng production `https://homeverse-bds.duckdns.org`.
 
 ---
 
@@ -482,4 +482,3 @@ Kiểm tra trước khi gửi APK:
 | 3 | ➕ Post | Đăng tin BĐS (FAB) |
 | 4 | 💬 Chat | Danh sách hội thoại |
 | 5 | 👤 Tôi | Hồ sơ cá nhân |
-

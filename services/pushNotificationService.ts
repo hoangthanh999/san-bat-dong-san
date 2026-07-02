@@ -263,14 +263,22 @@ export function handleNotificationNavigation(router: any, data: any) {
 
     try {
         const { type, roomId, chatPartnerId, appointmentId, contractId, transactionId } = data;
+        const normalizedType = String(type ?? '').trim().toUpperCase();
+
+        if (
+            contractId
+            || normalizedType === 'CONTRACT'
+            || normalizedType === 'CONTRACT_SIGN'
+            || normalizedType === 'BILL'
+            || normalizedType === 'BILL_NEW'
+        ) {
+            router.push('/notifications');
+            return;
+        }
 
         // Deep link by specific ID first
         if (appointmentId) {
             router.push(`/appointments/${appointmentId}`);
-            return;
-        }
-        if (contractId) {
-            router.push(`/contracts/${contractId}`);
             return;
         }
         if (transactionId) {
@@ -287,16 +295,10 @@ export function handleNotificationNavigation(router: any, data: any) {
         }
 
         // Fallback by type
-        switch (type) {
+        switch (normalizedType) {
             case 'APPOINTMENT':
             case 'APPOINTMENT_REMINDER':
                 router.push('/appointments');
-                break;
-            case 'CONTRACT':
-                router.push('/contracts');
-                break;
-            case 'BILL':
-                router.push('/wallet');
                 break;
             case 'SYSTEM':
             default:

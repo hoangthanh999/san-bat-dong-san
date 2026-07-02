@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import {
-    View, Text, StyleSheet, SectionList, TouchableOpacity,
+    View, Text, StyleSheet, SectionList, TouchableOpacity, Alert,
     StatusBar, Platform, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -70,6 +70,15 @@ const WALLET_HISTORY_TYPES = new Set([
     'WALLET_DEPOSIT',
 ]);
 
+const DEMO_DISABLED_ROUTE_PATTERN = /^\/(?:contracts|bills)(?:\/|$)/i;
+
+function showDemoDisabledMessage() {
+    Alert.alert(
+        'Tính năng đang phát triển',
+        'Hợp đồng điện tử và hóa đơn đang được hoàn thiện cho phiên bản tiếp theo.'
+    );
+}
+
 export default function NotificationsScreen() {
     return (
         <AuthGuardScreen
@@ -125,6 +134,11 @@ function NotificationsContent() {
             markAsRead(notif.id).catch(() => {});
         }
 
+        if (typeof notifAny.route === 'string' && DEMO_DISABLED_ROUTE_PATTERN.test(notifAny.route)) {
+            showDemoDisabledMessage();
+            return;
+        }
+
         if (notifAny.route) {
             safePush(notifAny.route as any);
             return;
@@ -154,7 +168,7 @@ function NotificationsContent() {
             case 'DEDUCTION':
             case 'BILL_NEW':
             case 'BILL':
-                safePush('/wallet/history' as any);
+                showDemoDisabledMessage();
                 break;
             case 'APPOINTMENT':
             case 'APPOINTMENT_CREATED':
@@ -172,7 +186,7 @@ function NotificationsContent() {
                 break;
             case 'CONTRACT':
             case 'CONTRACT_SIGN':
-                safePush(refId ? `/contracts/${refId}` as any : '/contracts' as any);
+                showDemoDisabledMessage();
                 break;
             default:
                 // Unknown type -> stay here
